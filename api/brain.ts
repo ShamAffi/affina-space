@@ -21,7 +21,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!email) return res.status(400).json({ error: 'email required' });
 
   const user = await db.query.users.findFirst({ where: eq(users.email, email) });
-  if (!user) return res.status(404).json({ error: 'user not found' });
+  if (!user) return res.status(200).json([]);
 
   const entries = await db.query.brainEntries.findMany({
     where: eq(brainEntries.userId, user.id),

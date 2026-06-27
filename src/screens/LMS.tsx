@@ -1,7 +1,7 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { MODULES } from '../data';
 import type { UserData, Lesson } from '../types';
-import { saveLessonInputToDB, toggleLessonCompleteToDB } from '../store';
+import { saveLessonInputToDB, toggleLessonCompleteToDB, syncUserToDB } from '../store';
 import ProfileButton from '../components/ProfileButton';
 import AccountPanel from '../components/AccountPanel';
 import DocumentsPanel from '../components/DocumentsPanel';
@@ -26,6 +26,9 @@ export default function LMS({ userData, onUpdateUserData }: Props) {
   // Save animation
   const [saveAnimLesson, setSaveAnimLesson] = useState<string | null>(null);
   const [savedToastLesson, setSavedToastLesson] = useState<string | null>(null);
+
+  // Ensure user exists in DB when LMS first loads (handles old sessions)
+  useEffect(() => { syncUserToDB(userData); }, []);
 
   const activeLesson = allLessons.find((l) => l.id === activeLessonId)!;
   const activeLessonIdx = allLessons.findIndex((l) => l.id === activeLessonId);

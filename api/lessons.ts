@@ -29,8 +29,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const db = getDb();
   const { action, email, lessonId, content } = req.body;
 
-  const user = await db.query.users.findFirst({ where: eq(users.email, email) });
-  if (!user) return res.status(404).json({ error: 'user not found' });
+  let user = await db.query.users.findFirst({ where: eq(users.email, email) });
+  if (!user) {
+    const [created] = await db.insert(users).values({ email }).returning();
+    user = created;
+  }
 
   // Save lesson input + write to brain_entries if this lesson has an entry type
   if (action === 'save-input') {
