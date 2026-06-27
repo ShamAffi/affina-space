@@ -1,5 +1,11 @@
 import type { Question, Module } from './types';
 
+// Maps input-type lesson IDs to their brain entry type.
+// Add new entries here as more input lessons are added across modules.
+export const BRAIN_ENTRY_TYPES: Record<string, string> = {
+  m1l2: 'value_proposition',
+};
+
 export const QUESTIONS: Question[] = [
   { id: 'idea', label: 'Describe your business idea', type: 'text' },
   { id: 'customer', label: 'Who is your perfect customer?', type: 'text' },

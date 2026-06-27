@@ -2,11 +2,21 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
 import { eq, and } from 'drizzle-orm';
-import { users, lessonInputs, completedLessons } from '../src/db/schema';
+import { users, lessonInputs, completedLessons, brainEntries } from '../src/db/schema';
+import { BRAIN_ENTRY_TYPES } from '../src/data';
+import { MODULES } from '../src/data';
 
 function getDb() {
   const sql = neon(process.env.DATABASE_URL!);
-  return drizzle(sql, { schema: { users, lessonInputs, completedLessons } });
+  return drizzle(sql, { schema: { users, lessonInputs, completedLessons, brainEntries } });
+}
+
+function getLessonMeta(lessonId: string): { title: string; prompt: string } | null {
+  for (const mod of MODULES) {
+    const lesson = mod.lessons.find((l) => l.id === lessonId);
+    if (lesson) return { title: lesson.title, prompt: lesson.inputPrompt ?? '' };
+  }
+  return null;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -19,11 +29,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const db = getDb();
   const { action, email, lessonId, content } = req.body;
 
-  // Resolve userId from email
   const user = await db.query.users.findFirst({ where: eq(users.email, email) });
   if (!user) return res.status(404).json({ error: 'user not found' });
 
-  // Save lesson input text
+  // Save lesson input + write to brain_entries if this lesson has an entry type
   if (action === 'save-input') {
     const existing = await db.query.lessonInputs.findFirst({
       where: and(eq(lessonInputs.userId, user.id), eq(lessonInputs.lessonId, lessonId)),
@@ -35,6 +44,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } else {
       await db.insert(lessonInputs).values({ userId: user.id, lessonId, content });
     }
+
+    // Write to brain_entries if this lesson maps to a brain entry type
+    const entryType = BRAIN_ENTRY_TYPES[lessonId];
+    if (entryType && content.trim()) {
+      const meta = getLessonMeta(lessonId);
+      if (meta) {
+        const existingBrain = await db.query.brainEntries.findFirst({
+          where: and(eq(brainEntries.userId, user.id), eq(brainEntries.lessonId, lessonId)),
+        });
+        if (existingBrain) {
+          await db.update(brainEntries)
+            .set({ content, processedByAi: false, updatedAt: new Date() })
+            .where(and(eq(brainEntries.userId, user.id), eq(brainEntries.lessonId, lessonId)));
+        } else {
+          await db.insert(brainEntries).values({
+            userId: user.id,
+            lessonId,
+            lessonTitle: meta.title,
+            prompt: meta.prompt,
+            content,
+            entryType,
+          });
+        }
+      }
+    }
+
     return res.status(200).json({ ok: true });
   }
 
