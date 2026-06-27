@@ -1,0 +1,57 @@
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { neon } from '@neondatabase/serverless';
+import { drizzle } from 'drizzle-orm/neon-http';
+import { eq, and } from 'drizzle-orm';
+import { users, lessonInputs, completedLessons } from '../src/db/schema';
+
+function getDb() {
+  const sql = neon(process.env.DATABASE_URL!);
+  return drizzle(sql, { schema: { users, lessonInputs, completedLessons } });
+}
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'method not allowed' });
+
+  const db = getDb();
+  const { action, email, lessonId, content } = req.body;
+
+  // Resolve userId from email
+  const user = await db.query.users.findFirst({ where: eq(users.email, email) });
+  if (!user) return res.status(404).json({ error: 'user not found' });
+
+  // Save lesson input text
+  if (action === 'save-input') {
+    const existing = await db.query.lessonInputs.findFirst({
+      where: and(eq(lessonInputs.userId, user.id), eq(lessonInputs.lessonId, lessonId)),
+    });
+    if (existing) {
+      await db.update(lessonInputs)
+        .set({ content, updatedAt: new Date() })
+        .where(and(eq(lessonInputs.userId, user.id), eq(lessonInputs.lessonId, lessonId)));
+    } else {
+      await db.insert(lessonInputs).values({ userId: user.id, lessonId, content });
+    }
+    return res.status(200).json({ ok: true });
+  }
+
+  // Toggle lesson completion
+  if (action === 'toggle-complete') {
+    const existing = await db.query.completedLessons.findFirst({
+      where: and(eq(completedLessons.userId, user.id), eq(completedLessons.lessonId, lessonId)),
+    });
+    if (existing) {
+      await db.delete(completedLessons)
+        .where(and(eq(completedLessons.userId, user.id), eq(completedLessons.lessonId, lessonId)));
+      return res.status(200).json({ completed: false });
+    } else {
+      await db.insert(completedLessons).values({ userId: user.id, lessonId });
+      return res.status(200).json({ completed: true });
+    }
+  }
+
+  return res.status(400).json({ error: 'unknown action' });
+}

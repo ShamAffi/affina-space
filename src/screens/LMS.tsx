@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { MODULES } from '../data';
 import type { UserData, Lesson } from '../types';
+import { saveLessonInputToDB, toggleLessonCompleteToDB } from '../store';
 
 interface Props {
   userData: UserData;
@@ -32,6 +33,7 @@ export default function LMS({ userData, onUpdateUserData }: Props) {
     onUpdateUserData({
       lessonInputs: { ...userData.lessonInputs, [lessonId]: val },
     });
+    saveLessonInputToDB(userData.email, lessonId, val);
   }
 
   function toggleComplete() {
@@ -41,6 +43,7 @@ export default function LMS({ userData, onUpdateUserData }: Props) {
         ? userData.completedLessons.filter((id) => id !== activeLessonId)
         : [...userData.completedLessons, activeLessonId],
     });
+    toggleLessonCompleteToDB(userData.email, activeLessonId);
   }
 
   function openLesson(id: string) {

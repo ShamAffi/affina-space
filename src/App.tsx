@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Screen, UserData } from './types';
-import { loadUserData, updateUserData } from './store';
+import { loadUserData, updateUserData, syncUserToDB } from './store';
 import { QUESTIONS } from './data';
 import Welcome from './screens/Welcome';
 import Question from './screens/Question';
@@ -71,7 +71,9 @@ export default function App() {
       return (
         <Analyzing
           onDone={() => {
-            update({ score: 80 });
+            const next = updateUserData({ score: 80 });
+            setUserData(next);
+            syncUserToDB(next);
             advance();
           }}
         />
