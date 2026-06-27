@@ -3,6 +3,7 @@ import { pgTable, serial, text, integer, timestamp, unique, boolean } from 'driz
 export const users = pgTable('users', {
   id: serial('id').primaryKey(),
   email: text('email').notNull().unique(),
+  name: text('name').default(''),
   idea: text('idea').default(''),
   customer: text('customer').default(''),
   businessModel: text('business_model').default(''),
@@ -27,8 +28,6 @@ export const completedLessons = pgTable('completed_lessons', {
   completedAt: timestamp('completed_at').defaultNow(),
 }, (t) => [unique().on(t.userId, t.lessonId)]);
 
-// Company Brain — structured user answers from input-type lessons,
-// designed to feed AI personalization in future phases.
 export const brainEntries = pgTable('brain_entries', {
   id: serial('id').primaryKey(),
   userId: integer('user_id').references(() => users.id, { onDelete: 'cascade' }),
@@ -36,11 +35,25 @@ export const brainEntries = pgTable('brain_entries', {
   lessonTitle: text('lesson_title').notNull(),
   prompt: text('prompt').notNull(),
   content: text('content').notNull().default(''),
-  // Semantic type — makes it easy to query specific facts about the founder
-  // e.g. 'value_proposition', 'target_customer', 'offer', etc.
   entryType: text('entry_type').notNull(),
-  // Flag for future AI processing pipeline
   processedByAi: boolean('processed_by_ai').default(false),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 }, (t) => [unique().on(t.userId, t.lessonId)]);
+
+// Content tables — editable via Neon dashboard
+export const modulesContent = pgTable('modules_content', {
+  id: text('id').primaryKey(),
+  order: integer('order').notNull(),
+  title: text('title').notNull(),
+});
+
+export const lessonsContent = pgTable('lessons_content', {
+  id: text('id').primaryKey(),
+  moduleId: text('module_id').references(() => modulesContent.id, { onDelete: 'cascade' }),
+  order: integer('order').notNull(),
+  title: text('title').notNull(),
+  type: text('type').notNull(),
+  body: text('body').notNull(),
+  inputPrompt: text('input_prompt'),
+});

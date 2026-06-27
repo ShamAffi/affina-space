@@ -10,6 +10,7 @@ export type Screen =
   | 'lms';
 
 export type UserData = {
+  name: string;
   idea: string;
   customer: string;
   businessModel: string;
@@ -43,4 +44,14 @@ export type Question = {
   label: string;
   type: 'text' | 'choice';
   options?: string[];
+};
+
+export type BrainEntry = {
+  id: number;
+  lessonId: string;
+  lessonTitle: string;
+  prompt: string;
+  content: string;
+  entryType: string;
+  updatedAt: string;
 };

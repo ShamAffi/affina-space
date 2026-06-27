@@ -1,7 +1,10 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { MODULES } from '../data';
 import type { UserData, Lesson } from '../types';
 import { saveLessonInputToDB, toggleLessonCompleteToDB } from '../store';
+import ProfileButton from '../components/ProfileButton';
+import AccountPanel from '../components/AccountPanel';
+import DocumentsPanel from '../components/DocumentsPanel';
 
 interface Props {
   userData: UserData;
@@ -15,14 +18,27 @@ export default function LMS({ userData, onUpdateUserData }: Props) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [inputDraft, setInputDraft] = useState<Record<string, string>>({});
 
+  // Profile
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [panel, setPanel] = useState<'none' | 'account' | 'documents'>('none');
+  const [avatarPing, setAvatarPing] = useState(false);
+
+  // Save animation
+  const [saveAnimLesson, setSaveAnimLesson] = useState<string | null>(null);
+  const [savedToastLesson, setSavedToastLesson] = useState<string | null>(null);
+
   const activeLesson = allLessons.find((l) => l.id === activeLessonId)!;
   const activeLessonIdx = allLessons.findIndex((l) => l.id === activeLessonId);
   const nextLesson = allLessons[activeLessonIdx + 1];
   const isCompleted = userData.completedLessons.includes(activeLessonId);
+  const activeModule = MODULES.find((m) => m.lessons.some((l) => l.id === activeLessonId));
 
-  const activeModule = MODULES.find((m) =>
-    m.lessons.some((l) => l.id === activeLessonId),
-  );
+  function isModuleLocked(modIdx: number): boolean {
+    if (modIdx === 0) return false;
+    return !MODULES[modIdx - 1].lessons.every((l) =>
+      userData.completedLessons.includes(l.id),
+    );
+  }
 
   function getInputValue(lessonId: string): string {
     return inputDraft[lessonId] ?? userData.lessonInputs[lessonId] ?? '';
@@ -30,10 +46,18 @@ export default function LMS({ userData, onUpdateUserData }: Props) {
 
   function handleSaveInput(lessonId: string) {
     const val = getInputValue(lessonId);
-    onUpdateUserData({
-      lessonInputs: { ...userData.lessonInputs, [lessonId]: val },
-    });
+    onUpdateUserData({ lessonInputs: { ...userData.lessonInputs, [lessonId]: val } });
     saveLessonInputToDB(userData.email, lessonId, val);
+
+    // Trigger animation
+    setSaveAnimLesson(lessonId);
+    setTimeout(() => {
+      setSaveAnimLesson(null);
+      setAvatarPing(true);
+      setSavedToastLesson(lessonId);
+      setTimeout(() => setAvatarPing(false), 600);
+      setTimeout(() => setSavedToastLesson(null), 3500);
+    }, 750);
   }
 
   function toggleComplete() {
@@ -51,11 +75,12 @@ export default function LMS({ userData, onUpdateUserData }: Props) {
     setSidebarOpen(false);
   }
 
+  const handleToggleMenu = useCallback(() => setProfileMenuOpen((v) => !v), []);
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Top bar */}
       <header className="bg-white border-b border-gray-100 flex items-center gap-3 px-4 sm:px-6 py-4 sticky top-0 z-30">
-        {/* Mobile menu toggle */}
         <button
           onClick={() => setSidebarOpen((v) => !v)}
           className="md:hidden w-9 h-9 flex items-center justify-center rounded-xl hover:bg-gray-100 text-gray-600 transition"
@@ -83,23 +108,29 @@ export default function LMS({ userData, onUpdateUserData }: Props) {
           <span className="text-gray-500 truncate max-w-[180px]">{activeLesson.title}</span>
         </div>
 
-        {/* Progress chip */}
-        <div className="ml-auto flex items-center gap-2 text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-full px-3 py-1">
-          <span className="text-purple-600 font-semibold">
-            {userData.completedLessons.length}
-          </span>
-          <span>/</span>
-          <span>{allLessons.length} completed</span>
+        <div className="ml-auto flex items-center gap-3">
+          {/* Progress chip */}
+          <div className="flex items-center gap-2 text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-full px-3 py-1">
+            <span className="text-purple-600 font-semibold">{userData.completedLessons.length}</span>
+            <span>/</span>
+            <span>{allLessons.length} completed</span>
+          </div>
+
+          {/* Profile avatar */}
+          <ProfileButton
+            avatarPing={avatarPing}
+            menuOpen={profileMenuOpen}
+            onToggleMenu={handleToggleMenu}
+            onAccount={() => setPanel('account')}
+            onDocuments={() => setPanel('documents')}
+          />
         </div>
       </header>
 
       <div className="flex flex-1 overflow-hidden relative">
         {/* Mobile overlay */}
         {sidebarOpen && (
-          <div
-            className="fixed inset-0 bg-black/30 z-20 md:hidden"
-            onClick={() => setSidebarOpen(false)}
-          />
+          <div className="fixed inset-0 bg-black/30 z-20 md:hidden" onClick={() => setSidebarOpen(false)} />
         )}
 
         {/* Sidebar */}
@@ -109,36 +140,37 @@ export default function LMS({ userData, onUpdateUserData }: Props) {
             w-72 md:w-72 bg-white border-r border-gray-100
             transform transition-transform duration-300
             ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
-            overflow-y-auto flex-shrink-0
-            pt-16 md:pt-0
+            overflow-y-auto flex-shrink-0 pt-16 md:pt-0
           `}
         >
           <div className="p-4">
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest px-2 mb-4">
-              Program
-            </p>
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest px-2 mb-4">Program</p>
 
-            {MODULES.map((mod) => {
+            {MODULES.map((mod, modIdx) => {
+              const locked = isModuleLocked(modIdx);
               const modCompleted = mod.lessons.filter((l) =>
                 userData.completedLessons.includes(l.id),
               ).length;
 
               return (
                 <div key={mod.id} className="mb-6">
-                  {/* Module header */}
                   <div className="flex items-center gap-2 px-2 mb-2">
-                    <span className="text-xs font-bold text-purple-500 bg-purple-50 rounded-md px-1.5 py-0.5">
+                    <span className={`text-xs font-bold rounded-md px-1.5 py-0.5 ${locked ? 'text-gray-400 bg-gray-100' : 'text-purple-500 bg-purple-50'}`}>
                       {String(mod.order).padStart(2, '0')}
                     </span>
-                    <span className="text-sm font-semibold text-gray-900 flex-1">
+                    <span className={`text-sm font-semibold flex-1 ${locked ? 'text-gray-400' : 'text-gray-900'}`}>
                       {mod.title}
                     </span>
-                    <span className="text-xs text-gray-400">
-                      {modCompleted}/{mod.lessons.length}
-                    </span>
+                    {locked ? (
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2">
+                        <rect x="3" y="11" width="18" height="11" rx="2" />
+                        <path d="M7 11V7a5 5 0 0110 0v4" />
+                      </svg>
+                    ) : (
+                      <span className="text-xs text-gray-400">{modCompleted}/{mod.lessons.length}</span>
+                    )}
                   </div>
 
-                  {/* Lessons */}
                   <div className="flex flex-col gap-0.5">
                     {mod.lessons.map((lesson) => {
                       const done = userData.completedLessons.includes(lesson.id);
@@ -147,22 +179,21 @@ export default function LMS({ userData, onUpdateUserData }: Props) {
                       return (
                         <button
                           key={lesson.id}
-                          onClick={() => openLesson(lesson.id)}
+                          onClick={() => !locked && openLesson(lesson.id)}
+                          disabled={locked}
                           className={`w-full text-left flex items-start gap-2.5 px-3 py-2.5 rounded-xl text-sm transition-all duration-150 ${
-                            active
-                              ? 'bg-purple-50 text-purple-700 font-medium'
-                              : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                            locked
+                              ? 'text-gray-300 cursor-not-allowed'
+                              : active
+                                ? 'bg-purple-50 text-purple-700 font-medium'
+                                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                           }`}
                         >
-                          <span
-                            className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 text-xs transition-all ${
-                              done
-                                ? 'bg-purple-600 border-purple-600 text-white'
-                                : active
-                                  ? 'border-purple-500'
-                                  : 'border-gray-200'
-                            }`}
-                          >
+                          <span className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 text-xs transition-all ${
+                            done ? 'bg-purple-600 border-purple-600 text-white' :
+                            active ? 'border-purple-500' :
+                            locked ? 'border-gray-200' : 'border-gray-200'
+                          }`}>
                             {done ? '✓' : ''}
                           </span>
                           <span className="leading-snug">{lesson.title}</span>
@@ -179,7 +210,6 @@ export default function LMS({ userData, onUpdateUserData }: Props) {
         {/* Lesson content */}
         <main className="flex-1 overflow-y-auto">
           <div className="max-w-2xl mx-auto px-5 sm:px-8 py-10 animate-fade-in" key={activeLessonId}>
-            {/* Lesson meta */}
             <div className="flex items-center gap-2 mb-6">
               <span className="text-xs font-semibold text-purple-500 bg-purple-50 rounded-full px-3 py-1">
                 {activeModule?.title}
@@ -195,28 +225,21 @@ export default function LMS({ userData, onUpdateUserData }: Props) {
               {activeLesson.title}
             </h1>
 
-            {/* Optional media placeholder */}
             {activeLesson.media && (
               <div className="w-full h-48 bg-gray-100 rounded-2xl flex items-center justify-center text-gray-400 mb-6 border border-gray-200">
-                <span className="text-sm">
-                  {activeLesson.media.kind === 'video' ? '▶ Video' : '🖼 Image'}
-                </span>
+                <span className="text-sm">{activeLesson.media.kind === 'video' ? '▶ Video' : '🖼 Image'}</span>
               </div>
             )}
 
-            <div className="prose prose-gray max-w-none mb-8">
-              <p className="text-gray-700 text-base sm:text-lg leading-relaxed">
-                {activeLesson.body}
-              </p>
-            </div>
+            <p className="text-gray-700 text-base sm:text-lg leading-relaxed mb-8">
+              {activeLesson.body}
+            </p>
 
             {/* Input lesson */}
             {activeLesson.type === 'input' && (
-              <div className="bg-purple-50 border border-purple-100 rounded-2xl p-5 mb-8">
+              <div className="bg-purple-50 border border-purple-100 rounded-2xl p-5 mb-8 relative">
                 {activeLesson.inputPrompt && (
-                  <p className="text-sm font-semibold text-purple-700 mb-3">
-                    {activeLesson.inputPrompt}
-                  </p>
+                  <p className="text-sm font-semibold text-purple-700 mb-3">{activeLesson.inputPrompt}</p>
                 )}
                 <textarea
                   className="w-full bg-white border border-purple-200 focus:border-purple-400 focus:ring-2 focus:ring-purple-100 rounded-xl px-4 py-3 text-sm text-gray-800 placeholder-gray-400 outline-none resize-none transition min-h-[120px]"
@@ -226,14 +249,37 @@ export default function LMS({ userData, onUpdateUserData }: Props) {
                     setInputDraft((d) => ({ ...d, [activeLessonId]: e.target.value }))
                   }
                 />
-                <button
-                  onClick={() => handleSaveInput(activeLessonId)}
-                  className="mt-3 bg-purple-600 hover:bg-purple-700 active:scale-95 text-white text-sm font-semibold px-6 py-2.5 rounded-xl transition-all duration-150"
-                >
-                  Save
-                </button>
-                {userData.lessonInputs[activeLessonId] && !inputDraft[activeLessonId] && (
-                  <p className="mt-2 text-xs text-purple-500">Saved ✓</p>
+
+                <div className="relative mt-3">
+                  <button
+                    onClick={() => handleSaveInput(activeLessonId)}
+                    className="relative bg-purple-600 hover:bg-purple-700 active:scale-95 text-white text-sm font-semibold px-6 py-2.5 rounded-xl transition-all duration-150"
+                  >
+                    Save
+                    {/* Flying document icon */}
+                    {saveAnimLesson === activeLessonId && (
+                      <span
+                        className="absolute -top-1 -right-1 pointer-events-none animate-doc-fly"
+                        style={{ display: 'inline-flex' }}
+                      >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="white" stroke="#9333ea" strokeWidth="1.5">
+                          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                          <polyline points="14 2 14 8 20 8" />
+                        </svg>
+                      </span>
+                    )}
+                  </button>
+                </div>
+
+                {/* Saved toast */}
+                {savedToastLesson === activeLessonId && (
+                  <p className="mt-3 text-sm text-purple-600 font-medium animate-fade-in flex items-center gap-1.5">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                      <polyline points="14 2 14 8 20 8" />
+                    </svg>
+                    Твоя информация сохранилась в Documents
+                  </p>
                 )}
               </div>
             )}
@@ -270,6 +316,21 @@ export default function LMS({ userData, onUpdateUserData }: Props) {
           </div>
         </main>
       </div>
+
+      {/* Panels */}
+      {panel === 'account' && (
+        <AccountPanel
+          userData={userData}
+          onClose={() => setPanel('none')}
+          onSave={onUpdateUserData}
+        />
+      )}
+      {panel === 'documents' && (
+        <DocumentsPanel
+          email={userData.email}
+          onClose={() => setPanel('none')}
+        />
+      )}
     </div>
   );
 }

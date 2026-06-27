@@ -3,6 +3,7 @@ import type { UserData } from './types';
 const STORAGE_KEY = 'userData';
 
 export const defaultUserData: UserData = {
+  name: '',
   idea: '',
   customer: '',
   businessModel: '',
