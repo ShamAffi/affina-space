@@ -2,9 +2,8 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
 import { eq, and } from 'drizzle-orm';
-import { users, lessonInputs, completedLessons, brainEntries } from '../src/db/schema';
-import { BRAIN_ENTRY_TYPES } from '../src/data';
-import { MODULES } from '../src/data';
+import { users, lessonInputs, completedLessons, brainEntries } from '../src/db/schema.js';
+import { BRAIN_ENTRY_TYPES, MODULES } from '../src/data.js';
 
 function getDb() {
   const sql = neon(process.env.DATABASE_URL!);

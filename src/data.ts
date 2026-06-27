@@ -1,4 +1,4 @@
-import type { Question, Module } from './types';
+import type { Question, Module } from './types.js';
 
 // Maps input-type lesson IDs to their brain entry type.
 // Add new entries here as more input lessons are added across modules.
