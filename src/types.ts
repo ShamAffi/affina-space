@@ -21,7 +21,7 @@ export type UserData = {
   completedLessons: string[];
 };
 
-export type LessonType = 'text' | 'input';
+export type LessonType = 'text' | 'input' | 'structured';
 
 export type Lesson = {
   id: string;
@@ -30,6 +30,8 @@ export type Lesson = {
   body: string;
   media?: { kind: 'image' | 'video'; url: string };
   inputPrompt?: string;
+  inputPlaceholder?: string;
+  aiMode?: 'feedback' | 'compare';
 };
 
 export type Module = {
@@ -53,6 +55,22 @@ export type AiFeedback = {
   verdict: FeedbackVerdict;
   good: string[];
   missing: string[];
+  nextStep: string;
+};
+
+export type CompareCandidate = {
+  label: string;
+  painIntensity: number;
+  reachability: number;
+  abilityToPay: number;
+  wordOfMouth: number;
+  total: number;
+};
+
+export type CompareResult = {
+  candidates: CompareCandidate[];
+  recommendation: string;
+  runnerUp: string;
   nextStep: string;
 };
 

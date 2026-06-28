@@ -1,11 +1,12 @@
 import { useState, useCallback, useEffect } from 'react';
 import { MODULES } from '../data';
-import type { UserData, Lesson, AiFeedback } from '../types';
+import type { UserData, Lesson, AiFeedback, CompareResult } from '../types';
 import { saveLessonInputToDB, toggleLessonCompleteToDB, syncUserToDB } from '../store';
 import ProfileButton from '../components/ProfileButton';
 import AccountPanel from '../components/AccountPanel';
 import DocumentsPanel from '../components/DocumentsPanel';
 import FeedbackCard from '../components/FeedbackCard';
+import CompareCard from '../components/CompareCard';
 
 interface Props {
   userData: UserData;
@@ -29,6 +30,7 @@ export default function LMS({ userData, onUpdateUserData }: Props) {
   // AI feedback state machine
   const [savingLesson, setSavingLesson] = useState<string | null>(null);
   const [feedbackByLesson, setFeedbackByLesson] = useState<Record<string, AiFeedback & { previousScore?: number }>>({});
+  const [compareByLesson, setCompareByLesson] = useState<Record<string, CompareResult>>({});
   const [refiningLesson, setRefiningLesson] = useState<string | null>(null);
 
   // Ensure user exists in DB when LMS first loads (handles old sessions)
@@ -72,6 +74,7 @@ export default function LMS({ userData, onUpdateUserData }: Props) {
       setSavingLesson(lessonId);
 
       const lesson = allLessons.find((l) => l.id === lessonId)!;
+      const isCompare = lesson.aiMode === 'compare';
       fetch('/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -81,18 +84,23 @@ export default function LMS({ userData, onUpdateUserData }: Props) {
           lessonTitle: lesson.title,
           prompt: lesson.inputPrompt ?? '',
           answer: val,
+          aiMode: lesson.aiMode ?? 'feedback',
         }),
       })
         .then((r) => {
           if (!r.ok) throw new Error('api error');
-          return r.json() as Promise<AiFeedback>;
+          return r.json();
         })
         .then((data) => {
           setSavingLesson(null);
-          setFeedbackByLesson((prev) => ({
-            ...prev,
-            [lessonId]: { ...data, previousScore: oldScore },
-          }));
+          if (isCompare) {
+            setCompareByLesson((prev) => ({ ...prev, [lessonId]: data as CompareResult }));
+          } else {
+            setFeedbackByLesson((prev) => ({
+              ...prev,
+              [lessonId]: { ...(data as AiFeedback), previousScore: oldScore },
+            }));
+          }
         })
         .catch(() => setSavingLesson(null));
     }, 750);
@@ -254,7 +262,7 @@ export default function LMS({ userData, onUpdateUserData }: Props) {
               <span className="text-xs font-semibold text-purple-500 bg-purple-50 rounded-full px-3 py-1">
                 {activeModule?.title}
               </span>
-              {activeLesson.type === 'input' && (
+              {(activeLesson.type === 'input' || activeLesson.type === 'structured') && (
                 <span className="text-xs font-semibold text-amber-600 bg-amber-50 rounded-full px-3 py-1">
                   Exercise
                 </span>
@@ -275,13 +283,25 @@ export default function LMS({ userData, onUpdateUserData }: Props) {
               {activeLesson.body}
             </p>
 
-            {/* Input lesson — state machine: input → saving → feedback ⟲ refine */}
-            {activeLesson.type === 'input' && (() => {
+            {/* Exercise lesson — state machine: input → saving → feedback/compare ⟲ refine */}
+            {(activeLesson.type === 'input' || activeLesson.type === 'structured') && (() => {
+              const isCompareMode = activeLesson.aiMode === 'compare';
               const lessonFeedback = feedbackByLesson[activeLessonId];
+              const lessonCompare = compareByLesson[activeLessonId];
               const isSaving = savingLesson === activeLessonId;
               const isRefining = refiningLesson === activeLessonId;
-              const showFeedback = !!lessonFeedback && !isRefining && !isSaving;
-              const showInput = !isSaving && !showFeedback;
+              const hasResult = isCompareMode ? !!lessonCompare : !!lessonFeedback;
+              const showResult = hasResult && !isRefining && !isSaving;
+              const showInput = !isSaving && !showResult;
+
+              const onContinue = () => {
+                setRefiningLesson(null);
+                if (!isCompleted) {
+                  onUpdateUserData({ completedLessons: [...userData.completedLessons, activeLessonId] });
+                  toggleLessonCompleteToDB(userData.email, activeLessonId);
+                }
+                if (nextLesson) openLesson(nextLesson.id);
+              };
 
               return (
                 <>
@@ -293,8 +313,8 @@ export default function LMS({ userData, onUpdateUserData }: Props) {
                     </div>
                   )}
 
-                  {/* 2. Feedback card */}
-                  {showFeedback && lessonFeedback && (
+                  {/* 2a. Feedback card (feedback mode) */}
+                  {showResult && !isCompareMode && lessonFeedback && (
                     <FeedbackCard
                       lessonTitle={activeLesson.title}
                       prompt={activeLesson.inputPrompt ?? ''}
@@ -302,14 +322,19 @@ export default function LMS({ userData, onUpdateUserData }: Props) {
                       feedback={lessonFeedback}
                       previousScore={lessonFeedback.previousScore}
                       onRefine={() => setRefiningLesson(activeLessonId)}
-                      onContinue={() => {
-                        setRefiningLesson(null);
-                        if (!isCompleted) {
-                          onUpdateUserData({ completedLessons: [...userData.completedLessons, activeLessonId] });
-                          toggleLessonCompleteToDB(userData.email, activeLessonId);
-                        }
-                        if (nextLesson) openLesson(nextLesson.id);
-                      }}
+                      onContinue={onContinue}
+                    />
+                  )}
+
+                  {/* 2b. Compare card (compare mode) */}
+                  {showResult && isCompareMode && lessonCompare && (
+                    <CompareCard
+                      lessonTitle={activeLesson.title}
+                      prompt={activeLesson.inputPrompt ?? ''}
+                      answer={getInputValue(activeLessonId)}
+                      result={lessonCompare}
+                      onRefine={() => setRefiningLesson(activeLessonId)}
+                      onContinue={onContinue}
                     />
                   )}
 
@@ -319,7 +344,7 @@ export default function LMS({ userData, onUpdateUserData }: Props) {
                       {activeLesson.inputPrompt && (
                         <p className="text-sm font-semibold text-purple-700 mb-3">{activeLesson.inputPrompt}</p>
                       )}
-                      {isRefining && lessonFeedback && (
+                      {isRefining && lessonFeedback && !isCompareMode && (
                         <div className="flex items-center gap-2 mb-3 text-xs text-gray-400">
                           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 102.13-9.36L1 10" />
@@ -328,8 +353,10 @@ export default function LMS({ userData, onUpdateUserData }: Props) {
                         </div>
                       )}
                       <textarea
-                        className="w-full bg-white border border-purple-200 focus:border-purple-400 focus:ring-2 focus:ring-purple-100 rounded-xl px-4 py-3 text-sm text-gray-800 placeholder-gray-400 outline-none resize-none transition min-h-[120px]"
-                        placeholder="Write your answer here…"
+                        className={`w-full bg-white border border-purple-200 focus:border-purple-400 focus:ring-2 focus:ring-purple-100 rounded-xl px-4 py-3 text-sm text-gray-800 placeholder-gray-400 outline-none resize-none transition ${
+                          activeLesson.type === 'structured' ? 'min-h-[200px]' : 'min-h-[120px]'
+                        }`}
+                        placeholder={activeLesson.inputPlaceholder ?? 'Write your answer here…'}
                         value={getInputValue(activeLessonId)}
                         onChange={(e) => setInputDraft((d) => ({ ...d, [activeLessonId]: e.target.value }))}
                       />
@@ -339,7 +366,7 @@ export default function LMS({ userData, onUpdateUserData }: Props) {
                           disabled={!getInputValue(activeLessonId).trim()}
                           className="relative bg-purple-600 hover:bg-purple-700 active:scale-95 disabled:opacity-40 text-white text-sm font-semibold px-6 py-2.5 rounded-xl transition-all duration-150"
                         >
-                          {isRefining ? 'Save & get new score' : 'Save'}
+                          {isRefining ? (isCompareMode ? 'Revise & re-score' : 'Save & get new score') : 'Save'}
                           {saveAnimLesson === activeLessonId && (
                             <span className="absolute -top-1 -right-1 pointer-events-none animate-doc-fly" style={{ display: 'inline-flex' }}>
                               <svg width="20" height="20" viewBox="0 0 24 24" fill="white" stroke="#9333ea" strokeWidth="1.5">
@@ -358,7 +385,9 @@ export default function LMS({ userData, onUpdateUserData }: Props) {
 
             {/* Action buttons — hidden while saving or showing feedback */}
             <div className={`flex flex-wrap items-center gap-3 pt-2 border-t border-gray-100 mt-2 ${
-              (savingLesson === activeLessonId || (feedbackByLesson[activeLessonId] && refiningLesson !== activeLessonId)) ? 'hidden' : ''
+              (savingLesson === activeLessonId ||
+               ((feedbackByLesson[activeLessonId] || compareByLesson[activeLessonId]) && refiningLesson !== activeLessonId)
+              ) ? 'hidden' : ''
             }`}>
               <button
                 onClick={toggleComplete}

@@ -16,12 +16,28 @@ const FeedbackSchema = z.object({
 
 export type AiFeedback = z.infer<typeof FeedbackSchema>;
 
+const CompareSchema = z.object({
+  candidates: z.array(z.object({
+    label: z.string(),
+    painIntensity: z.number().int().min(1).max(5),
+    reachability: z.number().int().min(1).max(5),
+    abilityToPay: z.number().int().min(1).max(5),
+    wordOfMouth: z.number().int().min(1).max(5),
+    total: z.number().int().min(4).max(20),
+  })).min(1).max(4),
+  recommendation: z.string(),
+  runnerUp: z.string(),
+  nextStep: z.string(),
+});
+
+export type CompareResult = z.infer<typeof CompareSchema>;
+
 function getDb() {
   const sql = neon(process.env.DATABASE_URL!);
   return drizzle(sql, { schema: { users, brainEntries } });
 }
 
-const SYSTEM_PROMPT = `You are Affina — a warm but honest startup mentor for early-stage female founders.
+const FEEDBACK_SYSTEM_PROMPT = `You are Affina — a warm but honest startup mentor for early-stage female founders.
 Your job: evaluate a founder's exercise answer and return structured feedback.
 
 Rules:
@@ -32,6 +48,26 @@ Rules:
 - Tone: warm but direct. "This describes the product, not the value to the person" — not "Great work!".
 - Respond ONLY with valid JSON, no other text.`;
 
+const COMPARE_SYSTEM_PROMPT = `You are Affina — a startup mentor for early-stage female founders.
+Your job: score 3 candidate customer segments and recommend the best beachhead to start with.
+
+Score each candidate on 4 criteria (1–5 scale):
+- painIntensity: How intense and frequent is their pain? (5 = actively hunting for a solution today)
+- reachability: Can the founder reach them without a big budget? (5 = direct, low-cost access)
+- abilityToPay: Real willingness and means to pay? (5 = already spending on this problem)
+- wordOfMouth: Will a delighted customer tell others like her? (5 = tight network, high trust)
+
+Calculate total = sum of the 4 scores (max 20).
+Recommend the candidate with the highest total as the beachhead.
+If tied, prefer the one with the highest painIntensity.
+
+Rules:
+- Be honest — don't inflate scores. A 5 should be exceptional.
+- Use the founder's own words for the candidate label (keep it short, e.g. "Moms on maternity leave").
+- Recommend exactly one candidate; name the runner-up with a one-sentence reason.
+- Give one concrete next step the founder can take in the next 7 days.
+- Respond ONLY with valid JSON, no other text.`;
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
@@ -39,15 +75,50 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'method not allowed' });
 
-  const { email, lessonId, lessonTitle, prompt, answer } = req.body;
+  const { email, lessonId, lessonTitle, prompt, answer, aiMode } = req.body;
   if (!email || !lessonId || !answer?.trim()) {
     return res.status(400).json({ error: 'email, lessonId, and answer are required' });
   }
 
-  // Call Claude
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const isCompare = aiMode === 'compare';
 
-  const userMessage = `Lesson: ${lessonTitle}
+  let result: AiFeedback | CompareResult;
+
+  try {
+    if (isCompare) {
+      const userMessage = `Lesson: ${lessonTitle}
+Exercise: ${prompt}
+Founder's answer: "${answer}"
+
+Return JSON with exactly this structure:
+{
+  "candidates": [
+    {
+      "label": "<short name from their words>",
+      "painIntensity": <1-5>,
+      "reachability": <1-5>,
+      "abilityToPay": <1-5>,
+      "wordOfMouth": <1-5>,
+      "total": <sum of above 4>
+    }
+  ],
+  "recommendation": "<We'd start with [label], because [1-2 sentence reason using her words]>",
+  "runnerUp": "<Runner-up label + one-sentence reason>",
+  "nextStep": "<one concrete action for the next 7 days>"
+}`;
+      const message = await client.messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1024,
+        system: COMPARE_SYSTEM_PROMPT,
+        messages: [{ role: 'user', content: userMessage }],
+      });
+      const raw = message.content[0].type === 'text' ? message.content[0].text : '';
+      const match = raw.match(/\{[\s\S]*\}/);
+      if (!match) throw new Error('no JSON in response');
+      result = CompareSchema.parse(JSON.parse(match[0]));
+    } else {
+      const userMessage = `Lesson: ${lessonTitle}
 Exercise: ${prompt}
 Founder's answer: "${answer}"
 
@@ -61,25 +132,22 @@ Return JSON with exactly this structure:
   "missing": [<1-3 specific gaps referencing what they wrote — not generic advice>],
   "nextStep": "<one concrete rewrite technique + mini-example using their specific product and audience>"
 }`;
-
-  let feedback: AiFeedback;
-  try {
-    const message = await client.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 1024,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: userMessage }],
-    });
-
-    const raw = message.content[0].type === 'text' ? message.content[0].text : '';
-    const match = raw.match(/\{[\s\S]*\}/);
-    if (!match) throw new Error('no JSON in response');
-    feedback = FeedbackSchema.parse(JSON.parse(match[0]));
+      const message = await client.messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1024,
+        system: FEEDBACK_SYSTEM_PROMPT,
+        messages: [{ role: 'user', content: userMessage }],
+      });
+      const raw = message.content[0].type === 'text' ? message.content[0].text : '';
+      const match = raw.match(/\{[\s\S]*\}/);
+      if (!match) throw new Error('no JSON in response');
+      result = FeedbackSchema.parse(JSON.parse(match[0]));
+    }
   } catch {
     return res.status(502).json({ error: 'ai_unavailable' });
   }
 
-  // Persist aiScore + aiFeedback to brain_entries
+  // Persist to brain_entries
   try {
     const db = getDb();
     const user = await db.query.users.findFirst({ where: eq(users.email, email) });
@@ -88,19 +156,20 @@ Return JSON with exactly this structure:
         where: and(eq(brainEntries.userId, user.id), eq(brainEntries.lessonId, lessonId)),
       });
       if (existing) {
+        const score = isCompare ? null : (result as AiFeedback).score;
         await db.update(brainEntries)
           .set({
             processedByAi: true,
-            aiScore: feedback.score,
-            aiFeedback: JSON.stringify(feedback),
+            aiScore: score,
+            aiFeedback: JSON.stringify(result),
             updatedAt: new Date(),
           })
           .where(and(eq(brainEntries.userId, user.id), eq(brainEntries.lessonId, lessonId)));
       }
     }
   } catch {
-    // DB write failure — still return the feedback to the client
+    // DB write failure — still return result to client
   }
 
-  return res.status(200).json(feedback);
+  return res.status(200).json(result);
 }
