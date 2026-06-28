@@ -5,6 +5,7 @@ import { saveLessonInputToDB, toggleLessonCompleteToDB, syncUserToDB } from '../
 import ProfileButton from '../components/ProfileButton';
 import AccountPanel from '../components/AccountPanel';
 import DocumentsPanel from '../components/DocumentsPanel';
+import FeedbackCard from '../components/FeedbackCard';
 
 interface Props {
   userData: UserData;
@@ -23,9 +24,10 @@ export default function LMS({ userData, onUpdateUserData }: Props) {
   const [panel, setPanel] = useState<'none' | 'account' | 'documents'>('none');
   const [avatarPing, setAvatarPing] = useState(false);
 
-  // Save animation
+  // Save animation + AI feedback flow
   const [saveAnimLesson, setSaveAnimLesson] = useState<string | null>(null);
-  const [savedToastLesson, setSavedToastLesson] = useState<string | null>(null);
+  const [analyzingLesson, setAnalyzingLesson] = useState<string | null>(null);
+  const [feedbackLesson, setFeedbackLesson] = useState<string | null>(null);
 
   // Ensure user exists in DB when LMS first loads (handles old sessions)
   useEffect(() => { syncUserToDB(userData); }, []);
@@ -49,17 +51,25 @@ export default function LMS({ userData, onUpdateUserData }: Props) {
 
   function handleSaveInput(lessonId: string) {
     const val = getInputValue(lessonId);
+    if (!val.trim()) return;
     onUpdateUserData({ lessonInputs: { ...userData.lessonInputs, [lessonId]: val } });
     saveLessonInputToDB(userData.email, lessonId, val);
 
-    // Trigger animation
+    // doc-fly animation
     setSaveAnimLesson(lessonId);
+    setTimeout(() => setSaveAnimLesson(null), 750);
+
+    // avatar ping
+    setAvatarPing(true);
+    setTimeout(() => setAvatarPing(false), 1350);
+
+    // after doc-fly → analyzing overlay → feedback card
     setTimeout(() => {
-      setSaveAnimLesson(null);
-      setAvatarPing(true);
-      setSavedToastLesson(lessonId);
-      setTimeout(() => setAvatarPing(false), 600);
-      setTimeout(() => setSavedToastLesson(null), 3500);
+      setAnalyzingLesson(lessonId);
+      setTimeout(() => {
+        setAnalyzingLesson(null);
+        setFeedbackLesson(lessonId);
+      }, 2200);
     }, 750);
   }
 
@@ -76,6 +86,8 @@ export default function LMS({ userData, onUpdateUserData }: Props) {
   function openLesson(id: string) {
     setActiveLessonId(id);
     setSidebarOpen(false);
+    setAnalyzingLesson(null);
+    setFeedbackLesson(null);
   }
 
   const handleToggleMenu = useCallback(() => setProfileMenuOpen((v) => !v), []);
@@ -238,57 +250,73 @@ export default function LMS({ userData, onUpdateUserData }: Props) {
               {activeLesson.body}
             </p>
 
-            {/* Input lesson */}
+            {/* Input lesson — three states: input / analyzing / feedback */}
             {activeLesson.type === 'input' && (
-              <div className="bg-purple-50 border border-purple-100 rounded-2xl p-5 mb-8 relative">
-                {activeLesson.inputPrompt && (
-                  <p className="text-sm font-semibold text-purple-700 mb-3">{activeLesson.inputPrompt}</p>
+              <>
+                {/* 1. Analyzing overlay */}
+                {analyzingLesson === activeLessonId && (
+                  <div className="bg-white border border-purple-100 rounded-2xl mb-8 flex flex-col items-center justify-center gap-4 py-14 animate-fade-in">
+                    <div className="w-12 h-12 rounded-full bg-purple-600 animate-orb-pulse" />
+                    <p className="text-sm font-semibold text-gray-400 tracking-wide">Affina AI is analyzing…</p>
+                  </div>
                 )}
-                <textarea
-                  className="w-full bg-white border border-purple-200 focus:border-purple-400 focus:ring-2 focus:ring-purple-100 rounded-xl px-4 py-3 text-sm text-gray-800 placeholder-gray-400 outline-none resize-none transition min-h-[120px]"
-                  placeholder="Write your answer here…"
-                  value={getInputValue(activeLessonId)}
-                  onChange={(e) =>
-                    setInputDraft((d) => ({ ...d, [activeLessonId]: e.target.value }))
-                  }
-                />
 
-                <div className="relative mt-3">
-                  <button
-                    onClick={() => handleSaveInput(activeLessonId)}
-                    className="relative bg-purple-600 hover:bg-purple-700 active:scale-95 text-white text-sm font-semibold px-6 py-2.5 rounded-xl transition-all duration-150"
-                  >
-                    Save
-                    {/* Flying document icon */}
-                    {saveAnimLesson === activeLessonId && (
-                      <span
-                        className="absolute -top-1 -right-1 pointer-events-none animate-doc-fly"
-                        style={{ display: 'inline-flex' }}
-                      >
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="white" stroke="#9333ea" strokeWidth="1.5">
-                          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-                          <polyline points="14 2 14 8 20 8" />
-                        </svg>
-                      </span>
+                {/* 2. Feedback card */}
+                {feedbackLesson === activeLessonId && (
+                  <FeedbackCard
+                    lessonTitle={activeLesson.title}
+                    prompt={activeLesson.inputPrompt ?? ''}
+                    answer={getInputValue(activeLessonId)}
+                    onRefine={() => setFeedbackLesson(null)}
+                    onContinue={() => {
+                      setFeedbackLesson(null);
+                      if (!isCompleted) {
+                        onUpdateUserData({ completedLessons: [...userData.completedLessons, activeLessonId] });
+                        toggleLessonCompleteToDB(userData.email, activeLessonId);
+                      }
+                      if (nextLesson) openLesson(nextLesson.id);
+                    }}
+                  />
+                )}
+
+                {/* 3. Normal input form */}
+                {analyzingLesson !== activeLessonId && feedbackLesson !== activeLessonId && (
+                  <div className="bg-purple-50 border border-purple-100 rounded-2xl p-5 mb-8 relative">
+                    {activeLesson.inputPrompt && (
+                      <p className="text-sm font-semibold text-purple-700 mb-3">{activeLesson.inputPrompt}</p>
                     )}
-                  </button>
-                </div>
-
-                {/* Saved toast */}
-                {savedToastLesson === activeLessonId && (
-                  <p className="mt-3 text-sm text-purple-600 font-medium animate-fade-in flex items-center gap-1.5">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-                      <polyline points="14 2 14 8 20 8" />
-                    </svg>
-                    Your answer has been saved to Documents
-                  </p>
+                    <textarea
+                      className="w-full bg-white border border-purple-200 focus:border-purple-400 focus:ring-2 focus:ring-purple-100 rounded-xl px-4 py-3 text-sm text-gray-800 placeholder-gray-400 outline-none resize-none transition min-h-[120px]"
+                      placeholder="Write your answer here…"
+                      value={getInputValue(activeLessonId)}
+                      onChange={(e) =>
+                        setInputDraft((d) => ({ ...d, [activeLessonId]: e.target.value }))
+                      }
+                    />
+                    <div className="relative mt-3">
+                      <button
+                        onClick={() => handleSaveInput(activeLessonId)}
+                        className="relative bg-purple-600 hover:bg-purple-700 active:scale-95 text-white text-sm font-semibold px-6 py-2.5 rounded-xl transition-all duration-150 disabled:opacity-50"
+                        disabled={!getInputValue(activeLessonId).trim()}
+                      >
+                        Save
+                        {saveAnimLesson === activeLessonId && (
+                          <span className="absolute -top-1 -right-1 pointer-events-none animate-doc-fly" style={{ display: 'inline-flex' }}>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="white" stroke="#9333ea" strokeWidth="1.5">
+                              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                              <polyline points="14 2 14 8 20 8" />
+                            </svg>
+                          </span>
+                        )}
+                      </button>
+                    </div>
+                  </div>
                 )}
-              </div>
+              </>
             )}
 
-            {/* Action buttons */}
-            <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-gray-100 mt-2">
+            {/* Action buttons — hidden while feedback card is open */}
+            <div className={`flex flex-wrap items-center gap-3 pt-2 border-t border-gray-100 mt-2 ${feedbackLesson === activeLessonId || analyzingLesson === activeLessonId ? 'hidden' : ''}`}>
               <button
                 onClick={toggleComplete}
                 className={`flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-xl border-2 transition-all duration-150 ${
