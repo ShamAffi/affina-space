@@ -46,6 +46,16 @@ export type Question = {
   options?: string[];
 };
 
+export type FeedbackVerdict = 'strong' | 'ok' | 'can_be_stronger';
+
+export type AiFeedback = {
+  score: number;
+  verdict: FeedbackVerdict;
+  good: string[];
+  missing: string[];
+  nextStep: string;
+};
+
 export type BrainEntry = {
   id: number;
   lessonId: string;
@@ -53,5 +63,8 @@ export type BrainEntry = {
   prompt: string;
   content: string;
   entryType: string;
+  processedByAi: boolean;
+  aiScore: number | null;
+  aiFeedback: string | null;
   updatedAt: string;
 };

@@ -97,13 +97,22 @@ export default function DocumentsPanel({ email, onClose }: Props) {
               <div key={entry.id} className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
                 {/* Doc header */}
                 <div className="flex items-start justify-between gap-2 mb-3">
-                  <div>
+                  <div className="flex-1 min-w-0">
                     <span className="text-xs font-bold text-purple-500 uppercase tracking-wider">
                       {ENTRY_TYPE_LABELS[entry.entryType] ?? entry.entryType}
                     </span>
                     <p className="text-sm font-semibold text-gray-800 mt-0.5 leading-snug">
                       {entry.lessonTitle}
                     </p>
+                    {entry.aiScore !== null && entry.aiScore !== undefined && (
+                      <span className={`inline-block mt-1.5 text-xs font-bold rounded-full px-2 py-0.5 ${
+                        entry.aiScore >= 80 ? 'bg-green-50 text-green-700' :
+                        entry.aiScore >= 55 ? 'bg-blue-50 text-blue-700' :
+                        'bg-amber-50 text-amber-700'
+                      }`}>
+                        {entry.aiScore}/100
+                      </span>
+                    )}
                   </div>
                   {!isEditing && (
                     <button

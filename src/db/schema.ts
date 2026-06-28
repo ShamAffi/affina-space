@@ -37,6 +37,8 @@ export const brainEntries = pgTable('brain_entries', {
   content: text('content').notNull().default(''),
   entryType: text('entry_type').notNull(),
   processedByAi: boolean('processed_by_ai').default(false),
+  aiScore: integer('ai_score'),
+  aiFeedback: text('ai_feedback'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 }, (t) => [unique().on(t.userId, t.lessonId)]);
