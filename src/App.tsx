@@ -16,7 +16,9 @@ const SCREEN_ORDER: Screen[] = [
 const Q_SCREENS: Screen[] = ['q1', 'q2', 'q3', 'q4'];
 
 export default function App() {
-  const [screen, setScreen] = useState<Screen>('welcome');
+  const [screen, setScreen] = useState<Screen>(() =>
+    loadUserData().email ? 'lms' : 'welcome',
+  );
   const [userData, setUserData] = useState<UserData>(loadUserData);
   const [scoreResult, setScoreResult] = useState<OnboardingScore | null>(null);
 
