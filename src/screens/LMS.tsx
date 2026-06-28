@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { MODULES } from '../data';
 import type { UserData, Lesson, AiFeedback, CompareResult } from '../types';
-import { saveLessonInputToDB, toggleLessonCompleteToDB, syncUserToDB } from '../store';
+import { saveLessonInputToDB, toggleLessonCompleteToDB, syncUserToDB, loadProgressFromDB } from '../store';
 import ProfileButton from '../components/ProfileButton';
 import AccountPanel from '../components/AccountPanel';
 import DocumentsPanel from '../components/DocumentsPanel';
@@ -33,8 +33,27 @@ export default function LMS({ userData, onUpdateUserData }: Props) {
   const [compareByLesson, setCompareByLesson] = useState<Record<string, CompareResult>>({});
   const [refiningLesson, setRefiningLesson] = useState<string | null>(null);
 
-  // Ensure user exists in DB when LMS first loads (handles old sessions)
-  useEffect(() => { syncUserToDB(userData); }, []);
+  const [progressLoading, setProgressLoading] = useState(true);
+
+  // On mount: sync user to DB and load progress from DB (cross-device sync)
+  useEffect(() => {
+    syncUserToDB(userData);
+    if (!userData.email) { setProgressLoading(false); return; }
+
+    loadProgressFromDB(userData.email).then((dbProgress) => {
+      if (dbProgress) {
+        // Merge: union completedLessons, DB wins on lessonInputs
+        const merged = {
+          completedLessons: [
+            ...new Set([...userData.completedLessons, ...dbProgress.completedLessons]),
+          ],
+          lessonInputs: { ...userData.lessonInputs, ...dbProgress.lessonInputs },
+        };
+        onUpdateUserData(merged);
+      }
+      setProgressLoading(false);
+    });
+  }, []);
 
   const activeLesson = allLessons.find((l) => l.id === activeLessonId)!;
   const activeLessonIdx = allLessons.findIndex((l) => l.id === activeLessonId);
@@ -85,6 +104,11 @@ export default function LMS({ userData, onUpdateUserData }: Props) {
           prompt: lesson.inputPrompt ?? '',
           answer: val,
           aiMode: lesson.aiMode ?? 'feedback',
+          context: {
+            idea: userData.idea,
+            customer: userData.customer,
+            stage: userData.stage,
+          },
         }),
       })
         .then((r) => {
@@ -124,6 +148,17 @@ export default function LMS({ userData, onUpdateUserData }: Props) {
   }
 
   const handleToggleMenu = useCallback(() => setProfileMenuOpen((v) => !v), []);
+
+  if (progressLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 rounded-full border-2 border-purple-600 border-t-transparent animate-spin" />
+          <p className="text-sm text-gray-400 font-medium">Loading your progress…</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">

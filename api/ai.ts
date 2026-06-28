@@ -75,7 +75,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'method not allowed' });
 
-  const { email, lessonId, lessonTitle, prompt, answer, aiMode } = req.body;
+  const { email, lessonId, lessonTitle, prompt, answer, aiMode, context } = req.body;
+  const contextBlock = context?.idea
+    ? `\n\nFounder context (use this to personalize feedback — reference their actual project):\n- Idea: ${context.idea}\n- Target customer: ${context.customer || 'not specified'}\n- Stage: ${context.stage || 'not specified'}`
+    : '';
   if (!email || !lessonId || !answer?.trim()) {
     return res.status(400).json({ error: 'email, lessonId, and answer are required' });
   }
@@ -110,7 +113,7 @@ Return JSON with exactly this structure:
       const message = await client.messages.create({
         model: 'claude-sonnet-4-6',
         max_tokens: 1024,
-        system: COMPARE_SYSTEM_PROMPT,
+        system: COMPARE_SYSTEM_PROMPT + contextBlock,
         messages: [{ role: 'user', content: userMessage }],
       });
       const raw = message.content[0].type === 'text' ? message.content[0].text : '';
@@ -135,7 +138,7 @@ Return JSON with exactly this structure:
       const message = await client.messages.create({
         model: 'claude-sonnet-4-6',
         max_tokens: 1024,
-        system: FEEDBACK_SYSTEM_PROMPT,
+        system: FEEDBACK_SYSTEM_PROMPT + contextBlock,
         messages: [{ role: 'user', content: userMessage }],
       });
       const raw = message.content[0].type === 'text' ? message.content[0].text : '';

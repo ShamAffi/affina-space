@@ -74,6 +74,12 @@ export type CompareResult = {
   nextStep: string;
 };
 
+export type OnboardingScore = {
+  score: number;
+  summary: string;
+  steps: { title: string; body: string }[];
+};
+
 export type BrainEntry = {
   id: number;
   lessonId: string;

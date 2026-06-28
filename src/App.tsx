@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Screen, UserData } from './types';
+import type { Screen, UserData, OnboardingScore } from './types';
 import { loadUserData, updateUserData, syncUserToDB } from './store';
 import { QUESTIONS } from './data';
 import Welcome from './screens/Welcome';
@@ -18,6 +18,7 @@ const Q_SCREENS: Screen[] = ['q1', 'q2', 'q3', 'q4'];
 export default function App() {
   const [screen, setScreen] = useState<Screen>('welcome');
   const [userData, setUserData] = useState<UserData>(loadUserData);
+  const [scoreResult, setScoreResult] = useState<OnboardingScore | null>(null);
 
   function update(updates: Partial<UserData>) {
     const updated = updateUserData(updates);
@@ -70,8 +71,10 @@ export default function App() {
     case 'analyzing':
       return (
         <Analyzing
-          onDone={() => {
-            const next = updateUserData({ score: 80 });
+          userData={userData}
+          onDone={(result) => {
+            setScoreResult(result);
+            const next = updateUserData({ score: result.score });
             setUserData(next);
             syncUserToDB(next);
             advance();
@@ -80,7 +83,14 @@ export default function App() {
       );
 
     case 'score':
-      return <Score score={userData.score} onStart={advance} />;
+      return (
+        <Score
+          score={userData.score}
+          summary={scoreResult?.summary ?? ''}
+          steps={scoreResult?.steps ?? []}
+          onStart={advance}
+        />
+      );
 
     case 'lms':
       return <LMS userData={userData} onUpdateUserData={update} />;

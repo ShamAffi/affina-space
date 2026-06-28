@@ -85,6 +85,20 @@ export async function toggleLessonCompleteToDB(email: string, lessonId: string):
   }
 }
 
+export async function loadProgressFromDB(email: string): Promise<{
+  completedLessons: string[];
+  lessonInputs: Record<string, string>;
+} | null> {
+  if (!email) return null;
+  try {
+    const res = await fetch(`/api/progress?email=${encodeURIComponent(email)}`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
 export async function loadUserFromDB(email: string): Promise<UserData | null> {
   try {
     const res = await fetch(`/api/user?email=${encodeURIComponent(email)}`);
