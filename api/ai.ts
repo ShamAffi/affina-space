@@ -74,8 +74,9 @@ Return JSON with exactly this structure:
     const raw = message.content[0].type === 'text' ? message.content[0].text : '';
     const parsed = JSON.parse(raw);
     feedback = FeedbackSchema.parse(parsed);
-  } catch {
-    return res.status(502).json({ error: 'ai_unavailable' });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return res.status(502).json({ error: 'ai_unavailable', detail: msg });
   }
 
   // Persist aiScore + aiFeedback to brain_entries
