@@ -186,6 +186,7 @@ https://… — pitch deck (Google Slides)`,
       },
       {
         id: 'm1l5',
+        delegateMode: 'B', // RULES §2.3: 2–3 one-liner variants (pain / result / audience angle)
         type: 'input',
         kind: 'exercise',
         title: 'Your value proposition',
@@ -247,6 +248,7 @@ https://… — pitch deck (Google Slides)`,
       },
       {
         id: 'm2l5',
+        delegateMode: 'B', // RULES §2.3: 2–3 positioning angles from landscape + persona
         type: 'input',
         kind: 'exercise',
         title: 'Your positioning & differentiation',
@@ -310,6 +312,7 @@ https://… — pitch deck (Google Slides)`,
       },
       {
         id: 'm3l4',
+        delegatable: false, // RULES §2.3: compare mechanic is built into the block
         type: 'structured',
         kind: 'exercise',
         title: 'Three candidate customers',
@@ -399,6 +402,7 @@ Candidate C: [who they are]
       },
       {
         id: 'm4l5',
+        delegateMode: 'C', // RULES §2.3: compare card is AI; what-I-change is hers only
         type: 'structured',
         kind: 'exercise',
         title: 'Problem–Solution check against your interviews',
@@ -411,6 +415,7 @@ What I'm adjusting: …`,
       },
       {
         id: 'm4l6',
+        delegateMode: 'B', // RULES §2.3: 3 user-journey variants to pick from
         type: 'input',
         kind: 'exercise',
         title: 'Use-case map',
@@ -419,6 +424,7 @@ What I'm adjusting: …`,
       },
       {
         id: 'm4l7',
+        delegateMode: 'B', // RULES §2.3: 3 product-description variants
         type: 'input',
         kind: 'exercise',
         title: 'Product sketch',
@@ -428,6 +434,7 @@ What I'm adjusting: …`,
       {
         // TODO: rewrite per spec — merged quantified value + core advantage into one block
         id: 'm4l8',
+        delegateMode: 'B', // RULES §2.3: phrasing variants; numbers only from her data
         type: 'structured',
         kind: 'exercise',
         title: 'Quantified value & your core advantage',
@@ -485,6 +492,7 @@ Core advantage & why it's hard to copy: …`,
       {
         // TODO: rewrite per spec — add written defense "why this model"
         id: 'm5l4',
+        delegateMode: 'C', // RULES §2.4: 2 scenarios w/ trade-offs; choice+defense hers
         type: 'input',
         kind: 'exercise',
         title: 'Your business model',
@@ -494,6 +502,7 @@ Core advantage & why it's hard to copy: …`,
       {
         // TODO: rewrite per spec — AI flags the 2–3 shakiest assumptions
         id: 'm5l5',
+        delegateMode: 'C', // RULES §2.4: 2 scenarios (mass vs premium), assumptions visible; she picks
         type: 'input',
         kind: 'exercise',
         title: 'Unit economics v1',
@@ -572,6 +581,7 @@ Core advantage & why it's hard to copy: …`,
       },
       {
         id: 'm6l6',
+        delegateMode: 'B', // RULES §2.4: 2 scope variants — leaner vs richer
         type: 'input',
         kind: 'exercise',
         title: 'MVBP definition',
@@ -659,6 +669,7 @@ Core advantage & why it's hard to copy: …`,
       },
       {
         id: 'm7l7',
+        delegateMode: 'B', // RULES §2.4: Bullseye ranked candidates; picking 2 is hers
         type: 'structured',
         kind: 'exercise',
         title: '5 candidate channels for your first 10 customers',
@@ -921,6 +932,7 @@ AUTOMATE: …`,
       },
       {
         id: 'm11l4',
+        delegateMode: 'C', // RULES §2.4: full analysis + recommendation; decision NEVER pre-filled
         type: 'structured',
         kind: 'exercise',
         title: 'Pivot/Scale scorecard',

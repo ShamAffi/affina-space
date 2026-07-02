@@ -43,14 +43,43 @@ function getDb() {
   return drizzle(sql, { schema: { users, brainEntries, tasks, delegations } });
 }
 
-const DELEGATE_SYSTEM = `You are Affina — the founder's AI mentor, drafting an exercise FOR her from everything you know about her startup (her Company Brain).
+const DELEGATE_SYSTEM = `You are Affina — the founder's AI mentor, drafting ON BEHALF of the founder, from her own data only.
 
-Rules:
-- Answer the exercise prompt directly, in first person as the founder ("I", "my customer").
-- Ground every claim in her Brain data — her persona, interviews, numbers, positioning. Do not invent facts she doesn't have; where data is missing, make the most reasonable draft and mark assumptions with "(assumption)".
-- Match the format the exercise asks for (template lines, lists, one-liners).
-- Quality bar: a strong, specific draft she could submit as-is — but expect her to edit.
-- Output ONLY the draft text. No preamble, no commentary, no markdown headers.`;
+SOURCE RULE: build the draft exclusively from her Brain — intake, Snapshot, prior
+answers, interview log. Use her words and phrasing wherever they exist.
+
+NO-FABRICATION RULE (absolute): never invent facts, interview quotes, numbers,
+customer commitments, or life details. Delegate exists for FORMULATION, not for facts.
+If the Brain lacks material for an honest draft — do not improvise. Say what's
+missing and ask exactly ONE question; draft after she answers.
+
+QUALITY BAR: the draft must pass this block's own rubric at ≥70. Self-check before
+returning; regenerate once if below.
+
+MODE A (single draft): answer the exercise prompt directly, first person as the founder
+("I", "my customer"). Match the format the exercise asks for. Output ONLY the draft text,
+then append this footer verbatim on its own line:
+"This is a draft to react to — a recommendation, not a decision. Edit it until every word is true for you. You know things I don't."
+
+MODE B (variants): produce 2–3 genuinely DIFFERENT takes (different angle each — e.g.
+pain-led vs result-led vs audience-led), not paraphrases. Respond ONLY with valid JSON:
+{ "variants": [{ "label": "<the angle, 2-4 words>", "text": "<the draft>" }] }
+
+MODE C (analysis only): you NEVER write her decision. Produce a balanced case file.
+Respond ONLY with valid JSON:
+{ "analysis": { "for": ["<evidence-backed point>"], "against": ["<evidence-backed point>"],
+  "recommendation": "<your recommendation with reasoning, clearly labeled as a recommendation for HER decision>" } }`;
+
+const DelegateVariantsSchema = z.object({
+  variants: z.array(z.object({ label: z.string(), text: z.string() })).min(2).max(3),
+});
+const DelegateAnalysisSchema = z.object({
+  analysis: z.object({
+    for: z.array(z.string()).min(1).max(6),
+    against: z.array(z.string()).min(1).max(6),
+    recommendation: z.string(),
+  }),
+});
 
 const FEEDBACK_SYSTEM_PROMPT = `You are Affina — a warm but honest startup mentor for early-stage female founders.
 Your job: evaluate a founder's exercise answer and return structured feedback.
@@ -127,8 +156,9 @@ Stage: ${stage || 'early'}${avoidLine}`,
 
   // §4 Delegate — "Let AI mentor draft this for me" (after ≥1 user attempt; logged for the credit model)
   if (req.body.mode === 'delegate') {
-    const { email, lessonId, lessonTitle, prompt } = req.body;
+    const { email, lessonId, lessonTitle, prompt, delegateMode } = req.body;
     if (!email || !lessonId) return res.status(400).json({ error: 'email and lessonId required' });
+    const dMode: 'A' | 'B' | 'C' = delegateMode === 'B' || delegateMode === 'C' ? delegateMode : 'A';
 
     const db = getDb();
     const user = await db.query.users.findFirst({ where: eq(users.email, email) });
@@ -144,25 +174,44 @@ Stage: ${stage || 'early'}${avoidLine}`,
       .map((e) => `[${e.entryType}] ${(e.content ?? '').slice(0, 600)}`)
       .join('\n\n');
 
+    const modeTask =
+      dMode === 'B' ? `MODE B — produce the JSON variants for this exercise.`
+      : dMode === 'C' ? `MODE C — produce the JSON analysis case file for this decision. Do NOT write the decision itself.`
+      : `MODE A — draft the founder's answer.`;
+
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     try {
       const msg = await client.messages.create({
         model: 'claude-sonnet-4-6',
-        max_tokens: 900,
+        max_tokens: dMode === 'A' ? 900 : 1400,
         system: DELEGATE_SYSTEM,
         messages: [{
           role: 'user',
-          content: `STARTUP SNAPSHOT:\n${snapText}\n\nOTHER BRAIN ENTRIES:\n${brainDump || '(none yet)'}\n\nEXERCISE — "${lessonTitle}":\n${prompt || 'Write the answer for this exercise.'}\n\nDraft the founder's answer.`,
+          content: `STARTUP SNAPSHOT:\n${snapText}\n\nOTHER BRAIN ENTRIES:\n${brainDump || '(none yet)'}\n\nEXERCISE — "${lessonTitle}":\n${prompt || 'Write the answer for this exercise.'}\n\n${modeTask}`,
         }],
       });
-      const aiDraft = msg.content[0].type === 'text' ? msg.content[0].text.trim() : '';
-      if (!aiDraft) throw new Error('empty');
+      const raw = msg.content[0].type === 'text' ? msg.content[0].text.trim() : '';
+      if (!raw) throw new Error('empty');
 
       // §10.5 — log every delegation (userId, lessonId, timestamp)
       try { await db.insert(delegations).values({ userId: user.id, lessonId }); } catch { /* log must not block */ }
 
-      return res.status(200).json({ aiDraft });
-    } catch {
+      if (dMode === 'B' || dMode === 'C') {
+        const match = raw.match(/\{[\s\S]*\}/);
+        if (!match) {
+          // NO-FABRICATION path (§2.1): the Brain lacks material — the model asks ONE question instead
+          return res.status(200).json({ question: raw.slice(0, 600) });
+        }
+        if (dMode === 'B') {
+          const parsed = DelegateVariantsSchema.parse(JSON.parse(match[0]));
+          return res.status(200).json({ variants: parsed.variants });
+        }
+        const parsed = DelegateAnalysisSchema.parse(JSON.parse(match[0]));
+        return res.status(200).json({ analysis: parsed.analysis });
+      }
+      return res.status(200).json({ aiDraft: raw });
+    } catch (err) {
+      console.error('delegate error', dMode, err instanceof Error ? err.message : err);
       return res.status(502).json({ error: 'ai_unavailable' });
     }
   }

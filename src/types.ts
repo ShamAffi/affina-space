@@ -62,6 +62,7 @@ export type Lesson = {
     minEntries?: number;      // for interview_log
   };
   delegatable?: boolean;      // exercise: is the "Do it for me" button available (default true)
+  delegateMode?: 'A' | 'B' | 'C'; // RULES_DONE_FOR_YOU §2.2: A=one draft (default) · B=2–3 variants to pick · C=analysis only, decision field NEVER pre-filled
   prefillFrom?: 'onboarding'; // exercise: compose initial draft from onboarding answers (M0 intake)
 };
 

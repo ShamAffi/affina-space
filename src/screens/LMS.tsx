@@ -59,6 +59,10 @@ export default function LMS({ userData, onUpdateUserData, onGoToDashboard, onLog
   const [delegating, setDelegating] = useState<string | null>(null);
   const [delegateOpen, setDelegateOpen] = useState<string | null>(null);
   const [pendingDrafts, setPendingDrafts] = useState<Record<string, { userDraft: string; aiDraft: string }>>({});
+  // Mode B: variant cards to pick from · Mode C: read-only analysis (never touches her field)
+  const [pendingVariants, setPendingVariants] = useState<Record<string, { userDraft: string; variants: { label: string; text: string }[] }>>({});
+  const [analysisByLesson, setAnalysisByLesson] = useState<Record<string, { for: string[]; against: string[]; recommendation: string }>>({});
+  const [clarifyByLesson, setClarifyByLesson] = useState<Record<string, string>>({});
 
   const [progressLoading, setProgressLoading] = useState(true);
   const mainRef = useRef<HTMLElement>(null);
@@ -221,9 +225,11 @@ My motivation & 12-week goal: …`;
     }, 750);
   }
 
-  // §4 Delegate — AI drafts the exercise from the Brain; available after ≥1 own attempt
+  // §4 Delegate — RULES §2.2 modes: A one draft (gate: ≥1 attempt) · B variants (gate: ≥1 attempt)
+  // · C analysis-only (no gate — it exists to inform the decision BEFORE she writes it).
   function handleDelegate(lessonId: string) {
     const lesson = allLessons.find((l) => l.id === lessonId)!;
+    const dMode = lesson.delegateMode ?? 'A';
     const userText = getInputValue(lessonId);
     setDelegating(lessonId);
     fetch('/api/ai', {
@@ -231,6 +237,7 @@ My motivation & 12-week goal: …`;
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         mode: 'delegate',
+        delegateMode: dMode,
         email: userData.email,
         lessonId,
         lessonTitle: lesson.title,
@@ -238,9 +245,20 @@ My motivation & 12-week goal: …`;
       }),
     })
       .then((r) => { if (!r.ok) throw new Error('api'); return r.json(); })
-      .then((data: { aiDraft: string }) => {
-        setPendingDrafts((p) => ({ ...p, [lessonId]: { userDraft: userText, aiDraft: data.aiDraft } }));
-        setDelegateOpen(lessonId);
+      .then((data: { aiDraft?: string; variants?: { label: string; text: string }[]; analysis?: { for: string[]; against: string[]; recommendation: string }; question?: string }) => {
+        if (data.question) {
+          // §2.1 no-fabrication: the AI needs one answer from her before drafting
+          setClarifyByLesson((p) => ({ ...p, [lessonId]: data.question! }));
+        } else if (dMode === 'C' && data.analysis) {
+          // Mode C: analysis panel only — her decision field is NEVER pre-filled
+          setAnalysisByLesson((p) => ({ ...p, [lessonId]: data.analysis! }));
+        } else if (dMode === 'B' && data.variants) {
+          setPendingVariants((p) => ({ ...p, [lessonId]: { userDraft: userText, variants: data.variants! } }));
+          setDelegateOpen(lessonId);
+        } else if (data.aiDraft) {
+          setPendingDrafts((p) => ({ ...p, [lessonId]: { userDraft: userText, aiDraft: data.aiDraft! } }));
+          setDelegateOpen(lessonId);
+        }
       })
       .catch(() => { /* silent — button stays available */ })
       .finally(() => setDelegating(null));
@@ -563,10 +581,13 @@ My motivation & 12-week goal: …`;
                 if (nextLesson) openLesson(nextLesson.id);
               };
 
-              // §4 Delegate — available only after at least one own attempt
+              // §4 Delegate — A/B gated on ≥1 own attempt; C has its own button above the field
+              const dMode = activeLesson.delegateMode ?? 'A';
               const hasAttempted = !!userData.lessonInputs[activeLessonId] || hasResult;
-              const canDelegate = activeLesson.delegatable !== false && hasAttempted;
+              const canDelegate = activeLesson.delegatable !== false && dMode !== 'C' && hasAttempted;
               const drafts = pendingDrafts[activeLessonId];
+              const variantsPack = pendingVariants[activeLessonId];
+              const analysis = analysisByLesson[activeLessonId];
 
               const delegateButton = canDelegate ? (
                 <button
@@ -574,7 +595,7 @@ My motivation & 12-week goal: …`;
                   disabled={delegating !== null}
                   className="mt-3 w-full flex items-center justify-center gap-2 border-[1.5px] border-brand text-brand text-sm font-semibold py-2.5 rounded-pill hover:bg-brand-50 disabled:opacity-50 transition-all duration-150"
                 >
-                  🪄 Let AI mentor draft this for me
+                  {dMode === 'B' ? '🪄 Show me 2–3 AI variants' : '🪄 Let AI mentor draft this for me'}
                 </button>
               ) : null;
 
@@ -588,7 +609,46 @@ My motivation & 12-week goal: …`;
                 );
               }
 
-              // Delegate compare view: your draft vs AI draft → Use / Merge / Keep
+              // Mode B: variant cards — she picks one INTO her field for editing (never auto-saved)
+              if (delegateOpen === activeLessonId && variantsPack) {
+                return (
+                  <div className="mb-8 animate-fade-in">
+                    <p className="text-sm font-bold text-ink mb-1">🪄 Pick a starting point</p>
+                    <p className="text-xs text-ink-mute mb-3">Each takes a different angle. Your pick lands in your answer field — edit it until every word is true for you.</p>
+                    <div className="flex flex-col gap-3 mb-4">
+                      {variantsPack.variants.map((v, i) => (
+                        <div key={i} className="bg-surface border border-hairline rounded-card p-4 hover:border-brand-200 transition-colors">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-[10px] font-bold bg-brand-50 text-brand-700 rounded-pill px-2 py-0.5 uppercase tracking-wider">
+                              {v.label}
+                            </span>
+                          </div>
+                          <p className="text-sm text-ink-soft whitespace-pre-wrap leading-relaxed mb-3">{v.text}</p>
+                          <button
+                            onClick={() => {
+                              setDelegateOpen(null);
+                              setInputDraft((d) => ({ ...d, [activeLessonId]: v.text }));
+                              setPendingDrafts((pd) => ({ ...pd, [activeLessonId]: { userDraft: variantsPack.userDraft, aiDraft: v.text } }));
+                              setRefiningLesson(activeLessonId);
+                            }}
+                            className="text-xs font-semibold text-brand border-[1.5px] border-brand rounded-pill px-4 py-1.5 hover:bg-brand-50 transition-colors"
+                          >
+                            Use as my draft →
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => setDelegateOpen(null)}
+                      className="text-sm font-semibold text-ink-mute hover:text-ink-soft px-2 py-1 transition"
+                    >
+                      Keep mine
+                    </button>
+                  </div>
+                );
+              }
+
+              // Mode A: compare view — your draft vs AI draft → Use / Merge / Keep
               if (delegateOpen === activeLessonId && drafts) {
                 return (
                   <div className="mb-8 animate-fade-in">
@@ -673,6 +733,51 @@ My motivation & 12-week goal: …`;
                       />
                       {delegateButton && <div className="-mt-5 mb-8">{delegateButton}</div>}
                     </>
+                  )}
+
+                  {/* §2.1 clarify: the AI asked one question before drafting — she answers in her field */}
+                  {showInput && clarifyByLesson[activeLessonId] && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-card p-4 mb-4 animate-fade-in">
+                      <p className="text-xs font-bold text-amber-700 uppercase tracking-widest mb-1.5">🪄 One thing first</p>
+                      <p className="text-sm text-ink-soft leading-relaxed whitespace-pre-wrap">{clarifyByLesson[activeLessonId]}</p>
+                      <p className="text-[11px] text-ink-mute mt-2">Add the answer to your draft below, then try Delegate again.</p>
+                    </div>
+                  )}
+
+                  {/* Mode C (RULES §2.2): read-only AI analysis ABOVE her field — the decision field is never pre-filled */}
+                  {showInput && dMode === 'C' && activeLesson.delegatable !== false && (
+                    analysis ? (
+                      <div className="bg-surface border border-brand-200 rounded-card p-5 mb-4 animate-fade-in">
+                        <p className="text-xs font-bold text-brand-700 uppercase tracking-widest mb-3">🧠 AI case file — for your decision</p>
+                        <div className="grid md:grid-cols-2 gap-3 mb-3">
+                          <div className="bg-accent-50 border border-accent-100 rounded-control p-3">
+                            <p className="text-[10px] font-bold text-accent-800 uppercase tracking-wider mb-1.5">For</p>
+                            <ul className="space-y-1">
+                              {analysis.for.map((x, i) => <li key={i} className="text-xs text-ink-soft leading-relaxed">▲ {x}</li>)}
+                            </ul>
+                          </div>
+                          <div className="bg-amber-50 border border-amber-100 rounded-control p-3">
+                            <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wider mb-1.5">Against</p>
+                            <ul className="space-y-1">
+                              {analysis.against.map((x, i) => <li key={i} className="text-xs text-ink-soft leading-relaxed">△ {x}</li>)}
+                            </ul>
+                          </div>
+                        </div>
+                        <div className="bg-brand-50 border border-brand-100 rounded-control px-4 py-3 mb-2">
+                          <p className="text-[10px] font-bold text-brand-700 uppercase tracking-wider mb-1">Recommendation</p>
+                          <p className="text-sm text-ink leading-relaxed">{analysis.recommendation}</p>
+                        </div>
+                        <p className="text-[11px] text-ink-mute">This is analysis, not a decision. The field below is yours — the AI never fills it.</p>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => handleDelegate(activeLessonId)}
+                        disabled={delegating !== null}
+                        className="w-full mb-4 flex items-center justify-center gap-2 border-[1.5px] border-brand text-brand text-sm font-semibold py-2.5 rounded-pill hover:bg-brand-50 disabled:opacity-50 transition-all duration-150"
+                      >
+                        {delegating === activeLessonId ? 'Analyzing your Brain…' : '🧠 Get the AI case file (for & against)'}
+                      </button>
+                    )
                   )}
 
                   {/* 3. Input form (idle or refining) */}
