@@ -3,6 +3,7 @@ import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
 import { eq } from 'drizzle-orm';
 import { users, lessonInputs, completedLessons, brainEntries, tasks, checkIns, achievements, delegations } from '../src/db/schema.js';
+import { GROWTH_SEED_XP } from './lib/progressUtils.js';
 
 function getDb() {
   const sql = neon(process.env.DATABASE_URL!);
@@ -116,6 +117,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (name !== undefined) patchFields.name = name;
     if (projectName !== undefined) patchFields.projectName = projectName;
     if (mentorSessions !== undefined) patchFields.mentorSessions = mentorSessions;
+
+    // Graduation (решение Шамиля): completing mentor session S3 IS the launch→growth
+    // moment — the post-program Growth/XP phase starts here with its seed points.
+    if (mentorSessions?.S3?.completed === true) {
+      const u = await db.query.users.findFirst({ where: eq(users.email, email) });
+      if (u && (u.phase ?? 'launch') === 'launch') {
+        patchFields.phase = 'growth';
+        patchFields.launchValidatedAt = new Date();
+        patchFields.growthXp = GROWTH_SEED_XP;
+      }
+    }
+
     await db.update(users).set(patchFields).where(eq(users.email, email));
     return res.status(200).json({ ok: true });
   }
