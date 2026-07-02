@@ -145,7 +145,10 @@ Return JSON:
         lessonTitle: task.title,
         prompt: task.instruction,
         content: submissionText.trim(),
-        entryType: 'task_result',
+        // Program field missions land in the Brain under their own layer
+        // (micro_commitment, first_sale, site_launch…) so required layers are reachable;
+        // ad-hoc mentor/self tasks stay generic task_result.
+        entryType: (task.source === 'program' && task.linkedEntryType) ? task.linkedEntryType : 'task_result',
         processedByAi: true,
         aiScore: review.score,
         aiFeedback: JSON.stringify(mappedFeedback),

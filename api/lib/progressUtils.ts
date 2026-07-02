@@ -16,7 +16,7 @@ export const LAUNCH_LAYER_WEIGHTS: Record<string, number> = {
   pricing:              1,
   unit_economics:       1,
   key_assumptions:      1,
-  demand_test:          3,
+  micro_commitment:     3,
   mvbp_definition:      1,
   traction_metrics:     3,
   north_star:           2,
@@ -73,13 +73,12 @@ export const LAYER_LABELS: Record<string, string> = {
   quantified_value: 'quantified value',
   core_advantage: 'core advantage',
   pricing: 'pricing',
-  demand_test: 'demand test',
 };
 
 export const LAUNCH_REQUIRED_LAYERS = [
   'value_proposition',
   'persona',
-  'demand_test',
+  'micro_commitment',
   'traction_metrics',
   'north_star',
 ];
