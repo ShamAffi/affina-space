@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { MODULES } from '../data';
-import type { UserData, Lesson, AiFeedback, CompareResult, BrainEntry, NorthStarSuggestion, NorthStarCandidate, BlockKind } from '../types';
+import type { UserData, Lesson, AiFeedback, CompareResult, BrainEntry, NorthStarSuggestion, NorthStarCandidate, BlockKind, StartupSnapshot } from '../types';
 import { blockKind } from '../types';
 import { saveLessonInputToDB, toggleLessonCompleteToDB, syncUserToDB, loadProgressFromDB } from '../store';
 import ProfileButton from '../components/ProfileButton';
@@ -51,6 +51,10 @@ export default function LMS({ userData, onUpdateUserData, onGoToDashboard, onLog
   const [feedbackByLesson, setFeedbackByLesson] = useState<Record<string, AiFeedback & { previousScore?: number }>>({});
   const [compareByLesson, setCompareByLesson] = useState<Record<string, CompareResult>>({});
   const [refiningLesson, setRefiningLesson] = useState<string | null>(null);
+  // §4 Delegate — Try → Review → Delegate
+  const [delegating, setDelegating] = useState<string | null>(null);
+  const [delegateOpen, setDelegateOpen] = useState<string | null>(null);
+  const [pendingDrafts, setPendingDrafts] = useState<Record<string, { userDraft: string; aiDraft: string }>>({});
 
   const [progressLoading, setProgressLoading] = useState(true);
   const mainRef = useRef<HTMLElement>(null);
@@ -146,12 +150,18 @@ My motivation & 12-week goal: …`;
     return '';
   }
 
-  function handleSaveInput(lessonId: string) {
-    const val = getInputValue(lessonId);
+  function handleSaveInput(lessonId: string, contentOverride?: string) {
+    const val = contentOverride ?? getInputValue(lessonId);
     if (!val.trim()) return;
+    if (contentOverride !== undefined) {
+      setInputDraft((d) => ({ ...d, [lessonId]: contentOverride }));
+    }
 
+    // §4 — if this save came out of a Delegate choice, persist both drafts alongside
+    const drafts = pendingDrafts[lessonId];
     onUpdateUserData({ lessonInputs: { ...userData.lessonInputs, [lessonId]: val } });
-    saveLessonInputToDB(userData.email, lessonId, val);
+    saveLessonInputToDB(userData.email, lessonId, val, drafts);
+    if (drafts) setPendingDrafts((p) => { const n = { ...p }; delete n[lessonId]; return n; });
 
     // doc-fly + avatar ping
     setSaveAnimLesson(lessonId);
@@ -205,11 +215,38 @@ My motivation & 12-week goal: …`;
     }, 750);
   }
 
+  // §4 Delegate — AI drafts the exercise from the Brain; available after ≥1 own attempt
+  function handleDelegate(lessonId: string) {
+    const lesson = allLessons.find((l) => l.id === lessonId)!;
+    const userText = getInputValue(lessonId);
+    setDelegating(lessonId);
+    fetch('/api/ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        mode: 'delegate',
+        email: userData.email,
+        lessonId,
+        lessonTitle: lesson.title,
+        prompt: lesson.inputPrompt ?? '',
+      }),
+    })
+      .then((r) => { if (!r.ok) throw new Error('api'); return r.json(); })
+      .then((data: { aiDraft: string }) => {
+        setPendingDrafts((p) => ({ ...p, [lessonId]: { userDraft: userText, aiDraft: data.aiDraft } }));
+        setDelegateOpen(lessonId);
+      })
+      .catch(() => { /* silent — button stays available */ })
+      .finally(() => setDelegating(null));
+  }
+
   function openLesson(id: string) {
     setActiveLessonId(id);
     setSidebarOpen(false);
     setSavingLesson(null);
     setRefiningLesson(null);
+    setDelegateOpen(null);
+    setDelegating(null);
   }
 
   const handleToggleMenu = useCallback(() => setProfileMenuOpen((v) => !v), []);
@@ -435,6 +472,21 @@ My motivation & 12-week goal: …`;
               </div>
             )}
 
+            {/* ⚙️ M0.5 — Startup Snapshot generation (§6.1, wow moment №1) */}
+            {activeLesson.id === 'm0l5' && (
+              <SnapshotBlock
+                key={activeLessonId}
+                email={userData.email}
+                onComplete={() => {
+                  if (!isCompleted) {
+                    onUpdateUserData({ completedLessons: [...userData.completedLessons, activeLessonId] });
+                    toggleLessonCompleteToDB(userData.email, activeLessonId);
+                  }
+                  if (nextLesson) openLesson(nextLesson.id);
+                }}
+              />
+            )}
+
             {/* Exercise lesson — state machine: input → saving → feedback/compare ⟲ refine */}
             {(activeLesson.type === 'input' || activeLesson.type === 'structured') && (() => {
               if (activeLesson.aiMode === 'north-star') {
@@ -478,6 +530,77 @@ My motivation & 12-week goal: …`;
                 if (nextLesson) openLesson(nextLesson.id);
               };
 
+              // §4 Delegate — available only after at least one own attempt
+              const hasAttempted = !!userData.lessonInputs[activeLessonId] || hasResult;
+              const canDelegate = activeLesson.delegatable !== false && hasAttempted;
+              const drafts = pendingDrafts[activeLessonId];
+
+              const delegateButton = canDelegate ? (
+                <button
+                  onClick={() => handleDelegate(activeLessonId)}
+                  disabled={delegating !== null}
+                  className="mt-3 w-full flex items-center justify-center gap-2 border-[1.5px] border-brand text-brand text-sm font-semibold py-2.5 rounded-pill hover:bg-brand-50 disabled:opacity-50 transition-all duration-150"
+                >
+                  🪄 Let AI mentor draft this for me
+                </button>
+              ) : null;
+
+              // Delegating spinner
+              if (delegating === activeLessonId) {
+                return (
+                  <div className="bg-surface border border-brand-100 rounded-card mb-8 flex flex-col items-center justify-center gap-4 py-14 animate-fade-in">
+                    <div className="w-12 h-12 rounded-pill bg-brand animate-orb-pulse" />
+                    <p className="text-sm font-semibold text-ink-mute tracking-wide">Mentor is drafting from your Brain…</p>
+                  </div>
+                );
+              }
+
+              // Delegate compare view: your draft vs AI draft → Use / Merge / Keep
+              if (delegateOpen === activeLessonId && drafts) {
+                return (
+                  <div className="mb-8 animate-fade-in">
+                    <p className="text-sm font-bold text-ink mb-3">🪄 Two versions — use the AI draft, merge, or keep yours</p>
+                    <div className="grid md:grid-cols-2 gap-3 mb-4">
+                      <div className="bg-surface border border-hairline rounded-card p-4">
+                        <p className="text-[10px] font-bold text-ink-mute uppercase tracking-widest mb-2">Your draft</p>
+                        <p className="text-sm text-ink-soft whitespace-pre-wrap leading-relaxed">{drafts.userDraft || '— (empty)'}</p>
+                      </div>
+                      <div className="bg-brand-50 border border-brand-200 rounded-card p-4">
+                        <p className="text-[10px] font-bold text-brand-700 uppercase tracking-widest mb-2">AI mentor's draft</p>
+                        <p className="text-sm text-ink whitespace-pre-wrap leading-relaxed">{drafts.aiDraft}</p>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => { setDelegateOpen(null); handleSaveInput(activeLessonId, drafts.aiDraft); }}
+                        className="flex-1 bg-brand hover:bg-brand-700 active:scale-95 text-white text-sm font-semibold px-5 py-2.5 rounded-pill transition-all duration-150"
+                      >
+                        Use AI version
+                      </button>
+                      <button
+                        onClick={() => {
+                          setDelegateOpen(null);
+                          setInputDraft((d) => ({ ...d, [activeLessonId]: `${drafts.userDraft}\n\n— AI version —\n${drafts.aiDraft}` }));
+                          setRefiningLesson(activeLessonId);
+                        }}
+                        className="flex-1 border-[1.5px] border-brand text-brand text-sm font-semibold px-5 py-2.5 rounded-pill hover:bg-brand-50 transition-all duration-150"
+                      >
+                        Merge & edit
+                      </button>
+                      <button
+                        onClick={() => {
+                          setDelegateOpen(null);
+                          setPendingDrafts((p) => { const n = { ...p }; delete n[activeLessonId]; return n; });
+                        }}
+                        className="text-sm font-semibold text-ink-mute hover:text-ink-soft px-4 py-2.5 transition"
+                      >
+                        Keep mine
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
+
               return (
                 <>
                   {/* 1. Saving / analyzing spinner */}
@@ -488,29 +611,35 @@ My motivation & 12-week goal: …`;
                     </div>
                   )}
 
-                  {/* 2a. Feedback card (feedback mode) */}
+                  {/* 2a. Feedback card (feedback mode) + Delegate */}
                   {showResult && !isCompareMode && lessonFeedback && (
-                    <FeedbackCard
-                      lessonTitle={activeLesson.title}
-                      prompt={activeLesson.inputPrompt ?? ''}
-                      answer={getInputValue(activeLessonId)}
-                      feedback={lessonFeedback}
-                      previousScore={lessonFeedback.previousScore}
-                      onRefine={() => setRefiningLesson(activeLessonId)}
-                      onContinue={onContinue}
-                    />
+                    <>
+                      <FeedbackCard
+                        lessonTitle={activeLesson.title}
+                        prompt={activeLesson.inputPrompt ?? ''}
+                        answer={getInputValue(activeLessonId)}
+                        feedback={lessonFeedback}
+                        previousScore={lessonFeedback.previousScore}
+                        onRefine={() => setRefiningLesson(activeLessonId)}
+                        onContinue={onContinue}
+                      />
+                      {delegateButton && <div className="-mt-5 mb-8">{delegateButton}</div>}
+                    </>
                   )}
 
-                  {/* 2b. Compare card (compare mode) */}
+                  {/* 2b. Compare card (compare mode) + Delegate */}
                   {showResult && isCompareMode && lessonCompare && (
-                    <CompareCard
-                      lessonTitle={activeLesson.title}
-                      prompt={activeLesson.inputPrompt ?? ''}
-                      answer={getInputValue(activeLessonId)}
-                      result={lessonCompare}
-                      onRefine={() => setRefiningLesson(activeLessonId)}
-                      onContinue={onContinue}
-                    />
+                    <>
+                      <CompareCard
+                        lessonTitle={activeLesson.title}
+                        prompt={activeLesson.inputPrompt ?? ''}
+                        answer={getInputValue(activeLessonId)}
+                        result={lessonCompare}
+                        onRefine={() => setRefiningLesson(activeLessonId)}
+                        onContinue={onContinue}
+                      />
+                      {delegateButton && <div className="-mt-5 mb-8">{delegateButton}</div>}
+                    </>
                   )}
 
                   {/* 3. Input form (idle or refining) */}
@@ -562,6 +691,7 @@ My motivation & 12-week goal: …`;
                           )}
                         </button>
                       </div>
+                      {delegateButton}
                     </div>
                   )}
                 </>
@@ -573,6 +703,10 @@ My motivation & 12-week goal: …`;
               const isExercise = activeLesson.type === 'input' || activeLesson.type === 'structured';
               // north-star exercise manages its own navigation
               if (isExercise && activeLesson.aiMode === 'north-star') return null;
+              // snapshot block manages its own Continue until generated once
+              if (activeLesson.id === 'm0l5' && !isCompleted) return null;
+              // delegate views manage their own actions
+              if (delegateOpen === activeLessonId || delegating === activeLessonId) return null;
               const hasFeedback = !!(feedbackByLesson[activeLessonId] || compareByLesson[activeLessonId]);
               const isRefining = refiningLesson === activeLessonId;
               const isSaving = savingLesson === activeLessonId;
@@ -859,6 +993,105 @@ function NorthStarExercise({ email, lessonId, alreadySubmitted, onComplete, onSa
         className="w-full bg-brand hover:bg-brand-700 disabled:opacity-40 text-white text-sm font-semibold py-3 rounded-pill transition-all active:scale-95"
       >
         Set as my North Star ⭐
+      </button>
+    </div>
+  );
+}
+
+// ─── SnapshotBlock (⚙️ M0.5, §6.1) — generate & present the Startup Snapshot ──
+function SnapshotBlock({ email, onComplete }: { email: string; onComplete: () => void }) {
+  type Status = 'checking' | 'idle' | 'generating' | 'ready' | 'error';
+  const [status, setStatus] = useState<Status>('checking');
+  const [snapshot, setSnapshot] = useState<StartupSnapshot | null>(null);
+
+  useEffect(() => {
+    if (!email) { setStatus('idle'); return; }
+    fetch(`/api/brain?email=${encodeURIComponent(email)}&with=snapshot`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.snapshot) { setSnapshot(d.snapshot); setStatus('ready'); }
+        else setStatus('idle');
+      })
+      .catch(() => setStatus('idle'));
+  }, [email]);
+
+  function generate() {
+    setStatus('generating');
+    fetch('/api/brain', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'generate-snapshot', email }),
+    })
+      .then((r) => { if (!r.ok) throw new Error('api'); return r.json(); })
+      .then((d) => { setSnapshot(d.snapshot); setStatus('ready'); })
+      .catch(() => setStatus('error'));
+  }
+
+  if (status === 'checking') {
+    return (
+      <div className="bg-surface border border-hairline rounded-card mb-8 flex justify-center py-10">
+        <div className="w-8 h-8 rounded-pill border-2 border-brand-200 border-t-brand animate-spin" />
+      </div>
+    );
+  }
+
+  if (status === 'generating') {
+    return (
+      <div className="bg-surface border border-brand-100 rounded-card mb-8 flex flex-col items-center justify-center gap-4 py-16 animate-fade-in">
+        <div className="w-14 h-14 rounded-pill bg-brand animate-orb-pulse" />
+        <p className="text-sm font-semibold text-ink-soft tracking-wide">Reading everything you've shared…</p>
+        <p className="text-xs text-ink-mute">Building your startup on one page</p>
+      </div>
+    );
+  }
+
+  if (status === 'ready' && snapshot) {
+    return (
+      <div className="mb-8 animate-slide-up">
+        <div className="flex items-center gap-2 mb-4">
+          <p className="font-display text-2xl font-medium tracking-tight text-ink flex-1">Your Startup Snapshot</p>
+          <span className="text-[10px] font-bold bg-brand-50 text-brand-700 rounded-pill px-2.5 py-1">
+            v{snapshot.version} · {snapshot.source}
+          </span>
+        </div>
+        <div className="flex flex-col gap-3 mb-4">
+          {snapshot.sections.map((s) => (
+            <div key={s.title} className="bg-surface border border-hairline rounded-card p-4">
+              <p className="text-[10px] font-bold text-brand-600 uppercase tracking-widest mb-1.5">{s.title}</p>
+              <p className="text-sm text-ink-soft leading-relaxed whitespace-pre-wrap">{s.content}</p>
+            </div>
+          ))}
+        </div>
+        <p className="text-xs text-ink-mute leading-relaxed mb-4">
+          Your Snapshot lives in Documents and updates itself after module checkpoints and weekly check-ins.
+          Something changed or looks off? Tell us in your weekly check-in — it updates itself.
+        </p>
+        <button
+          onClick={onComplete}
+          className="w-full bg-brand hover:bg-brand-700 active:scale-95 text-white text-sm font-semibold py-3.5 rounded-pill transition-all duration-150"
+        >
+          Continue to Module 1 →
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-brand-50 border border-brand-100 rounded-card p-6 mb-8 text-center">
+      <p className="text-3xl mb-3">✨</p>
+      <p className="text-sm font-bold text-brand-800 mb-1">Ready to see your startup on one page?</p>
+      <p className="text-xs text-brand-700/70 leading-relaxed max-w-sm mx-auto mb-5">
+        The AI mentor will read your intake, links, and onboarding answers and assemble your Startup
+        Snapshot — the living document the whole program builds on.
+      </p>
+      {status === 'error' && (
+        <p className="text-xs text-red-500 mb-3">Something went wrong — try again.</p>
+      )}
+      <button
+        onClick={generate}
+        className="bg-brand hover:bg-brand-700 active:scale-95 text-white text-sm font-semibold px-8 py-3 rounded-pill transition-all duration-150"
+      >
+        ✨ Generate my Startup Snapshot
       </button>
     </div>
   );

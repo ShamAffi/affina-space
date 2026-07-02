@@ -111,6 +111,18 @@ export type NorthStarSuggestion = {
   recommended: string;
 };
 
+// ─── Startup Snapshot (§3.4) — the curated "your startup on one page" doc ─────
+export type SnapshotSection = { title: string; content: string };
+
+export type StartupSnapshot = {
+  version: number;
+  generatedAt: string;          // ISO date
+  source: string;               // 'Module 0' | 'Module N checkpoint' | 'check-in YYYY-MM-DD'
+  sections: SnapshotSection[];  // fixed 10 sections per spec
+};
+
+export type SnapshotFact = { section: string; fact: string };
+
 export type FeedbackVerdict = 'strong' | 'ok' | 'can_be_stronger';
 
 export type AiFeedback = {
@@ -147,6 +159,11 @@ export type TaskReview = {
   highlights: string[];
   improvements: string[];
   nextStep: string;
+  // §4b Debrief — field-mission analysis rendered on top of the review
+  debrief?: {
+    meaning: string;   // what what-you-heard actually means
+    adjust: string;    // what to correct in the approach/hypothesis
+  } | null;
 };
 
 export type Task = {
@@ -161,6 +178,7 @@ export type Task = {
   submissionText: string | null;
   submissionFiles: string[] | null;
   submissionData: TaskSubmissionData | null;  // structured field-task data (§3.2)
+  briefing: string | null;       // §4b AI Mission Briefing (generated once, cached on the task)
   aiReview: string | null;       // JSON-serialised TaskReview
   linkedEntryType: string | null;
   createdAt: string;
@@ -306,4 +324,5 @@ export type CheckInDraft = {
   tasks: { title: string; instruction: string; priority: number }[];
   activity?: CheckInActivity[];
   momentumCard?: MomentumCard | null;
+  snapshotFacts?: SnapshotFact[];  // §3.4(b) — facts from the check-in merged into the Snapshot
 };

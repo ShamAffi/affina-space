@@ -39,6 +39,12 @@ const ActivitySchema = z.array(z.object({
   count: z.number(),
 })).max(8);
 
+// §3.4(b) — facts from the check-in that belong in the Startup Snapshot
+const SnapshotFactsSchema = z.array(z.object({
+  section: z.string(),
+  fact: z.string(),
+})).max(6);
+
 const MomentumBlockSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('headline_metric'), label: z.string(), value: z.number(), delta: z.number(), trend: z.array(z.number()).optional(), sentiment: z.string().optional() }),
   z.object({ type: z.literal('milestone'), text: z.string(), period: z.enum(['3w', 'all']), value: z.number().optional() }),
@@ -68,7 +74,8 @@ PART A — Analyze the check-in:
 - mentorNote: 1–2 warm, honest sentences. No toxic positivity.
 - tasks: 1–3 specific next steps. ≤6-word titles. priority 80/60/40.
 
-PART B — Extract activity + compose the Momentum card:
+PART B — Extract activity, snapshot facts + compose the Momentum card:
+- snapshotFacts: FACTS and DECISIONS from this update that change the startup's one-page Snapshot — new numbers, changed inputs, corrections ("price is now $29", "pivoted to B2B", "first paying customer"). NOT process ("worked hard this week"). section ∈ [Founder, Project & stage, Hypothesis, Market, Customer & persona, Product, Model & North Star, Traction, Risk flags, Next focus]. [] if nothing snapshot-worthy.
 - activity: normalise the REAL-WORLD actions she mentions into [{key,label,count}]. Canonical snake_case keys reused across weeks (people_talked_to, interviews_done, experiments_run, posts_published, demos_given...). Only real actions with a count; [] if none.
 - momentumCard: you are the EDITOR of her progress card. Lead with the HIGHEST tier that has real content; lower tiers drop off as higher ones appear:
   TIER 1 traction (North Star moving, customers, revenue, milestones) → headline_metric / milestone / trajectory
@@ -180,7 +187,8 @@ Return JSON:
   "mentorNote": "...",
   "tasks": [{"title": "...", "instruction": "...", "priority": 80}],
   "activity": [{"key": "people_talked_to", "label": "People talked to", "count": 4}],
-  "momentumCard": { "mood": "progressing", "blocks": [ /* 2-4 blocks, each with "type" */ ] }
+  "momentumCard": { "mood": "progressing", "blocks": [ /* 2-4 blocks, each with "type" */ ] },
+  "snapshotFacts": [{"section": "Traction", "fact": "First 5 sign-ups from Instagram"}]
 }`;
 
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -202,8 +210,10 @@ Return JSON:
     try { activity = ActivitySchema.parse(parsed.activity); } catch { /* keep [] */ }
     let momentumCard: z.infer<typeof MomentumCardSchema> | null = null;
     try { momentumCard = MomentumCardSchema.parse(parsed.momentumCard); } catch { /* keep null */ }
+    let snapshotFacts: z.infer<typeof SnapshotFactsSchema> = [];
+    try { snapshotFacts = SnapshotFactsSchema.parse(parsed.snapshotFacts); } catch { /* keep [] */ }
 
-    return res.status(200).json({ ...draft, activity, momentumCard });
+    return res.status(200).json({ ...draft, activity, momentumCard, snapshotFacts });
   } catch {
     return res.status(502).json({ error: 'ai_unavailable' });
   }

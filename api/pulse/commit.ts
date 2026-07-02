@@ -137,10 +137,42 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     // else gap — reset to 1
   }
+  // §3.4(b) — merge check-in facts into the Startup Snapshot (mechanical, no AI call).
+  // Each fact lands in its section as a dated line; version bumps; previous version → history (cap 5).
+  type Snap = { version: number; generatedAt: string; source: string; sections: { title: string; content: string }[] };
+  let snapshotPatch: { snapshot?: Snap; snapshotHistory?: Snap[] } = {};
+  const facts = (draft.snapshotFacts ?? []) as { section: string; fact: string }[];
+  const prevSnap = user.snapshot as Snap | null;
+  if (prevSnap && facts.length > 0) {
+    const sections = prevSnap.sections.map((s) => ({ ...s }));
+    let touched = false;
+    for (const f of facts) {
+      const target = sections.find((s) => s.title.toLowerCase() === f.section.toLowerCase())
+        ?? sections.find((s) => s.title.toLowerCase().includes(f.section.toLowerCase().split(' ')[0]));
+      if (target && f.fact.trim()) {
+        target.content = `${target.content}\n• ${f.fact.trim()} (check-in ${weekOf})`.trim();
+        touched = true;
+      }
+    }
+    if (touched) {
+      const history = Array.isArray(user.snapshotHistory) ? (user.snapshotHistory as Snap[]) : [];
+      snapshotPatch = {
+        snapshot: {
+          version: prevSnap.version + 1,
+          generatedAt: now.toISOString(),
+          source: `check-in ${weekOf}`,
+          sections,
+        },
+        snapshotHistory: [...history, prevSnap].slice(-5),
+      };
+    }
+  }
+
   await db.update(users).set({
     pulseStreak: newStreak,
     lastCheckInAt: now,
     momentumCard: draft.momentumCard ?? null,
+    ...snapshotPatch,
     updatedAt: now,
   }).where(eq(users.id, user.id));
 

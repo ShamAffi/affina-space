@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { BrainEntry, AiFeedback, CompareResult, Lesson } from '../types';
+import type { BrainEntry, AiFeedback, CompareResult, Lesson, StartupSnapshot } from '../types';
 import { MODULES } from '../data';
 
 // Lesson lookup, so Documents edits respect the course's char caps and can re-run the AI mentor.
@@ -34,14 +34,22 @@ interface Props {
 
 export default function DocumentsPanel({ email, onClose, onLessonInputSaved, context }: Props) {
   const [entries, setEntries] = useState<BrainEntry[]>([]);
+  const [snapshot, setSnapshot] = useState<StartupSnapshot | null>(null);
+  const [snapshotOpen, setSnapshotOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [modalEntry, setModalEntry] = useState<BrainEntry | null>(null);
 
   useEffect(() => {
     if (!email) { setLoading(false); return; }
-    fetch(`/api/brain?email=${encodeURIComponent(email)}`)
+    fetch(`/api/brain?email=${encodeURIComponent(email)}&with=snapshot`)
       .then((r) => r.json())
-      .then((data) => { setEntries(Array.isArray(data) ? data : []); setLoading(false); })
+      .then((data) => {
+        // Snapshot is pinned separately (§3.4) — keep it out of the regular doc list
+        const list: BrainEntry[] = Array.isArray(data.entries) ? data.entries : [];
+        setEntries(list.filter((e) => e.entryType !== 'startup_snapshot'));
+        setSnapshot(data.snapshot ?? null);
+        setLoading(false);
+      })
       .catch(() => setLoading(false));
   }, [email]);
 
@@ -79,7 +87,24 @@ export default function DocumentsPanel({ email, onClose, onLessonInputSaved, con
               </div>
             )}
 
-            {!loading && entries.length === 0 && (
+            {/* 📌 Startup Snapshot — pinned first (§3.4) */}
+            {!loading && snapshot && (
+              <button
+                onClick={() => setSnapshotOpen(true)}
+                className="w-full text-left bg-brand-50 border border-brand-200 rounded-card p-4 hover:border-brand-400 transition-colors"
+              >
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-brand-700">📌 Startup Snapshot</span>
+                  <span className="ml-auto text-[10px] font-bold bg-surface text-brand-700 rounded-pill px-2 py-0.5 border border-brand-200">
+                    v{snapshot.version}
+                  </span>
+                </div>
+                <p className="text-sm font-semibold text-ink leading-snug mb-1">Your startup on one page</p>
+                <p className="text-[11px] text-brand-700/70">updated after {snapshot.source}</p>
+              </button>
+            )}
+
+            {!loading && entries.length === 0 && !snapshot && (
               <div className="flex-1 flex flex-col items-center justify-center text-center gap-3 py-16">
                 <div className="w-12 h-12 rounded-pill bg-brand-50 flex items-center justify-center">
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7150EA" strokeWidth="1.5">
@@ -113,6 +138,42 @@ export default function DocumentsPanel({ email, onClose, onLessonInputSaved, con
           onSaved={handleSaved}
           context={context}
         />
+      )}
+
+      {/* Snapshot modal — read-only (§3.4): updates flow through the weekly check-in */}
+      {snapshotOpen && snapshot && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setSnapshotOpen(false)} />
+          <div className="relative z-10 w-full max-w-lg bg-surface rounded-card shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="flex items-start justify-between gap-3 px-6 pt-6 pb-4 border-b border-hairline">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-brand-700">📌 Startup Snapshot</span>
+                <h3 className="text-base font-bold text-ink mt-0.5">Your startup on one page</h3>
+                <span className="inline-block mt-1.5 text-xs font-bold bg-brand-50 text-brand-700 rounded-pill px-2.5 py-0.5">
+                  v{snapshot.version} · updated after {snapshot.source}
+                </span>
+              </div>
+              <button onClick={() => setSnapshotOpen(false)} className="mt-0.5 w-8 h-8 flex items-center justify-center rounded-control hover:bg-inset text-ink-mute transition flex-shrink-0">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-3">
+              {snapshot.sections.map((s) => (
+                <div key={s.title}>
+                  <p className="text-[10px] font-bold text-brand-600 uppercase tracking-widest mb-1">{s.title}</p>
+                  <p className="text-sm text-ink-soft leading-relaxed whitespace-pre-wrap">{s.content}</p>
+                </div>
+              ))}
+            </div>
+            <div className="px-6 pb-5 pt-4 border-t border-hairline">
+              <p className="text-[11px] text-ink-mute leading-relaxed">
+                Something changed or looks off? Tell us in your weekly check-in — your Snapshot updates itself.
+              </p>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

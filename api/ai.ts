@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
 import { eq, and } from 'drizzle-orm';
-import { users, brainEntries, tasks } from '../src/db/schema.js';
+import { users, brainEntries, tasks, delegations } from '../src/db/schema.js';
 import { computeLaunchReadiness, LAYER_LABELS } from './lib/progressUtils.js';
 
 const FeedbackSchema = z.object({
@@ -39,8 +39,17 @@ export type CompareResult = z.infer<typeof CompareSchema>;
 
 function getDb() {
   const sql = neon(process.env.DATABASE_URL!);
-  return drizzle(sql, { schema: { users, brainEntries, tasks } });
+  return drizzle(sql, { schema: { users, brainEntries, tasks, delegations } });
 }
+
+const DELEGATE_SYSTEM = `You are Affina — the founder's AI mentor, drafting an exercise FOR her from everything you know about her startup (her Company Brain).
+
+Rules:
+- Answer the exercise prompt directly, in first person as the founder ("I", "my customer").
+- Ground every claim in her Brain data — her persona, interviews, numbers, positioning. Do not invent facts she doesn't have; where data is missing, make the most reasonable draft and mark assumptions with "(assumption)".
+- Match the format the exercise asks for (template lines, lists, one-liners).
+- Quality bar: a strong, specific draft she could submit as-is — but expect her to edit.
+- Output ONLY the draft text. No preamble, no commentary, no markdown headers.`;
 
 const FEEDBACK_SYSTEM_PROMPT = `You are Affina — a warm but honest startup mentor for early-stage female founders.
 Your job: evaluate a founder's exercise answer and return structured feedback.
@@ -110,6 +119,48 @@ Stage: ${stage || 'early'}${avoidLine}`,
     const raw = message.content[0].type === 'text' ? message.content[0].text.trim() : '';
     const name = raw.replace(/["""''`*.\n]/g, '').trim().split(/\s+/).slice(0, 2).join(' ');
     return res.status(200).json({ name });
+  }
+
+  // §4 Delegate — "Let AI mentor draft this for me" (after ≥1 user attempt; logged for the credit model)
+  if (req.body.mode === 'delegate') {
+    const { email, lessonId, lessonTitle, prompt } = req.body;
+    if (!email || !lessonId) return res.status(400).json({ error: 'email and lessonId required' });
+
+    const db = getDb();
+    const user = await db.query.users.findFirst({ where: eq(users.email, email) });
+    if (!user) return res.status(404).json({ error: 'user not found' });
+
+    const entries = await db.query.brainEntries.findMany({ where: eq(brainEntries.userId, user.id) });
+    const snap = user.snapshot as { sections: { title: string; content: string }[] } | null;
+    const snapText = snap
+      ? snap.sections.map((s) => `## ${s.title}\n${s.content}`).join('\n')
+      : '(no snapshot yet)';
+    const brainDump = entries
+      .filter((e) => e.entryType !== 'startup_snapshot' && e.lessonId !== lessonId)
+      .map((e) => `[${e.entryType}] ${(e.content ?? '').slice(0, 600)}`)
+      .join('\n\n');
+
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    try {
+      const msg = await client.messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 900,
+        system: DELEGATE_SYSTEM,
+        messages: [{
+          role: 'user',
+          content: `STARTUP SNAPSHOT:\n${snapText}\n\nOTHER BRAIN ENTRIES:\n${brainDump || '(none yet)'}\n\nEXERCISE — "${lessonTitle}":\n${prompt || 'Write the answer for this exercise.'}\n\nDraft the founder's answer.`,
+        }],
+      });
+      const aiDraft = msg.content[0].type === 'text' ? msg.content[0].text.trim() : '';
+      if (!aiDraft) throw new Error('empty');
+
+      // §10.5 — log every delegation (userId, lessonId, timestamp)
+      try { await db.insert(delegations).values({ userId: user.id, lessonId }); } catch { /* log must not block */ }
+
+      return res.status(200).json({ aiDraft });
+    } catch {
+      return res.status(502).json({ error: 'ai_unavailable' });
+    }
   }
 
   const { email, lessonId, lessonTitle, prompt, answer, aiMode, context } = req.body;

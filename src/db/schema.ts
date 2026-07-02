@@ -21,6 +21,9 @@ export const users = pgTable('users', {
   lastCheckInAt: timestamp('last_check_in_at'),
   momentumCard: jsonb('momentum_card'),  // AI-composed MomentumCard | null
   lastReadinessGain: jsonb('last_readiness_gain'),  // { delta, sourceLabel } | null
+  // Startup Snapshot (§3.4)
+  snapshot: jsonb('snapshot'),                 // current StartupSnapshot | null
+  snapshotHistory: jsonb('snapshot_history'),  // StartupSnapshot[] — last 5 versions
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
@@ -51,6 +54,9 @@ export const brainEntries = pgTable('brain_entries', {
   processedByAi: boolean('processed_by_ai').default(false),
   aiScore: integer('ai_score'),
   aiFeedback: text('ai_feedback'),
+  // Delegate (§4): keep both drafts alongside the final content
+  userDraft: text('user_draft'),
+  aiDraft: text('ai_draft'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 }, (t) => [unique().on(t.userId, t.lessonId)]);
@@ -67,7 +73,8 @@ export const tasks = pgTable('tasks', {
   submissionText: text('submission_text'),
   submissionFiles: jsonb('submission_files'),  // string[] of URLs
   submissionData: jsonb('submission_data'),    // TaskSubmissionData (interview log, template fields, url)
-  aiReview: text('ai_review'),                 // JSON TaskReview
+  briefing: text('briefing'),                  // §4b AI Mission Briefing (cached)
+  aiReview: text('ai_review'),                 // JSON TaskReview (+ optional debrief)
   linkedEntryType: text('linked_entry_type'),  // brain layer this task strengthens
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
@@ -94,6 +101,14 @@ export const achievements = pgTable('achievements', {
   value: text('value'),         // description or numeric value as string
   verified: boolean('verified').default(false),
   xp: integer('xp').notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// Delegate usage log (§4 / §10.5) — data for the future credit model
+export const delegations = pgTable('delegations', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').references(() => users.id, { onDelete: 'cascade' }),
+  lessonId: text('lesson_id').notNull(),
   createdAt: timestamp('created_at').defaultNow(),
 });
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Task, TaskReview, TaskSource, TaskSubmissionData, InterviewLogEntry, FieldArtifactType } from '../types';
 import { MODULES } from '../data';
 import InterviewLog from '../components/InterviewLog';
@@ -71,6 +71,24 @@ export default function TaskDetail({ task, email, onBack }: Props) {
 
   const source = currentTask.source as TaskSource;
   const status = currentTask.status ?? 'todo';
+
+  // §4b Mission Briefing — replaces the static WHAT TO DO on program field tasks
+  const [briefing, setBriefing] = useState<string | null>(currentTask.briefing ?? null);
+  const [briefingLoading, setBriefingLoading] = useState(false);
+  useEffect(() => {
+    if (source !== 'program' || briefing || !email) return;
+    setBriefingLoading(true);
+    fetch('/api/tasks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'briefing', email, taskId: currentTask.id }),
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d?.briefing) setBriefing(d.briefing); })
+      .catch(() => { /* static instruction stays as fallback */ })
+      .finally(() => setBriefingLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const review: TaskReview | null = (() => {
     if (!currentTask.aiReview) return null;
@@ -187,12 +205,27 @@ export default function TaskDetail({ task, email, onBack }: Props) {
           </h1>
         </div>
 
-        {/* Instruction */}
+        {/* Instruction / Mission Briefing (§4b) */}
         <div className="bg-surface border border-hairline rounded-card p-6 shadow-sm mb-6">
-          <p className="text-xs font-bold text-ink-mute uppercase tracking-widest mb-3">What to do</p>
-          <p className="text-sm text-ink-soft leading-relaxed whitespace-pre-wrap">
-            {currentTask.instruction}
-          </p>
+          {briefing ? (
+            <>
+              <p className="text-xs font-bold text-brand-600 uppercase tracking-widest mb-3">🧭 Mission briefing</p>
+              <p className="text-sm text-ink-soft leading-relaxed whitespace-pre-wrap">{briefing}</p>
+            </>
+          ) : (
+            <>
+              <p className="text-xs font-bold text-ink-mute uppercase tracking-widest mb-3">What to do</p>
+              <p className="text-sm text-ink-soft leading-relaxed whitespace-pre-wrap">
+                {currentTask.instruction}
+              </p>
+              {briefingLoading && (
+                <div className="flex items-center gap-2 mt-4 pt-3 border-t border-hairline text-xs text-ink-mute">
+                  <div className="w-3.5 h-3.5 rounded-pill border-2 border-brand-200 border-t-brand animate-spin" />
+                  Preparing your personal mission briefing…
+                </div>
+              )}
+            </>
+          )}
         </div>
 
         {/* Submission / Review area */}
@@ -421,6 +454,18 @@ function ReviewCard({ review, submissionText }: { review: TaskReview; submission
   const v = VERDICT_STYLES[review.verdict] ?? VERDICT_STYLES.good;
   return (
     <div className="flex flex-col gap-4">
+      {/* §4b Debrief — rendered on top of the review for field missions */}
+      {review.debrief && (
+        <div className="bg-brand-50 border border-brand-200 rounded-card p-5">
+          <p className="text-xs font-bold text-brand-700 uppercase tracking-widest mb-2">🧭 Mission debrief</p>
+          <p className="text-sm text-ink leading-relaxed mb-3">{review.debrief.meaning}</p>
+          <div className="bg-surface border border-brand-100 rounded-control px-4 py-3">
+            <p className="text-[10px] font-bold text-brand-600 uppercase tracking-widest mb-1">Adjust</p>
+            <p className="text-sm text-ink-soft leading-relaxed">{review.debrief.adjust}</p>
+          </div>
+        </div>
+      )}
+
       {/* Score */}
       <div className={`${v.bg} border border-hairline rounded-card p-6 flex items-center gap-5`}>
         <div className="text-center min-w-[60px]">

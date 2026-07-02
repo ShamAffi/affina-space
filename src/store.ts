@@ -64,13 +64,18 @@ export async function syncUserToDB(data: UserData): Promise<void> {
   }
 }
 
-export async function saveLessonInputToDB(email: string, lessonId: string, content: string): Promise<void> {
+export async function saveLessonInputToDB(
+  email: string,
+  lessonId: string,
+  content: string,
+  drafts?: { userDraft?: string; aiDraft?: string },
+): Promise<void> {
   if (!email) return;
   try {
     await fetch('/api/brain', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'save-input', email, lessonId, content }),
+      body: JSON.stringify({ action: 'save-input', email, lessonId, content, ...drafts }),
     });
   } catch {
     // fail silently

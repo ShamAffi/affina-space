@@ -12,6 +12,11 @@ const TaskReviewSchema = z.object({
   highlights: z.array(z.string()).min(1).max(3),
   improvements: z.array(z.string()).min(0).max(3),
   nextStep: z.string(),
+  // §4b Debrief — required for program field missions, absent otherwise
+  debrief: z.object({
+    meaning: z.string(),
+    adjust: z.string(),
+  }).nullable().optional(),
 });
 
 function getDb() {
@@ -55,21 +60,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     })
     .where(eq(tasks.id, task.id));
 
-  // AI review
+  // AI review (+ §4b Debrief for program field missions)
+  const isFieldMission = task.source === 'program';
   let review: z.infer<typeof TaskReviewSchema>;
   try {
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const debriefPart = isFieldMission
+      ? `,
+  "debrief": {
+    "meaning": "<2-3 sentences: what what-she-heard/did actually MEANS for her startup — the honest interpretation of the field results>",
+    "adjust": "<1-2 sentences: what to correct in her hypothesis, script, or approach based on this>"
+  }`
+      : '';
     const userMessage = `Task: "${task.title}"
 Full instruction: ${task.instruction}
 Founder's submission: "${submissionText.trim()}"
-
+${isFieldMission ? '\nThis was a REAL-WORLD field mission — include a debrief interpreting the results.\n' : ''}
 Return JSON:
 {
   "score": <0-100>,
   "verdict": <"strong" if ≥80, "good" if 55-79, "needs_work" if <55>,
   "highlights": [<2-3 specific things they did well>],
   "improvements": [<0-2 gaps to strengthen — omit if score≥90>],
-  "nextStep": "<one concrete follow-up action>"
+  "nextStep": "<one concrete follow-up action>"${debriefPart}
 }`;
 
     const message = await client.messages.create({
