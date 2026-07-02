@@ -5,6 +5,7 @@ import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
 import { eq, and } from 'drizzle-orm';
 import { users, tasks, brainEntries } from '../../src/db/schema.js';
+import { RUBRICS, GLOBAL_RUBRIC_RULES } from '../../src/rubrics.js';
 
 const TaskReviewSchema = z.object({
   score: z.number().int().min(0).max(100),
@@ -27,7 +28,11 @@ function getDb() {
 const REVIEW_SYSTEM_PROMPT = `You are Affina — a warm but honest startup mentor reviewing a founder's real-world task completion.
 Be specific: reference what they actually wrote. Keep each bullet to 1-2 sentences.
 Score guide: 90+ = excellent execution, 70-89 = good with minor gaps, 50-69 = partial, below 50 = needs significant improvement.
-Respond ONLY with valid JSON, no other text.`;
+Respond ONLY with valid JSON, no other text.
+
+GLOBAL RUBRIC RULES (always in force — fabrication protocol and celebration
+protocol matter most on field missions):
+${GLOBAL_RUBRIC_RULES}`;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -72,10 +77,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     "adjust": "<1-2 sentences: what to correct in her hypothesis, script, or approach based on this>"
   }`
       : '';
+    const missionRubric = task.sourceRef && RUBRICS[task.sourceRef]
+      ? `\nSCORING RUBRIC FOR THIS MISSION (overrides the generic score guide):\n${RUBRICS[task.sourceRef]}\n`
+      : '';
     const userMessage = `Task: "${task.title}"
 Full instruction: ${task.instruction}
 Founder's submission: "${submissionText.trim()}"
-${isFieldMission ? '\nThis was a REAL-WORLD field mission — include a debrief interpreting the results.\n' : ''}
+${missionRubric}${isFieldMission ? '\nThis was a REAL-WORLD field mission — include a debrief interpreting the results.\n' : ''}
 Return JSON:
 {
   "score": <0-100>,

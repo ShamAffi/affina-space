@@ -109,7 +109,7 @@ export default function LMS({ userData, onUpdateUserData, onGoToDashboard, onLog
             const parsed = JSON.parse(entry.aiFeedback);
             if (Array.isArray(parsed.candidates)) {
               compareMap[entry.lessonId] = parsed as CompareResult;
-            } else if (typeof parsed.score === 'number') {
+            } else if ('good' in parsed || typeof parsed.score === 'number') {
               feedbackMap[entry.lessonId] = parsed as AiFeedback;
             }
           } catch { /* malformed JSON — skip */ }
@@ -175,7 +175,7 @@ My motivation & 12-week goal: …`;
     setTimeout(() => setSaveAnimLesson(null), 750);
     setTimeout(() => setAvatarPing(false), 1350);
 
-    const oldScore = feedbackByLesson[lessonId]?.score;
+    const oldScore = feedbackByLesson[lessonId]?.score ?? undefined;
     setRefiningLesson(null);
 
     // After doc-fly: show spinner, call Claude
@@ -681,7 +681,7 @@ My motivation & 12-week goal: …`;
                       {activeLesson.inputPrompt && (
                         <p className="text-sm font-semibold text-brand-700 mb-3">{activeLesson.inputPrompt}</p>
                       )}
-                      {isRefining && lessonFeedback && !isCompareMode && (
+                      {isRefining && lessonFeedback && lessonFeedback.score !== null && !isCompareMode && (
                         <div className="flex items-center gap-2 mb-3 text-xs text-ink-mute">
                           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 102.13-9.36L1 10" />

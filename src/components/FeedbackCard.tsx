@@ -18,7 +18,8 @@ const VERDICT_CONFIG = {
 
 export default function FeedbackCard({ lessonTitle, prompt, answer, feedback, previousScore, onRefine, onContinue }: Props) {
   const cfg = VERDICT_CONFIG[feedback.verdict];
-  const improved = previousScore !== undefined && feedback.score > previousScore;
+  const noScore = feedback.score === null;
+  const improved = previousScore !== undefined && feedback.score !== null && feedback.score > previousScore;
 
   return (
     <div className="rounded-card border border-hairline shadow-sm bg-surface overflow-hidden mb-8 animate-slide-up">
@@ -69,16 +70,24 @@ export default function FeedbackCard({ lessonTitle, prompt, answer, feedback, pr
 
           {/* Score + optional improvement */}
           <div className="flex items-center gap-2">
-            {improved && previousScore !== undefined && (
-              <span className="text-xs text-ink-mute line-through">{previousScore}</span>
+            {noScore ? (
+              <span className="text-xs font-semibold rounded-pill px-2.5 py-1 bg-inset text-ink-soft">
+                Saved · intake isn't scored
+              </span>
+            ) : (
+              <>
+                {improved && previousScore !== undefined && (
+                  <span className="text-xs text-ink-mute line-through">{previousScore}</span>
+                )}
+                <span className={`text-lg font-bold ${cfg.score}`}>
+                  {feedback.score}
+                  <span className="text-sm font-normal text-ink-mute">/100</span>
+                </span>
+                <span className={`text-xs font-semibold rounded-pill px-2.5 py-1 ${cfg.bg} ${cfg.text}`}>
+                  {improved ? '↑ ' : ''}{cfg.label}
+                </span>
+              </>
             )}
-            <span className={`text-lg font-bold ${cfg.score}`}>
-              {feedback.score}
-              <span className="text-sm font-normal text-ink-mute">/100</span>
-            </span>
-            <span className={`text-xs font-semibold rounded-pill px-2.5 py-1 ${cfg.bg} ${cfg.text}`}>
-              {improved ? '↑ ' : ''}{cfg.label}
-            </span>
           </div>
         </div>
 

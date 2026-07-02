@@ -6,9 +6,10 @@ import { drizzle } from 'drizzle-orm/neon-http';
 import { eq, and } from 'drizzle-orm';
 import { users, brainEntries, tasks, delegations } from '../src/db/schema.js';
 import { computeExercisePoints, LAYER_LABELS } from './lib/progressUtils.js';
+import { RUBRICS, GLOBAL_RUBRIC_RULES, NO_SCORE_LESSONS } from '../src/rubrics.js';
 
 const FeedbackSchema = z.object({
-  score: z.number().int().min(0).max(100),
+  score: z.number().int().min(0).max(100).nullable(),
   verdict: z.enum(['strong', 'ok', 'can_be_stronger']),
   good: z.array(z.string()).min(1).max(2),
   missing: z.array(z.string()).min(1).max(3),
@@ -60,7 +61,10 @@ Rules:
 - Identify concrete gaps (not vague "improve your phrasing" — say exactly what's missing).
 - Give exactly ONE next step. If it's a real-world action outside the app (e.g. interview customers, build a landing page, run an ad), set realWorldTask with a short imperative title (≤6 words) AND the full detailed instruction. If it's just an in-app rewrite, set realWorldTask to null.
 - Tone: warm but direct. "This describes the product, not the value to the person" — not "Great work!".
-- Respond ONLY with valid JSON, no other text.`;
+- Respond ONLY with valid JSON, no other text.
+
+GLOBAL RUBRIC RULES (always in force):
+${GLOBAL_RUBRIC_RULES}`;
 
 const COMPARE_SYSTEM_PROMPT = `You are Affina — a startup mentor for early-stage female founders.
 Your job: score 3 candidate customer segments and recommend the best beachhead to start with.
@@ -178,10 +182,13 @@ Stage: ${stage || 'early'}${avoidLine}`,
 
   try {
     if (isCompare) {
+      const compareRubric = RUBRICS[lessonId]
+        ? `\nSCORING RUBRIC FOR THIS BLOCK:\n${RUBRICS[lessonId]}\n`
+        : '';
       const userMessage = `Lesson: ${lessonTitle}
 Exercise: ${prompt}
 Founder's answer: "${answer}"
-
+${compareRubric}
 Return JSON with exactly this structure:
 {
   "candidates": [
@@ -209,15 +216,21 @@ Return JSON with exactly this structure:
       if (!match) throw new Error('no JSON in response');
       result = CompareSchema.parse(JSON.parse(match[0]));
     } else {
+      const rubric = RUBRICS[lessonId];
+      const noScore = NO_SCORE_LESSONS.includes(lessonId);
+      const rubricBlock = rubric
+        ? `\nSCORING RUBRIC FOR THIS BLOCK (overrides the generic rubric):\n${rubric}\n`
+        : '\nEvaluation rubric: problem clarity · target segment · measurable result\n';
+      const scoreLine = noScore
+        ? '"score": null,  // DO NOT SCORE this intake block — extraction + follow-ups only (see rubric)'
+        : '"score": <integer 0-100>,';
       const userMessage = `Lesson: ${lessonTitle}
 Exercise: ${prompt}
 Founder's answer: "${answer}"
-
-Evaluation rubric: problem clarity · target segment · measurable result
-
+${rubricBlock}
 Return JSON with exactly this structure:
 {
-  "score": <integer 0-100>,
+  ${scoreLine}
   "verdict": <"strong" if score≥80, "ok" if score 55-79, "can_be_stronger" if score<55>,
   "good": [<1-2 specific strengths from their actual answer>],
   "missing": [<1-3 specific gaps referencing what they wrote — not generic advice>],

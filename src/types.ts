@@ -126,7 +126,7 @@ export type SnapshotFact = { section: string; fact: string };
 export type FeedbackVerdict = 'strong' | 'ok' | 'can_be_stronger';
 
 export type AiFeedback = {
-  score: number;
+  score: number | null;   // null = NO-SCORE block (M0 intake: extraction + follow-ups only)
   verdict: FeedbackVerdict;
   good: string[];
   missing: string[];
