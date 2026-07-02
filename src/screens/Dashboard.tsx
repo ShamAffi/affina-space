@@ -1,10 +1,11 @@
 import { useEffect, useState, useCallback } from 'react';
 import { MODULES } from '../data';
-import type { UserData, BrainEntry, TrackName, ProgressResponse, Task, TaskSource } from '../types';
+import type { UserData, BrainEntry, TrackName, ProgressResponse, Task, TaskSource, MentorSessionId, MentorSessionsState } from '../types';
 import ProfileButton from '../components/ProfileButton';
 import AccountPanel from '../components/AccountPanel';
 import DocumentsPanel from '../components/DocumentsPanel';
 import MomentumCard from '../components/MomentumCard';
+import MentorSessionModal from '../components/MentorSessionModal';
 
 const TASK_SOURCE_CHIP: Record<TaskSource, string> = {
   program: 'bg-brand-100 text-brand-800',
@@ -109,6 +110,32 @@ export default function Dashboard({ userData, onUpdateUserData, onGoToLMS, onGoT
   const modulesCompleted = MODULES.filter((m) => m.lessons.every((l) => userData.completedLessons.includes(l.id))).length;
   const momentumCard = progressData?.momentumCard ?? null;
   const streak = progressData?.streak ?? 0;
+  const northStar = progressData?.northStar ?? null;
+
+  // §6.5 mentor sessions — due when the trigger module is complete and the session isn't marked done
+  const [sessionsState, setSessionsState] = useState<MentorSessionsState>({});
+  const [openSession, setOpenSession] = useState<MentorSessionId | null>(null);
+  useEffect(() => {
+    if (progressData?.mentorSessions) setSessionsState(progressData.mentorSessions);
+  }, [progressData]);
+  const doneSet = new Set(userData.completedLessons);
+  const dueSession: MentorSessionId | null = (() => {
+    for (const m of MODULES) {
+      if (!m.mentorSessionAfter) continue;
+      const complete = m.lessons.every((l) => doneSet.has(l.id));
+      if (complete && !sessionsState[m.mentorSessionAfter]?.completed) return m.mentorSessionAfter;
+    }
+    return null;
+  })();
+
+  // §5 program map — done / current / locked states for all 13 modules
+  const moduleStates = MODULES.map((m, i) => {
+    const done = m.lessons.every((l) => doneSet.has(l.id));
+    const unlocked = i === 0 || MODULES[i - 1].lessons.every((l) => doneSet.has(l.id));
+    const state: 'done' | 'current' | 'locked' = done ? 'done' : unlocked ? 'current' : 'locked';
+    const firstOpen = m.lessons.find((l) => !doneSet.has(l.id)) ?? m.lessons[0];
+    return { module: m, state, firstOpen };
+  });
 
   return (
     <div className="min-h-screen bg-canvas">
@@ -178,6 +205,85 @@ export default function Dashboard({ userData, onUpdateUserData, onGoToLMS, onGoT
           ) : (
             <GrowthCard progressData={progressData} />
           )}
+        </div>
+
+        {/* 📅 Mentor session due (§6.5) */}
+        {dueSession && (
+          <div className="flex items-center gap-3 bg-brand-50 border border-brand-200 rounded-card px-5 py-4 mb-6">
+            <span className="text-2xl flex-shrink-0">📅</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-brand-800">
+                Mentor session {dueSession} is due
+              </p>
+              <p className="text-xs text-brand-700/70 mt-0.5">
+                {dueSession === 'S1' ? 'You finished Module 4 — time for your Start session with a real mentor.'
+                  : dueSession === 'S2' ? 'You finished Module 9 — book your Midpoint review.'
+                  : 'You finished the program — book your Graduation session.'}
+              </p>
+            </div>
+            <button
+              onClick={() => setOpenSession(dueSession)}
+              className="flex-shrink-0 bg-brand hover:bg-brand-700 active:scale-95 text-white text-sm font-semibold px-5 py-2.5 rounded-pill transition-all duration-150"
+            >
+              View & book →
+            </button>
+          </div>
+        )}
+
+        {/* 🗺 Program map (§5) + North Star widget */}
+        <div className="bg-surface border border-hairline rounded-card p-5 shadow-sm mb-6">
+          <div className="flex items-center gap-2 mb-4 flex-wrap">
+            <div>
+              <p className="text-sm font-bold text-ink">Program map</p>
+              <p className="text-xs text-ink-mute mt-0.5">{modulesCompleted} of {MODULES.length} modules complete</p>
+            </div>
+            {northStar && (
+              <button
+                onClick={onGoToPulse}
+                className="ml-auto flex items-center gap-2 bg-brand-50 border border-brand-100 hover:border-brand-300 rounded-pill px-4 py-2 transition-colors"
+              >
+                <span className="text-sm">⭐</span>
+                <span className="text-xs font-bold text-brand-800">{northStar.label}</span>
+                <span className="text-[10px] text-brand-600">track weekly →</span>
+              </button>
+            )}
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+            {moduleStates.map(({ module: m, state, firstOpen }) => (
+              <button
+                key={m.id}
+                onClick={() => state !== 'locked' && onGoToLMS(firstOpen.id)}
+                disabled={state === 'locked'}
+                title={`${m.title}${m.paid ? ' · Premium' : ''}`}
+                className={`flex-shrink-0 w-[92px] text-left rounded-control border p-2.5 transition-all duration-150 ${
+                  state === 'done'
+                    ? 'bg-brand border-brand text-white hover:bg-brand-700'
+                    : state === 'current'
+                      ? 'bg-brand-50 border-brand-300 hover:border-brand-400'
+                      : 'bg-inset border-hairline opacity-60 cursor-not-allowed'
+                }`}
+              >
+                <div className="flex items-center gap-1 mb-1">
+                  <span className={`text-[10px] font-bold ${state === 'done' ? 'text-white/80' : state === 'current' ? 'text-brand-700' : 'text-ink-mute'}`}>
+                    M{m.order}
+                  </span>
+                  {state === 'done' && <span className="text-[10px] text-white">✓</span>}
+                  {state === 'current' && <span className="w-1.5 h-1.5 rounded-pill bg-brand animate-pulse" />}
+                  {state === 'locked' && (
+                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#9D9DA6" strokeWidth="2.5" className="flex-shrink-0">
+                      <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" />
+                    </svg>
+                  )}
+                  {m.mentorSessionAfter && <span className="ml-auto text-[9px]">📅</span>}
+                </div>
+                <p className={`text-[10px] font-semibold leading-tight line-clamp-2 ${
+                  state === 'done' ? 'text-white' : state === 'current' ? 'text-ink' : 'text-ink-mute'
+                }`}>
+                  {m.title}
+                </p>
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Three columns */}
@@ -312,6 +418,18 @@ export default function Dashboard({ userData, onUpdateUserData, onGoToLMS, onGoT
           />
         </div>
       </main>
+
+      {openSession && (
+        <MentorSessionModal
+          session={openSession}
+          email={userData.email}
+          completed={!!sessionsState[openSession]?.completed}
+          onClose={() => setOpenSession(null)}
+          onCompletedChange={(completed) =>
+            setSessionsState((s) => ({ ...s, [openSession]: { completed } }))
+          }
+        />
+      )}
 
       {panel === 'account' && (
         <AccountPanel userData={userData} onClose={() => setPanel('none')} onSave={onUpdateUserData} />

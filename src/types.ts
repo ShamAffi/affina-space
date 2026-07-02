@@ -215,13 +215,26 @@ export type Phase = 'launch' | 'growth';
 
 export type LastReadinessGain = { delta: number; sourceLabel: string };
 
+// §7 Launch Readiness v2 breakdown
+export type ReadinessBreakdown = {
+  seed: number;
+  lessons: number;
+  exercises: number;
+  field: number;
+  checkpoints: number;
+  traction: number;
+};
+
+// §6.5 mentor sessions state — completion is set manually in v2
+export type MentorSessionId = 'S1' | 'S2' | 'S3';
+export type MentorSessionsState = Partial<Record<MentorSessionId, { completed?: boolean }>>;
+
 export type LaunchProgress = {
   phase: 'launch';
   launch: {
     readiness: number;
     seed: number;
-    weakestLayer: string | null;
-    unmetRequired: string[];
+    breakdown: ReadinessBreakdown | null;
   };
   completedLessons: string[];
   lessonInputs: Record<string, string>;
@@ -229,6 +242,8 @@ export type LaunchProgress = {
   streak?: number;
   lastCheckInAt?: string | null;
   lastReadinessGain?: LastReadinessGain | null;
+  northStar?: NorthStarValue | null;
+  mentorSessions?: MentorSessionsState | null;
 };
 
 export type GrowthProgress = {
@@ -246,6 +261,8 @@ export type GrowthProgress = {
   streak?: number;
   lastCheckInAt?: string | null;
   lastReadinessGain?: LastReadinessGain | null;
+  northStar?: NorthStarValue | null;
+  mentorSessions?: MentorSessionsState | null;
 };
 
 export type ProgressResponse = LaunchProgress | GrowthProgress;

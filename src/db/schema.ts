@@ -24,6 +24,8 @@ export const users = pgTable('users', {
   // Startup Snapshot (§3.4)
   snapshot: jsonb('snapshot'),                 // current StartupSnapshot | null
   snapshotHistory: jsonb('snapshot_history'),  // StartupSnapshot[] — last 5 versions
+  // Mentor sessions (§6.5): { S1?: { completed?: boolean }, S2?: ..., S3?: ... }
+  mentorSessions: jsonb('mentor_sessions'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });

@@ -1,7 +1,8 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { MODULES } from '../data';
-import type { UserData, Lesson, AiFeedback, CompareResult, BrainEntry, NorthStarSuggestion, NorthStarCandidate, BlockKind, StartupSnapshot } from '../types';
+import type { UserData, Lesson, AiFeedback, CompareResult, BrainEntry, NorthStarSuggestion, NorthStarCandidate, BlockKind, StartupSnapshot, MentorSessionId, MentorSessionsState } from '../types';
 import { blockKind } from '../types';
+import MentorSessionModal from '../components/MentorSessionModal';
 import { saveLessonInputToDB, toggleLessonCompleteToDB, syncUserToDB, loadProgressFromDB } from '../store';
 import ProfileButton from '../components/ProfileButton';
 import AccountPanel from '../components/AccountPanel';
@@ -51,6 +52,9 @@ export default function LMS({ userData, onUpdateUserData, onGoToDashboard, onLog
   const [feedbackByLesson, setFeedbackByLesson] = useState<Record<string, AiFeedback & { previousScore?: number }>>({});
   const [compareByLesson, setCompareByLesson] = useState<Record<string, CompareResult>>({});
   const [refiningLesson, setRefiningLesson] = useState<string | null>(null);
+  // §6.5 mentor sessions
+  const [openSession, setOpenSession] = useState<MentorSessionId | null>(null);
+  const [sessionsState, setSessionsState] = useState<MentorSessionsState>({});
   // §4 Delegate — Try → Review → Delegate
   const [delegating, setDelegating] = useState<string | null>(null);
   const [delegateOpen, setDelegateOpen] = useState<string | null>(null);
@@ -80,6 +84,8 @@ export default function LMS({ userData, onUpdateUserData, onGoToDashboard, onLog
       fetch(`/api/brain?email=${enc}`).then((r) => r.json()).catch(() => []),
     ]).then(([dbProgress, brainData]) => {
       if (dbProgress) {
+        const ms = (dbProgress as { mentorSessions?: MentorSessionsState }).mentorSessions;
+        if (ms) setSessionsState(ms);
         const merged = {
           completedLessons: [
             ...new Set([...userData.completedLessons, ...dbProgress.completedLessons]),
@@ -398,6 +404,18 @@ My motivation & 12-week goal: …`;
                       );
                     })}
                   </div>
+
+                  {/* 📅 §6.5 — mentor session marker after M4/M9/M12 */}
+                  {mod.mentorSessionAfter && (
+                    <button
+                      onClick={() => setOpenSession(mod.mentorSessionAfter!)}
+                      className="mt-1 w-full flex items-center gap-2 px-3 py-2 rounded-control text-xs font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 transition-colors"
+                    >
+                      <span>📅</span>
+                      Mentor Session {mod.mentorSessionAfter}
+                      {sessionsState[mod.mentorSessionAfter!]?.completed && <span className="ml-auto text-accent-600">✓ done</span>}
+                    </button>
+                  )}
                 </div>
               );
             })}
@@ -744,6 +762,18 @@ My motivation & 12-week goal: …`;
           </div>
         </main>
       </div>
+
+      {openSession && (
+        <MentorSessionModal
+          session={openSession}
+          email={userData.email}
+          completed={!!sessionsState[openSession]?.completed}
+          onClose={() => setOpenSession(null)}
+          onCompletedChange={(completed) =>
+            setSessionsState((st) => ({ ...st, [openSession]: { completed } }))
+          }
+        />
+      )}
 
       {/* Panels */}
       {panel === 'account' && (

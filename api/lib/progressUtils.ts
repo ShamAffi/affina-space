@@ -104,8 +104,6 @@ export const GROWTH_XP = {
 
 export const GROWTH_SEED_XP = Math.round(GROWTH_TIERS[1].xpThreshold * 0.2); // 100
 
-const TOTAL_POSSIBLE_WEIGHT = Object.values(LAUNCH_LAYER_WEIGHTS).reduce((s, w) => s + w, 0);
-
 type BrainRow = { entryType: string; aiScore: number | null };
 
 export type LaunchReadiness = {
@@ -131,39 +129,80 @@ export function onboardingSeed(onboardingScore: number): number {
   return Math.min(ONBOARDING_SEED_MAX, Math.max(0, Math.round(onboardingScore / 10)));
 }
 
-export function computeLaunchReadiness(
-  brainEntries: BrainRow[],
-  onboardingScore = 0,
-): LaunchReadiness {
-  const scoreMap: Record<string, number> = {};
-  for (const e of brainEntries) {
-    if (e.aiScore !== null) scoreMap[e.entryType] = e.aiScore;
+// ─── Launch Readiness v2 (SPEC §7) ───────────────────────────────────────────
+// readiness = min(100, seed + lessons + exercises + field + checkpoints + traction)
+// Real-world actions weigh several times more than lessons; 100 ≈ launch-ready.
+
+// Field-mission points by lessonId (§7 table). Unlisted done missions get the default.
+export const FIELD_POINTS: Record<string, number> = {
+  m2l7: 2,   // competitor journey
+  m3l7: 3,   // 1–2 warm interviews
+  m4l9: 4,   // micro-commitment
+  m5l7: 5,   // 5–10 WTP interviews
+  m6l8: 6,   // site/MVP launch
+  m7l8: 4,   // channel results
+  m8l6: 8,   // first paid deal — the program's North Star
+  m9l6: 3,   // non-buyer interviews
+  m11l6: 4,  // verification sprint
+  m12l6: 3,  // investor outreach
+};
+const FIELD_DEFAULT = 2;
+const CAP = { lessons: 10, exercises: 20, field: 42, checkpoints: 6, traction: 12 };
+
+export type ReadinessBreakdown = {
+  seed: number;
+  lessons: number;
+  exercises: number;
+  field: number;
+  checkpoints: number;
+  traction: number;
+};
+
+// Exercise points: +1 per exercise scored ≥50, +1.5 if ≥80 (cap 20).
+// Shared with /api/ai and /api/northstar so lastReadinessGain deltas match the formula.
+export function computeExercisePoints(rows: BrainRow[]): number {
+  let pts = 0;
+  for (const e of rows) {
+    if (e.entryType === 'startup_snapshot' || e.aiScore == null) continue;
+    if (e.aiScore >= 80) pts += 1.5;
+    else if (e.aiScore >= 50) pts += 1;
   }
+  return Math.min(pts, CAP.exercises);
+}
 
-  // TODO(activity-points): currently only scored Brain layers count toward readiness.
-  // Closed tasks and Pulse check-in streaks contribute 0. Planned: fold real activity
-  // (e.g. +N per completed task, +N per consecutive check-in week) into the same 0–90 scale.
-  // Design deferred — see project memory "activity-points-backlog".
+export type ReadinessInputs = {
+  onboardingScore: number;
+  theoryDoneCount: number;                       // completed lessons with kind 'theory'
+  brainRows: BrainRow[];                         // for exercise points
+  fieldDone: string[];                           // lessonIds of program field tasks with status done
+  checkpointsPassed: number;                     // of M4/M9 (0–2)
+  checkInMetrics: { name: string; value: number }[][]; // metrics per check-in, oldest→newest
+};
 
-  // Course points: each scored Brain layer adds weight×score, normalised to 0–100.
-  let weightedSum = 0;
-  for (const [type, weight] of Object.entries(LAUNCH_LAYER_WEIGHTS)) {
-    weightedSum += weight * (scoreMap[type] ?? 0);
-  }
-  const coursePoints = TOTAL_POSSIBLE_WEIGHT > 0 ? weightedSum / TOTAL_POSSIBLE_WEIGHT : 0;
+export function computeLaunchReadiness(inp: ReadinessInputs): { readiness: number; breakdown: ReadinessBreakdown } {
+  const seed = onboardingSeed(inp.onboardingScore);
+  const lessons = Math.min(Math.round(inp.theoryDoneCount * 0.4 * 10) / 10, CAP.lessons);
+  const exercises = computeExercisePoints(inp.brainRows);
 
-  // Head-start from the onboarding idea score + course work, capped at the 90 launch ceiling.
-  const readiness = Math.min(Math.round(coursePoints + onboardingSeed(onboardingScore)), 90);
+  let field = 0;
+  for (const id of inp.fieldDone) field += FIELD_POINTS[id] ?? FIELD_DEFAULT;
+  field = Math.min(field, CAP.field);
 
-  const scored = brainEntries.filter((e) => e.aiScore !== null);
-  const weakest = [...scored].sort((a, b) => (a.aiScore ?? 100) - (b.aiScore ?? 100))[0];
-  const unmetRequired = LAUNCH_REQUIRED_LAYERS.filter((l) => !(l in scoreMap));
-  return {
-    readiness,
-    seed: onboardingSeed(onboardingScore),
-    weakestLayer: weakest?.entryType ?? null,
-    unmetRequired,
-  };
+  const checkpoints = Math.min(inp.checkpointsPassed * 3, CAP.checkpoints);
+
+  // Traction milestones from Pulse — milestone-based, never "per check-in" (anti-gaming §7)
+  let traction = 0;
+  const all = inp.checkInMetrics.flat();
+  if (all.some((m) => m.value > 0 && /signup|regist|waitlist|subscriber|user/i.test(m.name))) traction += 3;
+  if (all.some((m) => m.value > 0 && /revenue|mrr|sale|paid|income|\$/i.test(m.name))) traction += 6;
+  // sustained growth: any metric tracked 3+ times whose latest value beats the first
+  const series: Record<string, number[]> = {};
+  for (const ci of inp.checkInMetrics) for (const m of ci) (series[m.name.toLowerCase()] ??= []).push(m.value);
+  if (Object.values(series).some((v) => v.length >= 3 && v[v.length - 1] > v[0])) traction += 3;
+  traction = Math.min(traction, CAP.traction);
+
+  const readiness = Math.min(100, Math.round(seed + lessons + exercises + field + checkpoints + traction));
+  return { readiness, breakdown: { seed, lessons: Math.round(lessons), exercises: Math.round(exercises), field, checkpoints, traction } };
 }
 
 export function computeGrowth(growthXp: number): GrowthState {

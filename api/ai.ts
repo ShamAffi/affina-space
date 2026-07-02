@@ -5,7 +5,7 @@ import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
 import { eq, and } from 'drizzle-orm';
 import { users, brainEntries, tasks, delegations } from '../src/db/schema.js';
-import { computeLaunchReadiness, LAYER_LABELS } from './lib/progressUtils.js';
+import { computeExercisePoints, LAYER_LABELS } from './lib/progressUtils.js';
 
 const FeedbackSchema = z.object({
   score: z.number().int().min(0).max(100),
@@ -260,16 +260,13 @@ Return JSON with exactly this structure:
           .where(and(eq(brainEntries.userId, user.id), eq(brainEntries.lessonId, lessonId)));
 
         // Record the readiness gain from this scored exercise (feedback mode only — compare has no score).
+        // §7: exercises contribute +1 (score ≥50) / +1.5 (score ≥80) — delta comes from that component.
         if (!isCompare) {
           const allEntries = await db.query.brainEntries.findMany({ where: eq(brainEntries.userId, user.id) });
-          const after = computeLaunchReadiness(
-            allEntries.map((e) => ({ entryType: e.entryType, aiScore: e.aiScore ?? null })),
-            user.score ?? 0,
-          ).readiness;
-          const before = computeLaunchReadiness(
-            allEntries.map((e) => ({ entryType: e.entryType, aiScore: e.lessonId === lessonId ? oldScore : (e.aiScore ?? null) })),
-            user.score ?? 0,
-          ).readiness;
+          const after = computeExercisePoints(
+            allEntries.map((e) => ({ entryType: e.entryType, aiScore: e.aiScore ?? null })));
+          const before = computeExercisePoints(
+            allEntries.map((e) => ({ entryType: e.entryType, aiScore: e.lessonId === lessonId ? oldScore : (e.aiScore ?? null) })));
           const delta = after - before;
           if (delta > 0) {
             await db.update(users).set({

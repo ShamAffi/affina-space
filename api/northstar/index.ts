@@ -5,7 +5,7 @@ import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
 import { eq, desc } from 'drizzle-orm';
 import { users, brainEntries, checkIns } from '../../src/db/schema.js';
-import { computeLaunchReadiness, LAYER_LABELS } from '../lib/progressUtils.js';
+import { computeExercisePoints, LAYER_LABELS } from '../lib/progressUtils.js';
 
 function getDb() {
   const sql = neon(process.env.DATABASE_URL!);
@@ -213,18 +213,14 @@ Evaluate this metric. Return JSON:
       });
     }
 
-    // Readiness gain from setting/strengthening the North Star.
+    // Readiness gain from setting/strengthening the North Star (§7 exercise points).
     const baseRows = brain
       .filter((e) => e.entryType !== 'north_star')
       .map((e) => ({ entryType: e.entryType, aiScore: e.aiScore ?? null }));
-    const after = computeLaunchReadiness(
-      [...baseRows, { entryType: 'north_star', aiScore: evaluation.score }],
-      user.score ?? 0,
-    ).readiness;
-    const before = computeLaunchReadiness(
-      existing ? [...baseRows, { entryType: 'north_star', aiScore: existing.aiScore ?? null }] : baseRows,
-      user.score ?? 0,
-    ).readiness;
+    const after = computeExercisePoints(
+      [...baseRows, { entryType: 'north_star', aiScore: evaluation.score }]);
+    const before = computeExercisePoints(
+      existing ? [...baseRows, { entryType: 'north_star', aiScore: existing.aiScore ?? null }] : baseRows);
     const gainDelta = after - before;
 
     // Update users.north_star (+ readiness gain line)

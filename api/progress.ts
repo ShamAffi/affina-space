@@ -2,13 +2,21 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
 import { eq } from 'drizzle-orm';
-import { users, lessonInputs, completedLessons, brainEntries } from '../src/db/schema.js';
-import { computeLaunchReadiness, computeGrowth, GROWTH_SEED_XP } from './lib/progressUtils.js';
+import { users, lessonInputs, completedLessons, brainEntries, tasks, checkIns } from '../src/db/schema.js';
+import { computeLaunchReadiness, computeGrowth, GROWTH_SEED_XP, onboardingSeed } from './lib/progressUtils.js';
+import { MODULES } from '../src/data.js';
+import { blockKind } from '../src/types.js';
 
 function getDb() {
   const sql = neon(process.env.DATABASE_URL!);
-  return drizzle(sql, { schema: { users, lessonInputs, completedLessons, brainEntries } });
+  return drizzle(sql, { schema: { users, lessonInputs, completedLessons, brainEntries, tasks, checkIns } });
 }
+
+// Theory lesson ids + checkpoint modules (M4/M9) resolved once from the program map
+const THEORY_IDS = new Set(
+  MODULES.flatMap((m) => m.lessons.filter((l) => blockKind(l) === 'theory').map((l) => l.id)),
+);
+const CHECKPOINT_MODULES = MODULES.filter((m) => m.mentorSessionAfter === 'S1' || m.mentorSessionAfter === 'S2');
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -56,7 +64,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!user) {
       return res.status(200).json({
         phase: 'launch',
-        launch: { readiness: 0, seed: 0, weakestLayer: null, unmetRequired: [] },
+        launch: { readiness: 0, seed: 0, breakdown: null },
         completedLessons: [],
         lessonInputs: {},
       });
@@ -84,34 +92,55 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         streak: user.pulseStreak ?? 0,
         lastCheckInAt: user.lastCheckInAt ?? null,
         lastReadinessGain: user.lastReadinessGain ?? null,
+        northStar: user.northStar ?? null,
+        mentorSessions: user.mentorSessions ?? null,
       });
     }
 
-    // launch phase — compute readiness from brain entries
-    const brain = await db.query.brainEntries.findMany({
-      where: eq(brainEntries.userId, user.id),
-    });
+    // launch phase — Launch Readiness v2 (§7): seed + lessons + exercises + field + checkpoints + traction
+    const [brain, userTasks, userCheckIns] = await Promise.all([
+      db.query.brainEntries.findMany({ where: eq(brainEntries.userId, user.id) }),
+      db.query.tasks.findMany({ where: eq(tasks.userId, user.id) }),
+      db.query.checkIns.findMany({ where: eq(checkIns.userId, user.id) }),
+    ]);
 
-    const launch = computeLaunchReadiness(
-      brain.map((e) => ({ entryType: e.entryType, aiScore: e.aiScore ?? null })),
-      user.score ?? 0,
-    );
+    const doneSet = new Set(completedIds);
+    const theoryDoneCount = completedIds.filter((id) => THEORY_IDS.has(id)).length;
+    const fieldDone = userTasks
+      .filter((t) => t.source === 'program' && t.status === 'done' && t.sourceRef)
+      .map((t) => t.sourceRef as string);
+    const checkpointsPassed = CHECKPOINT_MODULES
+      .filter((m) => m.lessons.every((l) => doneSet.has(l.id))).length;
+    const checkInMetrics = [...userCheckIns]
+      .sort((a, b) => a.weekOf.localeCompare(b.weekOf))
+      .map((ci) => (Array.isArray(ci.metrics) ? (ci.metrics as { name: string; value: number }[]) : []));
+
+    const { readiness, breakdown } = computeLaunchReadiness({
+      onboardingScore: user.score ?? 0,
+      theoryDoneCount,
+      brainRows: brain.map((e) => ({ entryType: e.entryType, aiScore: e.aiScore ?? null })),
+      fieldDone,
+      checkpointsPassed,
+      checkInMetrics,
+    });
 
     return res.status(200).json({
       phase: 'launch',
-      launch,
+      launch: { readiness, seed: onboardingSeed(user.score ?? 0), breakdown },
       completedLessons: completedIds,
       lessonInputs: inputsMap,
       momentumCard: user.momentumCard ?? null,
       streak: user.pulseStreak ?? 0,
       lastCheckInAt: user.lastCheckInAt ?? null,
       lastReadinessGain: user.lastReadinessGain ?? null,
+      northStar: user.northStar ?? null,
+      mentorSessions: user.mentorSessions ?? null,
     });
   } catch (err) {
     console.error('progress error', err);
     return res.status(200).json({
       phase: 'launch',
-      launch: { readiness: 0, seed: 0, weakestLayer: null, unmetRequired: [] },
+      launch: { readiness: 0, seed: 0, breakdown: null },
       completedLessons: [],
       lessonInputs: {},
     });

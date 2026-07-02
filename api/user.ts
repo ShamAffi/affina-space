@@ -67,13 +67,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 
-  // PATCH /api/user — update account fields (name, projectName)
+  // PATCH /api/user — update account fields (name, projectName, mentorSessions)
   if (req.method === 'PATCH') {
-    const { email, name, projectName } = req.body;
+    const { email, name, projectName, mentorSessions } = req.body;
     if (!email) return res.status(400).json({ error: 'email required' });
     const patchFields: Record<string, unknown> = { updatedAt: new Date() };
     if (name !== undefined) patchFields.name = name;
     if (projectName !== undefined) patchFields.projectName = projectName;
+    if (mentorSessions !== undefined) patchFields.mentorSessions = mentorSessions;
     await db.update(users).set(patchFields).where(eq(users.email, email));
     return res.status(200).json({ ok: true });
   }
