@@ -6,6 +6,7 @@ import { drizzle } from 'drizzle-orm/neon-http';
 import { eq, and } from 'drizzle-orm';
 import { users, tasks, brainEntries } from '../../src/db/schema.js';
 import { RUBRICS, GLOBAL_RUBRIC_RULES } from '../../src/rubrics.js';
+import { FIELD_POINTS, LAYER_LABELS } from '../lib/progressUtils.js';
 
 const TaskReviewSchema = z.object({
   score: z.number().int().min(0).max(100),
@@ -118,6 +119,19 @@ Return JSON:
     .set({ aiReview: JSON.stringify(review), status: finalStatus, updatedAt: new Date() })
     .where(eq(tasks.id, task.id))
     .returning();
+
+  // §7: a program field mission reaching done for the FIRST time earns its readiness
+  // points (first sale +8, site launch +6, …) — surface it as the "+Δ from your X" line.
+  if (finalStatus === 'done' && task.source === 'program' && task.sourceRef && task.status !== 'done') {
+    try {
+      const delta = FIELD_POINTS[task.sourceRef] ?? 2;
+      const label = LAYER_LABELS[task.linkedEntryType ?? ''] ?? 'field mission';
+      await db.update(users).set({
+        lastReadinessGain: { delta, sourceLabel: label },
+        updatedAt: new Date(),
+      }).where(eq(users.id, user.id));
+    } catch { /* gain line must never block the submit */ }
+  }
 
   // score ≥ 50 → save to brain_entries so it appears in Documents
   if (review.score >= 50) {
