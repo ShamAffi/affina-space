@@ -1,0 +1,210 @@
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+import Anthropic from '@anthropic-ai/sdk';
+import { z } from 'zod';
+import { neon } from '@neondatabase/serverless';
+import { drizzle } from 'drizzle-orm/neon-http';
+import { eq, desc } from 'drizzle-orm';
+import { users, checkIns, completedLessons, brainEntries } from '../../src/db/schema.js';
+import { MODULES } from '../../src/data.js';
+
+function getDb() {
+  const sql = neon(process.env.DATABASE_URL!);
+  return drizzle(sql, { schema: { users, checkIns, completedLessons, brainEntries } });
+}
+
+const DraftSchema = z.object({
+  headline: z.string(),
+  keyResults: z.array(z.object({
+    type: z.enum(['win', 'setback', 'milestone']),
+    text: z.string(),
+    metric: z.string().optional(),
+  })).min(1).max(5),
+  metrics: z.array(z.object({
+    name: z.string(),
+    value: z.number(),
+    delta: z.number(),
+  })),
+  sentiment: z.enum(['energized', 'steady', 'struggling']),
+  mentorNote: z.string(),
+  tasks: z.array(z.object({
+    title: z.string(),
+    instruction: z.string(),
+    priority: z.number().int(),
+  })).min(1).max(3),
+});
+
+const ActivitySchema = z.array(z.object({
+  key: z.string(),
+  label: z.string(),
+  count: z.number(),
+})).max(8);
+
+const MomentumBlockSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('headline_metric'), label: z.string(), value: z.number(), delta: z.number(), trend: z.array(z.number()).optional(), sentiment: z.string().optional() }),
+  z.object({ type: z.literal('milestone'), text: z.string(), period: z.enum(['3w', 'all']), value: z.number().optional() }),
+  z.object({ type: z.literal('trajectory'), text: z.string(), trend: z.array(z.number()).optional() }),
+  z.object({ type: z.literal('this_week'), items: z.array(z.object({ kind: z.enum(['win', 'learning', 'setback']), text: z.string() })).min(1).max(4) }),
+  z.object({ type: z.literal('cumulative'), stats: z.array(z.object({ label: z.string(), value: z.union([z.number(), z.string()]) })).min(1).max(4) }),
+  z.object({ type: z.literal('learning_progress'), stats: z.array(z.object({ label: z.string(), value: z.union([z.number(), z.string()]) })).min(1).max(4) }),
+  z.object({ type: z.literal('streak'), weeks: z.number(), text: z.string() }),
+  z.object({ type: z.literal('encouragement'), text: z.string() }),
+  z.object({ type: z.literal('nudge'), text: z.string() }),
+]);
+
+const MomentumCardSchema = z.object({
+  mood: z.enum(['building', 'progressing', 'traction', 'recovering', 'quiet']),
+  blocks: z.array(MomentumBlockSchema).min(2).max(4),
+});
+
+const SYSTEM = `You are Affina — a warm but honest startup mentor for early-stage female founders.
+From one weekly update you do TWO things.
+
+PART A — Analyze the check-in:
+- headline: one punchy line capturing the week (max 10 words)
+- keyResults: 2–5 items. INCLUDE setbacks if mentioned — never omit failures.
+  type: 'win' | 'setback' | 'milestone'. metric: e.g. "signups 40→62" if a number relates.
+- metrics: extract EVERY number mentioned. value: new value. delta: change vs last week (0 if unknown/first).
+- sentiment: energized | steady | struggling
+- mentorNote: 1–2 warm, honest sentences. No toxic positivity.
+- tasks: 1–3 specific next steps. ≤6-word titles. priority 80/60/40.
+
+PART B — Extract activity + compose the Momentum card:
+- activity: normalise the REAL-WORLD actions she mentions into [{key,label,count}]. Canonical snake_case keys reused across weeks (people_talked_to, interviews_done, experiments_run, posts_published, demos_given...). Only real actions with a count; [] if none.
+- momentumCard: you are the EDITOR of her progress card. Lead with the HIGHEST tier that has real content; lower tiers drop off as higher ones appear:
+  TIER 1 traction (North Star moving, customers, revenue, milestones) → headline_metric / milestone / trajectory
+  TIER 2 real-world effort (activity) → this_week + cumulative
+  TIER 3 learning (lessons/exercises/modules) → learning_progress  ← LOWEST. Show ONLY when there is no real-world action yet; it disappears the moment real activity exists.
+  Block palette (each block needs "type"):
+   headline_metric {label,value,delta,trend?:number[],sentiment?}  · milestone {text,period:'3w'|'all',value?}
+   trajectory {text,trend?:number[]}  · this_week {items:[{kind:'win'|'learning'|'setback',text}]}
+   cumulative {stats:[{label,value}]}  · learning_progress {stats:[{label,value}]}
+   streak {weeks,text}  · encouragement {text}  · nudge {text}
+  RULES:
+  - Focus on the LAST WEEK. Use a multi-week block (milestone/trajectory) ONLY when clearly stronger than the weekly highlight, when the week was weak (zoom out), or ~once every 4 weeks. At most ONE multi-week block.
+  - NEVER headline a falling or zero external number. On a dip → this_week (framed as learning) + cumulative + encouragement.
+  - A milestone (first customer, first revenue, a round) → celebrate (headline_metric/milestone).
+  - Quiet week / nothing real → nudge.
+  - Always ≥1 truthful positive. A setback is learning, never failure. Warm, honest tone.
+  - mood: building | progressing | traction | recovering | quiet. 2–4 blocks, most important first.
+Respond ONLY with valid JSON matching the structure exactly.`;
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'method not allowed' });
+
+  const { email, rawText } = req.body ?? {};
+  if (!email || !rawText?.trim()) return res.status(400).json({ error: 'email and rawText required' });
+
+  const db = getDb();
+  const user = await db.query.users.findFirst({ where: eq(users.email, email) });
+  if (!user) return res.status(404).json({ error: 'user not found' });
+
+  // ── Windowed inputs ──────────────────────────────────────────────────────────
+  const past = await db.query.checkIns.findMany({
+    where: eq(checkIns.userId, user.id),
+    orderBy: [desc(checkIns.weekOf)],
+    limit: 12,
+  });
+  const completed = await db.query.completedLessons.findMany({ where: eq(completedLessons.userId, user.id) });
+  const brain = await db.query.brainEntries.findMany({ where: eq(brainEntries.userId, user.id) });
+
+  const completedSet = new Set(completed.map((c) => c.lessonId));
+  const lessonsDone = completed.length;
+  const exercisesScored = brain.filter((b) => b.aiScore !== null).length;
+  const modulesCompleted = MODULES.filter((m) => m.lessons.every((l) => completedSet.has(l.id))).length;
+
+  type Act = { key: string; label: string; count: number };
+  const sumActivity = (rows: typeof past) => {
+    const out: Record<string, { label: string; count: number }> = {};
+    for (const ci of rows) {
+      const acts = Array.isArray(ci.activity) ? (ci.activity as Act[]) : [];
+      for (const a of acts) {
+        if (!out[a.key]) out[a.key] = { label: a.label, count: 0 };
+        out[a.key].count += a.count;
+      }
+    }
+    return Object.values(out);
+  };
+  const fmt = (arr: { label: string; count: number }[]) =>
+    arr.length ? arr.map((a) => `${a.label}: ${a.count}`).join(', ') : 'none recorded';
+
+  const ns = user.northStar as { key: string; label: string } | null;
+  const nsSeries = ns
+    ? [...past].reverse().map((ci) => {
+        const ms = Array.isArray(ci.metrics) ? (ci.metrics as { name: string; value: number }[]) : [];
+        const m = ms.find((x) =>
+          x.name.toLowerCase().includes(ns.key.toLowerCase()) ||
+          x.name.toLowerCase().includes(ns.label.toLowerCase()));
+        return m ? m.value : null;
+      }).filter((v): v is number => v !== null)
+    : [];
+
+  const pastContext = past.length > 0
+    ? past.slice(0, 4).map((c) => {
+        const metricsStr = Array.isArray(c.metrics) && c.metrics.length > 0
+          ? (c.metrics as { name: string; value: number }[]).map((m) => `${m.name}: ${m.value}`).join(', ')
+          : 'no metrics';
+        return `Week of ${c.weekOf}: "${c.headline ?? ''}" · ${metricsStr}`;
+      }).join('\n')
+    : 'No previous check-ins (this is the first one).';
+
+  const lastMetrics = past[0]?.metrics
+    ? (past[0].metrics as { name: string; value: number }[]).map((m) => `${m.name}: ${m.value}`).join(', ')
+    : 'none';
+
+  const userMessage = `Project: ${user.projectName || 'startup'} — ${user.idea || 'not specified'}
+North star metric: ${ns ? `${ns.label} (${ns.key})` : 'not set yet'}
+
+Recent check-ins (for deltas):
+${pastContext}
+Last known metrics: ${lastMetrics}
+
+This week's update from the founder:
+"${rawText}"
+
+=== MOMENTUM INPUTS ===
+LEARNING (tier 3 — drop once real-world activity exists): lessons ${lessonsDone}, exercises scored ${exercisesScored}, modules ${modulesCompleted}
+REAL-WORLD ACTIVITY (tier 2): last 3 weeks → ${fmt(sumActivity(past.slice(0, 3)))}; all-time → ${fmt(sumActivity(past))}
+TRACTION (tier 1): North Star ${ns ? ns.label : 'not set'}; series oldest→newest → ${nsSeries.length ? nsSeries.join(' → ') : 'no data'}
+CONTEXT: stage ${user.stage || 'early'}, phase ${user.phase || 'launch'}, goal ${user.goal || 'not set'}, weeks active ${past.length + 1}, streak ${user.pulseStreak ?? 0}, last check-in ${past[0]?.weekOf ?? 'first ever'}
+
+Return JSON:
+{
+  "headline": "...",
+  "keyResults": [{"type": "win|setback|milestone", "text": "...", "metric": "optional"}],
+  "metrics": [{"name": "...", "value": 0, "delta": 0}],
+  "sentiment": "energized|steady|struggling",
+  "mentorNote": "...",
+  "tasks": [{"title": "...", "instruction": "...", "priority": 80}],
+  "activity": [{"key": "people_talked_to", "label": "People talked to", "count": 4}],
+  "momentumCard": { "mood": "progressing", "blocks": [ /* 2-4 blocks, each with "type" */ ] }
+}`;
+
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  try {
+    const message = await client.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 2500,
+      system: SYSTEM,
+      messages: [{ role: 'user', content: userMessage }],
+    });
+    const raw = message.content[0].type === 'text' ? message.content[0].text : '';
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error('no JSON');
+    const parsed = JSON.parse(match[0]);
+    const draft = DraftSchema.parse(parsed);
+
+    // Momentum + activity parsed leniently — a malformed card must not break the check-in.
+    let activity: z.infer<typeof ActivitySchema> = [];
+    try { activity = ActivitySchema.parse(parsed.activity); } catch { /* keep [] */ }
+    let momentumCard: z.infer<typeof MomentumCardSchema> | null = null;
+    try { momentumCard = MomentumCardSchema.parse(parsed.momentumCard); } catch { /* keep null */ }
+
+    return res.status(200).json({ ...draft, activity, momentumCard });
+  } catch {
+    return res.status(502).json({ error: 'ai_unavailable' });
+  }
+}

@@ -1,23 +1,41 @@
 import { useEffect, useState } from 'react';
-import type { BrainEntry } from '../types';
+import type { BrainEntry, AiFeedback, CompareResult, Lesson } from '../types';
+import { MODULES } from '../data';
+
+// Lesson lookup, so Documents edits respect the course's char caps and can re-run the AI mentor.
+const LESSON_BY_ID: Record<string, Lesson> = {};
+for (const m of MODULES) for (const l of m.lessons) LESSON_BY_ID[l.id] = l;
+
+export interface DocContext { name: string; idea: string; customer: string; stage: string }
 
 const ENTRY_TYPE_LABELS: Record<string, string> = {
   value_proposition: 'Value Proposition',
   target_customer: 'Target Customer',
   first_offer: 'First Offer',
+  task_result: 'Task Result',
+};
+
+const ENTRY_TYPE_COLOR: Record<string, string> = {
+  task_result: 'text-accent-600',
+};
+
+const VERDICT_CONFIG: Record<string, { label: string; dot: string; bg: string; text: string }> = {
+  strong:           { label: 'Strong',         dot: 'bg-accent-400',  bg: 'bg-accent-50',  text: 'text-accent-800'  },
+  ok:               { label: 'Good',            dot: 'bg-brand-400',   bg: 'bg-brand-50',   text: 'text-brand-700'   },
+  can_be_stronger:  { label: 'Can be stronger', dot: 'bg-amber-400',  bg: 'bg-amber-50',  text: 'text-amber-700'  },
 };
 
 interface Props {
   email: string;
   onClose: () => void;
+  onLessonInputSaved?: (lessonId: string, content: string) => void;
+  context?: DocContext;
 }
 
-export default function DocumentsPanel({ email, onClose }: Props) {
+export default function DocumentsPanel({ email, onClose, onLessonInputSaved, context }: Props) {
   const [entries, setEntries] = useState<BrainEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [editDraft, setEditDraft] = useState('');
-  const [savingId, setSavingId] = useState<number | null>(null);
+  const [modalEntry, setModalEntry] = useState<BrainEntry | null>(null);
 
   useEffect(() => {
     if (!email) { setLoading(false); return; }
@@ -27,139 +45,357 @@ export default function DocumentsPanel({ email, onClose }: Props) {
       .catch(() => setLoading(false));
   }, [email]);
 
-  async function handleSave(entry: BrainEntry) {
-    setSavingId(entry.id);
+  function handleSaved(updated: BrainEntry) {
+    setEntries((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
+    setModalEntry(updated);
+    onLessonInputSaved?.(updated.lessonId, updated.content);
+  }
+
+  return (
+    <>
+      {/* Side panel */}
+      <div className="fixed inset-0 z-40 flex items-start justify-end">
+        <div className="absolute inset-0 bg-black/20" onClick={onClose} />
+
+        <div className="relative z-10 w-full max-w-sm h-full bg-surface shadow-2xl flex flex-col animate-panel-in">
+          {/* Header */}
+          <div className="flex items-center justify-between px-6 py-5 border-b border-hairline">
+            <div>
+              <h2 className="text-base font-bold text-ink">Documents</h2>
+              <p className="text-xs text-ink-mute mt-0.5">Your Company Brain</p>
+            </div>
+            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-control hover:bg-inset text-ink-soft transition">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M18 6L6 18M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Body */}
+          <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-3">
+            {loading && (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-pill animate-spin" />
+              </div>
+            )}
+
+            {!loading && entries.length === 0 && (
+              <div className="flex-1 flex flex-col items-center justify-center text-center gap-3 py-16">
+                <div className="w-12 h-12 rounded-pill bg-brand-50 flex items-center justify-center">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7150EA" strokeWidth="1.5">
+                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                  </svg>
+                </div>
+                <p className="text-sm text-ink-soft leading-relaxed">
+                  Complete exercises in the program<br />to build your Company Brain
+                </p>
+              </div>
+            )}
+
+            {!loading && entries.map((entry) => (
+              <DocCard
+                key={entry.id}
+                entry={entry}
+                onOpen={() => setModalEntry(entry)}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Edit modal */}
+      {modalEntry && (
+        <EditModal
+          entry={modalEntry}
+          email={email}
+          onClose={() => setModalEntry(null)}
+          onSaved={handleSaved}
+          context={context}
+        />
+      )}
+    </>
+  );
+}
+
+// ─── Compact doc card ─────────────────────────────────────────────────────────
+function DocCard({ entry, onOpen }: { entry: BrainEntry; onOpen: () => void }) {
+  return (
+    <div className="bg-surface border border-hairline rounded-card p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div className="flex-1 min-w-0">
+          <span className={`text-[10px] font-bold uppercase tracking-wider ${ENTRY_TYPE_COLOR[entry.entryType] ?? 'text-brand-600'}`}>
+            {ENTRY_TYPE_LABELS[entry.entryType] ?? entry.entryType}
+          </span>
+          <div className="flex items-center gap-2 mt-0.5">
+            <p className="text-sm font-semibold text-ink leading-snug truncate">{entry.lessonTitle}</p>
+            {entry.aiScore !== null && entry.aiScore !== undefined && (
+              <span className={`flex-shrink-0 text-[10px] font-bold rounded-pill px-2 py-0.5 ${
+                entry.aiScore >= 80 ? 'bg-accent-50 text-accent-800' :
+                entry.aiScore >= 55 ? 'bg-brand-50 text-brand-700' :
+                'bg-amber-50 text-amber-700'
+              }`}>
+                {entry.aiScore}/100
+              </span>
+            )}
+          </div>
+        </div>
+        <button
+          onClick={onOpen}
+          className="flex-shrink-0 text-xs font-semibold text-brand border border-brand-200 rounded-pill px-3 py-1 hover:bg-brand-50 transition"
+        >
+          Open
+        </button>
+      </div>
+      <p className="text-sm text-ink-soft leading-relaxed line-clamp-3">
+        {entry.content || '—'}
+      </p>
+    </div>
+  );
+}
+
+// ─── Edit modal ───────────────────────────────────────────────────────────────
+function EditModal({
+  entry, email, onClose, onSaved, context,
+}: {
+  entry: BrainEntry;
+  email: string;
+  onClose: () => void;
+  onSaved: (updated: BrainEntry) => void;
+  context?: DocContext;
+}) {
+  const [draft, setDraft] = useState(entry.content);
+  const [saving, setSaving] = useState(false);
+
+  const lesson = LESSON_BY_ID[entry.lessonId];
+  const maxLen = lesson?.inputMaxLength;
+  // Lesson exercises get a fresh mentor review on save (same as editing in the exercise itself).
+  // North Star and non-lesson docs (e.g. task results) just save.
+  const reEvaluatable = !!lesson && (lesson.type === 'input' || lesson.type === 'structured') && lesson.aiMode !== 'north-star';
+  const aiMode = lesson?.aiMode === 'compare' ? 'compare' : 'feedback';
+
+  async function handleSave() {
+    setSaving(true);
     try {
-      await fetch('/api/lessons', {
+      // 1. Persist the edited text.
+      await fetch('/api/brain', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'save-input',
-          email,
-          lessonId: entry.lessonId,
-          content: editDraft,
-        }),
+        body: JSON.stringify({ action: 'save-input', email, lessonId: entry.lessonId, content: draft }),
       });
-      setEntries((prev) =>
-        prev.map((e) => (e.id === entry.id ? { ...e, content: editDraft } : e)),
-      );
-      setEditingId(null);
+
+      // 2. Re-run the AI mentor for exercise docs and refresh the score + feedback.
+      if (reEvaluatable && draft.trim()) {
+        try {
+          const r = await fetch('/api/ai', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email,
+              lessonId: entry.lessonId,
+              lessonTitle: entry.lessonTitle,
+              prompt: entry.prompt,
+              answer: draft,
+              aiMode,
+              context,
+            }),
+          });
+          if (r.ok) {
+            const feedback = await r.json();
+            const isCompare = Array.isArray(feedback?.candidates);
+            onSaved({
+              ...entry,
+              content: draft,
+              aiScore: isCompare ? null : (typeof feedback?.score === 'number' ? feedback.score : entry.aiScore),
+              aiFeedback: JSON.stringify(feedback),
+              processedByAi: true,
+            });
+            return;
+          }
+        } catch { /* fall through to plain save below */ }
+      }
+
+      onSaved({ ...entry, content: draft });
     } finally {
-      setSavingId(null);
+      setSaving(false);
     }
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex items-start justify-end">
-      <div className="absolute inset-0 bg-black/20" onClick={onClose} />
-
-      <div className="relative z-10 w-full max-w-sm h-full bg-white shadow-2xl flex flex-col animate-panel-in">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-lg bg-surface rounded-card shadow-2xl flex flex-col max-h-[90vh]">
+        {/* Modal header */}
+        <div className="flex items-start justify-between gap-3 px-6 pt-6 pb-4 border-b border-hairline">
           <div>
-            <h2 className="text-base font-bold text-gray-900">Documents</h2>
-            <p className="text-xs text-gray-400 mt-0.5">Your Company Brain</p>
+            <span className={`text-[10px] font-bold uppercase tracking-wider ${ENTRY_TYPE_COLOR[entry.entryType] ?? 'text-brand-600'}`}>
+              {ENTRY_TYPE_LABELS[entry.entryType] ?? entry.entryType}
+            </span>
+            <h3 className="text-base font-bold text-ink mt-0.5 leading-snug">{entry.lessonTitle}</h3>
+            {entry.aiScore !== null && entry.aiScore !== undefined && (
+              <span className={`inline-block mt-1.5 text-xs font-bold rounded-pill px-2.5 py-0.5 ${
+                entry.aiScore >= 80 ? 'bg-accent-50 text-accent-800' :
+                entry.aiScore >= 55 ? 'bg-brand-50 text-brand-700' :
+                'bg-amber-50 text-amber-700'
+              }`}>
+                {entry.aiScore}/100
+              </span>
+            )}
           </div>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500 transition">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <button onClick={onClose} className="mt-0.5 w-8 h-8 flex items-center justify-center rounded-control hover:bg-inset text-ink-mute transition flex-shrink-0">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M18 6L6 18M6 6l12 12" />
             </svg>
           </button>
         </div>
 
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
-          {loading && (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="w-6 h-6 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
-            </div>
-          )}
-
-          {!loading && entries.length === 0 && (
-            <div className="flex-1 flex flex-col items-center justify-center text-center gap-3 py-16">
-              <div className="w-12 h-12 rounded-full bg-purple-50 flex items-center justify-center">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#9333ea" strokeWidth="1.5">
-                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-                  <polyline points="14 2 14 8 20 8" />
-                </svg>
-              </div>
-              <p className="text-sm text-gray-500 leading-relaxed">
-                Complete exercises in the program<br />to build your Company Brain
+        {/* Scrollable body */}
+        <div className="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-5">
+          {/* Editable text */}
+          <div>
+            <p className="text-xs font-bold text-ink-mute uppercase tracking-widest mb-2">Your answer</p>
+            <textarea
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              rows={6}
+              maxLength={maxLen}
+              className="w-full rounded-control border border-hairline focus:border-brand-400 focus:ring-2 focus:ring-brand-100 outline-none px-4 py-3 text-sm text-ink resize-none transition leading-relaxed"
+              autoFocus
+            />
+            {maxLen && (
+              <p className={`mt-1 text-xs text-right ${draft.length >= maxLen ? 'text-red-400 font-semibold' : draft.length >= maxLen * 0.9 ? 'text-amber-500' : 'text-ink-mute'}`}>
+                {draft.length} / {maxLen}
               </p>
-            </div>
+            )}
+          </div>
+
+          {/* AI mentor feedback */}
+          {entry.aiFeedback && (
+            <FeedbackSection aiFeedback={entry.aiFeedback} />
           )}
+        </div>
 
-          {!loading && entries.map((entry) => {
-            const isEditing = editingId === entry.id;
-            const isSaving = savingId === entry.id;
-
-            return (
-              <div key={entry.id} className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
-                {/* Doc header */}
-                <div className="flex items-start justify-between gap-2 mb-3">
-                  <div className="flex-1 min-w-0">
-                    <span className="text-xs font-bold text-purple-500 uppercase tracking-wider">
-                      {ENTRY_TYPE_LABELS[entry.entryType] ?? entry.entryType}
-                    </span>
-                    <p className="text-sm font-semibold text-gray-800 mt-0.5 leading-snug">
-                      {entry.lessonTitle}
-                    </p>
-                    {entry.aiScore !== null && entry.aiScore !== undefined && (
-                      <span className={`inline-block mt-1.5 text-xs font-bold rounded-full px-2 py-0.5 ${
-                        entry.aiScore >= 80 ? 'bg-green-50 text-green-700' :
-                        entry.aiScore >= 55 ? 'bg-blue-50 text-blue-700' :
-                        'bg-amber-50 text-amber-700'
-                      }`}>
-                        {entry.aiScore}/100
-                      </span>
-                    )}
-                  </div>
-                  {!isEditing && (
-                    <button
-                      onClick={() => { setEditingId(entry.id); setEditDraft(entry.content); }}
-                      className="flex-shrink-0 text-xs font-semibold text-purple-600 border border-purple-200 rounded-lg px-2.5 py-1 hover:bg-purple-50 transition"
-                    >
-                      Edit
-                    </button>
-                  )}
-                </div>
-
-                {/* Prompt */}
-                <p className="text-xs text-gray-400 mb-2">{entry.prompt}</p>
-
-                {/* Content or edit textarea */}
-                {isEditing ? (
-                  <div className="flex flex-col gap-2">
-                    <textarea
-                      value={editDraft}
-                      onChange={(e) => setEditDraft(e.target.value)}
-                      className="w-full rounded-xl border border-purple-200 bg-purple-50 focus:bg-white focus:border-purple-400 focus:ring-2 focus:ring-purple-100 outline-none px-3 py-2.5 text-sm text-gray-800 resize-none transition min-h-[80px]"
-                      autoFocus
-                    />
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleSave(entry)}
-                        disabled={isSaving}
-                        className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:opacity-60 text-white text-xs font-semibold py-2 rounded-xl transition"
-                      >
-                        {isSaving ? 'Saving…' : 'Save'}
-                      </button>
-                      <button
-                        onClick={() => setEditingId(null)}
-                        className="px-4 text-xs font-semibold text-gray-500 border border-gray-200 rounded-xl hover:bg-gray-50 transition"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-700 leading-relaxed">{entry.content || '—'}</p>
-                )}
-              </div>
-            );
-          })}
+        {/* Footer */}
+        <div className="flex gap-2 px-6 pb-6 pt-4 border-t border-hairline">
+          <button
+            onClick={onClose}
+            className="px-4 py-2.5 text-sm font-semibold text-ink-soft border border-hairline rounded-control hover:bg-inset transition"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving || draft === entry.content || !draft.trim()}
+            className="flex-1 bg-brand hover:bg-brand-700 disabled:opacity-50 text-white text-sm font-semibold py-2.5 rounded-pill transition"
+          >
+            {saving
+              ? (reEvaluatable ? 'Updating…' : 'Saving…')
+              : (reEvaluatable ? 'Update & Save' : 'Save changes')}
+          </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── Feedback section inside modal ────────────────────────────────────────────
+function FeedbackSection({ aiFeedback }: { aiFeedback: string }) {
+  let parsed: AiFeedback | (CompareResult & { recommendation?: string }) | null = null;
+  try { parsed = JSON.parse(aiFeedback); } catch { return null; }
+  if (!parsed) return null;
+
+  const isCompare = 'candidates' in parsed && Array.isArray((parsed as CompareResult).candidates);
+
+  return (
+    <div>
+      <p className="text-xs font-bold text-ink-mute uppercase tracking-widest mb-3">Mentor feedback</p>
+
+      {isCompare ? (
+        <CompareSection result={parsed as CompareResult} />
+      ) : (
+        <StandardSection feedback={parsed as AiFeedback} />
+      )}
+    </div>
+  );
+}
+
+function StandardSection({ feedback }: { feedback: AiFeedback }) {
+  const vc = VERDICT_CONFIG[feedback.verdict] ?? VERDICT_CONFIG.ok;
+  return (
+    <div className="flex flex-col gap-3">
+      {/* Score row */}
+      <div className={`flex items-center gap-3 ${vc.bg} rounded-control px-4 py-3`}>
+        <span className={`text-2xl font-extrabold tabular-nums ${vc.text}`}>{feedback.score}</span>
+        <span className="text-ink-mute text-lg">/</span>
+        <span className="text-sm text-ink-mute font-medium">100</span>
+        <div className="ml-auto flex items-center gap-1.5">
+          <span className={`w-2 h-2 rounded-pill ${vc.dot}`} />
+          <span className={`text-xs font-bold ${vc.text}`}>{vc.label}</span>
+        </div>
+      </div>
+
+      {/* Good */}
+      {feedback.good?.length > 0 && (
+        <div className="bg-accent-50 rounded-control px-4 py-3">
+          <p className="text-[10px] font-bold text-accent-600 uppercase tracking-widest mb-2">What worked</p>
+          <ul className="flex flex-col gap-1.5">
+            {feedback.good.map((g, i) => (
+              <li key={i} className="flex gap-2 text-sm text-ink-soft leading-relaxed">
+                <span className="text-accent-600 flex-shrink-0 mt-0.5">✓</span>
+                {g}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Missing */}
+      {feedback.missing?.length > 0 && (
+        <div className="bg-amber-50 rounded-control px-4 py-3">
+          <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest mb-2">To strengthen</p>
+          <ul className="flex flex-col gap-1.5">
+            {feedback.missing.map((m, i) => (
+              <li key={i} className="flex gap-2 text-sm text-ink-soft leading-relaxed">
+                <span className="text-amber-500 flex-shrink-0 mt-0.5">→</span>
+                {m}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Next step */}
+      {feedback.nextStep && (
+        <div className="bg-brand-50 border border-brand-100 rounded-control px-4 py-3">
+          <p className="text-[10px] font-bold text-brand uppercase tracking-widest mb-1">Next step</p>
+          <p className="text-sm text-ink-soft leading-relaxed">{feedback.nextStep}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CompareSection({ result }: { result: CompareResult }) {
+  return (
+    <div className="flex flex-col gap-3">
+      {result.recommendation && (
+        <div className="bg-brand-50 border border-brand-100 rounded-control px-4 py-3">
+          <p className="text-[10px] font-bold text-brand uppercase tracking-widest mb-1">Recommendation</p>
+          <p className="text-sm text-ink-soft leading-relaxed">{result.recommendation}</p>
+        </div>
+      )}
+      {result.runnerUp && (
+        <div className="bg-inset rounded-control px-4 py-3">
+          <p className="text-[10px] font-bold text-ink-mute uppercase tracking-widest mb-1">Runner-up</p>
+          <p className="text-sm text-ink-soft leading-relaxed">{result.runnerUp}</p>
+        </div>
+      )}
+      {result.nextStep && (
+        <div className="bg-accent-50 rounded-control px-4 py-3">
+          <p className="text-[10px] font-bold text-accent-600 uppercase tracking-widest mb-1">Next step</p>
+          <p className="text-sm text-ink-soft leading-relaxed">{result.nextStep}</p>
+        </div>
+      )}
     </div>
   );
 }

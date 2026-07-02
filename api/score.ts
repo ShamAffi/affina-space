@@ -9,12 +9,17 @@ const ScoreSchema = z.object({
     title: z.string(),
     body: z.string(),
   })).min(3).max(3),
+  strength: z.string(),
+  threat: z.string(),
+  firstFocus: z.string(),
 });
 
-export type OnboardingScore = z.infer<typeof ScoreSchema>;
+function computePercentile(score: number): number {
+  return Math.min(92, Math.max(55, Math.round(score * 0.9 + 4)));
+}
 
 const SYSTEM_PROMPT = `You are Affina — an honest but encouraging startup mentor for early-stage female founders.
-Based on a founder's onboarding answers, give a readiness score and 3 personalized next steps.
+Based on a founder's onboarding answers, give a readiness score, 3 personalized next steps, a strength, and a first-month focus.
 
 Scoring guide (be honest — do not default to 80):
 - 20–45: Idea is vague, customer undefined, or very early stage
@@ -26,10 +31,17 @@ Rules:
 - Reference their actual idea and words in the summary and steps — no generic advice.
 - Each step title must be an action (verb-first, e.g. "Narrow your customer segment to X").
 - Keep step body to 2 sentences max.
+- strength: one sentence naming the founder's clearest competitive asset based on what they wrote.
+- threat: one sentence naming the biggest near-future RISK to this business — a likely upcoming obstacle (market, competition, adoption, timing, regulation), NOT a current weakness in the answer. Think SWOT "T". Be honest and specific to their idea.
+- firstFocus: one specific, actionable sentence — the single most valuable thing to do in Month 1.
 - Respond ONLY with valid JSON, no other text.`;
 
-const FALLBACK: OnboardingScore = {
+const FALLBACK = {
   score: 62,
+  percentileAheadOf: 60,
+  strength: "You've identified a real problem with a clear target audience in mind.",
+  threat: "A larger, funded player could move on this space before you build a loyal early base.",
+  firstFocus: "Have 5 honest conversations with potential customers before building anything.",
   summary: "You're onto a real opportunity — there's a genuine problem here worth solving. Right now your idea is still broad, which makes it harder to validate and sell. With sharper focus on one customer and one offer, this can become a launch-ready business.",
   steps: [
     { title: 'Narrow your idea to one problem', body: 'Focus on one specific pain felt often and badly enough to pay for a fix. The narrower you go, the faster you can validate.' },
@@ -45,7 +57,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'method not allowed' });
 
-  const { idea, customer, businessModel, stage } = req.body;
+  const { idea, customer, businessModel, stage, goal } = req.body;
   if (!idea?.trim()) return res.status(200).json(FALLBACK);
 
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -55,6 +67,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 - Target customer: "${customer || 'not specified'}"
 - Business model: "${businessModel || 'not specified'}"
 - Stage: "${stage || 'not specified'}"
+- Launch goal: "${goal || 'not specified'}"
 
 Return JSON with exactly this structure:
 {
@@ -64,13 +77,16 @@ Return JSON with exactly this structure:
     { "title": "<action-oriented, specific to their idea>", "body": "<2 sentences max>" },
     { "title": "<action-oriented, specific to their idea>", "body": "<2 sentences max>" },
     { "title": "<action-oriented, specific to their idea>", "body": "<2 sentences max>" }
-  ]
+  ],
+  "strength": "<one sentence: their clearest competitive asset based on what they wrote>",
+  "threat": "<one sentence: the biggest near-future risk/obstacle to this business — SWOT 'T', not a current weakness>",
+  "firstFocus": "<one specific action sentence: the single most valuable thing to do in Month 1>"
 }`;
 
   try {
     const message = await client.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 800,
+      max_tokens: 900,
       system: SYSTEM_PROMPT,
       messages: [{ role: 'user', content: userMessage }],
     });
@@ -78,7 +94,11 @@ Return JSON with exactly this structure:
     const raw = message.content[0].type === 'text' ? message.content[0].text : '';
     const match = raw.match(/\{[\s\S]*\}/);
     if (!match) throw new Error('no JSON');
-    return res.status(200).json(ScoreSchema.parse(JSON.parse(match[0])));
+    const parsed = ScoreSchema.parse(JSON.parse(match[0]));
+    return res.status(200).json({
+      ...parsed,
+      percentileAheadOf: computePercentile(parsed.score),
+    });
   } catch {
     return res.status(200).json(FALLBACK);
   }

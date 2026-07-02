@@ -6,6 +6,7 @@ interface Props {
   onToggleMenu: () => void;
   onAccount: () => void;
   onDocuments: () => void;
+  onLogout: () => void;
 }
 
 export default function ProfileButton({
@@ -14,6 +15,7 @@ export default function ProfileButton({
   onToggleMenu,
   onAccount,
   onDocuments,
+  onLogout,
 }: Props) {
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -31,7 +33,7 @@ export default function ProfileButton({
     <div className="relative" ref={menuRef}>
       <button
         onClick={onToggleMenu}
-        className={`w-9 h-9 rounded-full bg-purple-50 border-2 border-purple-200 flex items-center justify-center text-purple-600 hover:bg-purple-100 hover:border-purple-400 transition-all duration-150 ${
+        className={`w-9 h-9 rounded-pill bg-brand-50 border-2 border-brand-200 flex items-center justify-center text-brand hover:bg-brand-100 hover:border-brand-400 transition-all duration-150 ${
           avatarPing ? 'animate-avatar-ping' : ''
         }`}
         aria-label="Profile"
@@ -45,10 +47,10 @@ export default function ProfileButton({
       </button>
 
       {menuOpen && (
-        <div className="absolute right-0 top-11 w-44 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-50 animate-fade-in">
+        <div className="absolute right-0 top-11 w-44 bg-surface rounded-card shadow-xl border border-hairline overflow-hidden z-50 animate-fade-in">
           <button
             onClick={() => { onAccount(); onToggleMenu(); }}
-            className="w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-purple-50 hover:text-purple-700 flex items-center gap-2.5 transition-colors"
+            className="w-full text-left px-4 py-3 text-sm font-medium text-ink-soft hover:bg-brand-50 hover:text-brand-700 flex items-center gap-2.5 transition-colors"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
               <circle cx="12" cy="8" r="4" />
@@ -56,10 +58,10 @@ export default function ProfileButton({
             </svg>
             Account
           </button>
-          <div className="h-px bg-gray-100 mx-3" />
+          <div className="h-px bg-inset mx-3" />
           <button
             onClick={() => { onDocuments(); onToggleMenu(); }}
-            className="w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-purple-50 hover:text-purple-700 flex items-center gap-2.5 transition-colors"
+            className="w-full text-left px-4 py-3 text-sm font-medium text-ink-soft hover:bg-brand-50 hover:text-brand-700 flex items-center gap-2.5 transition-colors"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
               <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
@@ -68,6 +70,18 @@ export default function ProfileButton({
               <line x1="8" y1="17" x2="13" y2="17" />
             </svg>
             Documents
+          </button>
+          <div className="h-px bg-inset mx-3" />
+          <button
+            onClick={() => { onLogout(); onToggleMenu(); }}
+            className="w-full text-left px-4 py-3 text-sm font-medium text-red-500 hover:bg-red-50 flex items-center gap-2.5 transition-colors"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+              <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+            Log out
           </button>
         </div>
       )}

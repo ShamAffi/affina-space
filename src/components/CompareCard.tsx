@@ -22,7 +22,7 @@ function ScoreDots({ value }: { value: number }) {
       {[1, 2, 3, 4, 5].map((i) => (
         <span
           key={i}
-          className={`w-2 h-2 rounded-full ${i <= value ? 'bg-purple-500' : 'bg-gray-200'}`}
+          className={`w-2 h-2 rounded-pill ${i <= value ? 'bg-brand-600' : 'bg-inset'}`}
         />
       ))}
     </div>
@@ -33,19 +33,19 @@ export default function CompareCard({ lessonTitle, prompt, answer, result, onRef
   const winner = result.candidates.reduce((a, b) => (a.total >= b.total ? a : b));
 
   return (
-    <div className="rounded-2xl border border-gray-100 shadow-sm bg-white overflow-hidden mb-8 animate-slide-up">
+    <div className="rounded-card border border-hairline shadow-sm bg-surface overflow-hidden mb-8 animate-slide-up">
 
       {/* Answer recap */}
-      <div className="px-5 pt-5 pb-4 border-b border-gray-100">
-        <p className="text-xs font-bold text-purple-500 uppercase tracking-wider mb-1">{lessonTitle}</p>
-        <p className="text-xs text-gray-400 mb-3">{prompt}</p>
-        <p className="text-sm text-gray-800 leading-relaxed bg-gray-50 rounded-xl px-4 py-3 border border-gray-100 line-clamp-4">
+      <div className="px-5 pt-5 pb-4 border-b border-hairline">
+        <p className="text-xs font-bold text-brand-600 uppercase tracking-wider mb-1">{lessonTitle}</p>
+        <p className="text-xs text-ink-mute mb-3">{prompt}</p>
+        <p className="text-sm text-ink leading-relaxed bg-inset rounded-control px-4 py-3 border border-hairline line-clamp-4">
           {answer}
         </p>
         <div className="flex items-center gap-3 mt-3">
           <button
             onClick={onRefine}
-            className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50 transition"
+            className="flex items-center gap-1.5 text-xs font-semibold text-ink-soft border border-hairline rounded-control px-3 py-1.5 hover:bg-inset transition"
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
@@ -53,7 +53,7 @@ export default function CompareCard({ lessonTitle, prompt, answer, result, onRef
             </svg>
             Edit
           </button>
-          <span className="flex items-center gap-1.5 text-xs font-semibold text-purple-600">
+          <span className="flex items-center gap-1.5 text-xs font-semibold text-brand">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <polyline points="20 6 9 17 4 12" />
             </svg>
@@ -67,28 +67,28 @@ export default function CompareCard({ lessonTitle, prompt, answer, result, onRef
 
         {/* Header */}
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-9 h-9 rounded-full bg-purple-600 flex items-center justify-center flex-shrink-0">
+          <div className="w-9 h-9 rounded-pill bg-brand flex items-center justify-center flex-shrink-0">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round">
               <path d="M12 3l1.5 4H18l-3.5 2.5 1.3 4.3L12 11.2l-3.8 2.6 1.3-4.3L6 7h4.5z" />
             </svg>
           </div>
           <div>
-            <p className="text-sm font-bold text-gray-900">Mentor analysis</p>
-            <p className="text-xs text-gray-400">pain · reach · pay · word of mouth</p>
+            <p className="text-sm font-bold text-ink">Mentor analysis</p>
+            <p className="text-xs text-ink-mute">pain · reach · pay · word of mouth</p>
           </div>
         </div>
 
         {/* Scoring table */}
-        <div className="rounded-xl border border-gray-100 overflow-hidden mb-4">
+        <div className="rounded-control border border-hairline overflow-hidden mb-4">
           {/* Column headers */}
-          <div className="grid grid-cols-[1fr_repeat(5,40px)] bg-gray-50 border-b border-gray-100 px-3 py-2 gap-1">
-            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Segment</span>
+          <div className="grid grid-cols-[1fr_repeat(5,40px)] bg-inset border-b border-hairline px-3 py-2 gap-1">
+            <span className="text-xs font-bold text-ink-mute uppercase tracking-wider">Segment</span>
             {CRITERIA.map((c) => (
-              <span key={c.key} className="text-xs font-bold text-gray-400 uppercase tracking-wider text-center leading-tight">
+              <span key={c.key} className="text-xs font-bold text-ink-mute uppercase tracking-wider text-center leading-tight">
                 {c.label}
               </span>
             ))}
-            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider text-center">/20</span>
+            <span className="text-xs font-bold text-ink-mute uppercase tracking-wider text-center">/20</span>
           </div>
 
           {/* Candidate rows */}
@@ -97,17 +97,17 @@ export default function CompareCard({ lessonTitle, prompt, answer, result, onRef
             return (
               <div
                 key={c.label}
-                className={`grid grid-cols-[1fr_repeat(5,40px)] items-center px-3 py-2.5 gap-1 border-b last:border-b-0 border-gray-50 transition-colors ${
-                  isWinner ? 'bg-purple-50' : 'bg-white'
+                className={`grid grid-cols-[1fr_repeat(5,40px)] items-center px-3 py-2.5 gap-1 border-b last:border-b-0 border-hairline transition-colors ${
+                  isWinner ? 'bg-brand-50' : 'bg-surface'
                 }`}
               >
                 <div className="flex items-center gap-1.5 min-w-0">
                   {isWinner && (
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="#9333ea" stroke="none" className="flex-shrink-0">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="#7150EA" stroke="none" className="flex-shrink-0">
                       <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z" />
                     </svg>
                   )}
-                  <span className={`text-xs font-semibold truncate ${isWinner ? 'text-purple-700' : 'text-gray-700'}`}>
+                  <span className={`text-xs font-semibold truncate ${isWinner ? 'text-brand-700' : 'text-ink-soft'}`}>
                     {c.label}
                   </span>
                 </div>
@@ -115,7 +115,7 @@ export default function CompareCard({ lessonTitle, prompt, answer, result, onRef
                 <ScoreDots value={c.reachability} />
                 <ScoreDots value={c.abilityToPay} />
                 <ScoreDots value={c.wordOfMouth} />
-                <span className={`text-sm font-bold text-center ${isWinner ? 'text-purple-700' : 'text-gray-500'}`}>
+                <span className={`text-sm font-bold text-center ${isWinner ? 'text-brand-700' : 'text-ink-soft'}`}>
                   {c.total}
                 </span>
               </div>
@@ -124,24 +124,24 @@ export default function CompareCard({ lessonTitle, prompt, answer, result, onRef
         </div>
 
         {/* Recommendation */}
-        <div className="bg-green-50 border border-green-100 rounded-xl px-4 py-3 mb-3">
-          <p className="text-xs font-bold text-green-700 mb-1 flex items-center gap-1.5">
+        <div className="bg-accent-50 border border-accent-100 rounded-control px-4 py-3 mb-3">
+          <p className="text-xs font-bold text-accent-800 mb-1 flex items-center gap-1.5">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <polyline points="20 6 9 17 4 12" />
             </svg>
             Recommendation
           </p>
-          <p className="text-sm text-green-800 leading-relaxed">{result.recommendation}</p>
+          <p className="text-sm text-accent-800 leading-relaxed">{result.recommendation}</p>
         </div>
 
         {/* Runner-up */}
-        <p className="text-xs text-gray-400 mb-4 px-1">
-          <span className="font-semibold text-gray-500">Runner-up: </span>{result.runnerUp}
+        <p className="text-xs text-ink-mute mb-4 px-1">
+          <span className="font-semibold text-ink-soft">Runner-up: </span>{result.runnerUp}
         </p>
 
         {/* Next step */}
-        <div className="bg-purple-600 rounded-xl px-4 py-3 mb-5">
-          <p className="text-xs font-bold text-purple-200 mb-1">→ Next step</p>
+        <div className="bg-brand rounded-control px-4 py-3 mb-5">
+          <p className="text-xs font-bold text-brand-200 mb-1">→ Next step</p>
           <p className="text-sm text-white leading-relaxed">{result.nextStep}</p>
         </div>
 
@@ -149,7 +149,7 @@ export default function CompareCard({ lessonTitle, prompt, answer, result, onRef
         <div className="flex gap-3">
           <button
             onClick={onRefine}
-            className="flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-xl border-2 border-gray-200 text-gray-700 hover:border-purple-300 hover:text-purple-700 transition-all duration-150 active:scale-95"
+            className="flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-pill border-2 border-hairline text-ink-soft hover:border-brand-200 hover:text-brand-700 transition-all duration-150 active:scale-95"
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <polyline points="1 4 1 10 7 10" />
@@ -159,7 +159,7 @@ export default function CompareCard({ lessonTitle, prompt, answer, result, onRef
           </button>
           <button
             onClick={onContinue}
-            className="flex-1 flex items-center justify-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-xl bg-gray-900 text-white hover:bg-gray-800 active:scale-95 transition-all duration-150"
+            className="flex-1 flex items-center justify-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-pill bg-ink text-white hover:bg-ink active:scale-95 transition-all duration-150"
           >
             Continue →
           </button>

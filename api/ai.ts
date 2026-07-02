@@ -4,7 +4,8 @@ import { z } from 'zod';
 import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
 import { eq, and } from 'drizzle-orm';
-import { users, brainEntries } from '../src/db/schema.js';
+import { users, brainEntries, tasks } from '../src/db/schema.js';
+import { computeLaunchReadiness, LAYER_LABELS } from './lib/progressUtils.js';
 
 const FeedbackSchema = z.object({
   score: z.number().int().min(0).max(100),
@@ -12,6 +13,10 @@ const FeedbackSchema = z.object({
   good: z.array(z.string()).min(1).max(2),
   missing: z.array(z.string()).min(1).max(3),
   nextStep: z.string(),
+  realWorldTask: z.union([
+    z.object({ title: z.string(), instruction: z.string() }),
+    z.null(),
+  ]).default(null),
 });
 
 export type AiFeedback = z.infer<typeof FeedbackSchema>;
@@ -34,7 +39,7 @@ export type CompareResult = z.infer<typeof CompareSchema>;
 
 function getDb() {
   const sql = neon(process.env.DATABASE_URL!);
-  return drizzle(sql, { schema: { users, brainEntries } });
+  return drizzle(sql, { schema: { users, brainEntries, tasks } });
 }
 
 const FEEDBACK_SYSTEM_PROMPT = `You are Affina — a warm but honest startup mentor for early-stage female founders.
@@ -44,7 +49,7 @@ Rules:
 - Be specific. Reference the actual words in their answer.
 - Always find at least one genuine positive, even in a weak answer — it keeps founders going.
 - Identify concrete gaps (not vague "improve your phrasing" — say exactly what's missing).
-- Give exactly ONE next step with a concrete mini-example that uses their actual project/audience.
+- Give exactly ONE next step. If it's a real-world action outside the app (e.g. interview customers, build a landing page, run an ad), set realWorldTask with a short imperative title (≤6 words) AND the full detailed instruction. If it's just an in-app rewrite, set realWorldTask to null.
 - Tone: warm but direct. "This describes the product, not the value to the person" — not "Great work!".
 - Respond ONLY with valid JSON, no other text.`;
 
@@ -75,9 +80,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'method not allowed' });
 
+  // Generate project name mode — cheap Haiku call, no lesson context required
+  if (req.body.mode === 'generate-name') {
+    const { idea, customer, businessModel, stage, avoid } = req.body;
+    if (!idea?.trim()) return res.status(200).json({ name: '' });
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const avoidList: string[] = Array.isArray(avoid) ? avoid.filter(Boolean) : [];
+    const avoidLine = avoidList.length
+      ? `\nAlready suggested — return something clearly DIFFERENT in sound and root: ${avoidList.join(', ')}.`
+      : '';
+    const message = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 24,
+      system: `You name consumer startups. Output ONE brand name that fits THIS specific business.
+Rules:
+- The name must connect to what the startup actually does, its value, or its customer — never generic.
+- 1–2 words, short, memorable, easy to pronounce and spell. A coined or blended word is great.
+- No generic mashups ("SmartHub", "QuickConnect"); no "AI"/"Tech"/"Labs"/"App"/"Hub" suffixes.
+- Output JUST the name. No quotes, no punctuation, no explanation.`,
+      messages: [{
+        role: 'user',
+        content: `Name this startup:
+What it does: ${idea}
+Target customer: ${customer || 'not specified'}
+Business model: ${businessModel || 'not specified'}
+Stage: ${stage || 'early'}${avoidLine}`,
+      }],
+    });
+    const raw = message.content[0].type === 'text' ? message.content[0].text.trim() : '';
+    const name = raw.replace(/["""''`*.\n]/g, '').trim().split(/\s+/).slice(0, 2).join(' ');
+    return res.status(200).json({ name });
+  }
+
   const { email, lessonId, lessonTitle, prompt, answer, aiMode, context } = req.body;
   const contextBlock = context?.idea
-    ? `\n\nFounder context (use this to personalize feedback — reference their actual project):\n- Idea: ${context.idea}\n- Target customer: ${context.customer || 'not specified'}\n- Stage: ${context.stage || 'not specified'}`
+    ? `\n\nFounder context (use this to personalize feedback — reference their actual project and address them by name):\n- Name: ${context.name || 'not provided'}\n- Idea: ${context.idea}\n- Target customer: ${context.customer || 'not specified'}\n- Stage: ${context.stage || 'not specified'}`
     : '';
   if (!email || !lessonId || !answer?.trim()) {
     return res.status(400).json({ error: 'email, lessonId, and answer are required' });
@@ -133,7 +170,8 @@ Return JSON with exactly this structure:
   "verdict": <"strong" if score≥80, "ok" if score 55-79, "can_be_stronger" if score<55>,
   "good": [<1-2 specific strengths from their actual answer>],
   "missing": [<1-3 specific gaps referencing what they wrote — not generic advice>],
-  "nextStep": "<one concrete rewrite technique + mini-example using their specific product and audience>"
+  "nextStep": "<one concrete next step>",
+  "realWorldTask": null | { "title": "<≤6 word imperative, e.g. 'Interview 5 target customers'>", "instruction": "<full detailed instruction with context, how-to, and expected output>" }
 }`;
       const message = await client.messages.create({
         model: 'claude-sonnet-4-6',
@@ -150,7 +188,7 @@ Return JSON with exactly this structure:
     return res.status(502).json({ error: 'ai_unavailable' });
   }
 
-  // Persist to brain_entries
+  // Persist to brain_entries + auto-create real-world task if applicable
   try {
     const db = getDb();
     const user = await db.query.users.findFirst({ where: eq(users.email, email) });
@@ -158,6 +196,7 @@ Return JSON with exactly this structure:
       const existing = await db.query.brainEntries.findFirst({
         where: and(eq(brainEntries.userId, user.id), eq(brainEntries.lessonId, lessonId)),
       });
+      const oldScore = existing?.aiScore ?? null;
       if (existing) {
         const score = isCompare ? null : (result as AiFeedback).score;
         await db.update(brainEntries)
@@ -168,6 +207,49 @@ Return JSON with exactly this structure:
             updatedAt: new Date(),
           })
           .where(and(eq(brainEntries.userId, user.id), eq(brainEntries.lessonId, lessonId)));
+
+        // Record the readiness gain from this scored exercise (feedback mode only — compare has no score).
+        if (!isCompare) {
+          const allEntries = await db.query.brainEntries.findMany({ where: eq(brainEntries.userId, user.id) });
+          const after = computeLaunchReadiness(
+            allEntries.map((e) => ({ entryType: e.entryType, aiScore: e.aiScore ?? null })),
+            user.score ?? 0,
+          ).readiness;
+          const before = computeLaunchReadiness(
+            allEntries.map((e) => ({ entryType: e.entryType, aiScore: e.lessonId === lessonId ? oldScore : (e.aiScore ?? null) })),
+            user.score ?? 0,
+          ).readiness;
+          const delta = after - before;
+          if (delta > 0) {
+            await db.update(users).set({
+              lastReadinessGain: { delta, sourceLabel: LAYER_LABELS[existing.entryType] ?? existing.entryType },
+              updatedAt: new Date(),
+            }).where(eq(users.id, user.id));
+          }
+        }
+      }
+
+      // Upsert real-world task if mentor returned one
+      if (!isCompare) {
+        const rwt = (result as AiFeedback).realWorldTask;
+        if (rwt) {
+          const existingTask = await db.query.tasks.findFirst({
+            where: and(eq(tasks.userId, user.id), eq(tasks.sourceRef, lessonId)),
+          });
+          if (existingTask) {
+            await db.update(tasks)
+              .set({ title: rwt.title, instruction: rwt.instruction, updatedAt: new Date() })
+              .where(eq(tasks.id, existingTask.id));
+          } else {
+            await db.insert(tasks).values({
+              userId: user.id,
+              source: 'mentor',
+              sourceRef: lessonId,
+              title: rwt.title,
+              instruction: rwt.instruction,
+            });
+          }
+        }
       }
     }
   } catch {

@@ -1,0 +1,291 @@
+import { useEffect, useState } from 'react';
+import type { Task, TaskSource } from '../types';
+import { MODULES } from '../data';
+
+// lessonId → fieldTask config (for interview-log progress counters on program cards)
+const FIELD_TASKS: Record<string, { artifactType: string; minEntries?: number }> = {};
+for (const m of MODULES) for (const l of m.lessons) if (l.fieldTask) FIELD_TASKS[l.id] = l.fieldTask;
+
+const SOURCE_LABEL: Record<TaskSource, string> = {
+  program: 'Program',
+  mentor: 'Mentor',
+  lesson: 'Lesson',
+  advisor: 'Advisor',
+  self: 'You',
+  system: 'System',
+  pulse: 'Pulse',
+};
+
+const SOURCE_CHIP: Record<TaskSource, string> = {
+  program: 'bg-brand-100 text-brand-800',
+  mentor: 'bg-brand-50 text-brand',
+  lesson: 'bg-inset text-ink-soft',
+  advisor: 'bg-amber-50 text-amber-600',
+  self: 'bg-brand-50 text-brand',
+  system: 'bg-inset text-ink-mute',
+  pulse: 'bg-accent-50 text-accent-600',
+};
+
+const GROUP_LABEL: Partial<Record<TaskSource, string>> = {
+  program: 'From program',
+  mentor: 'From mentor',
+  lesson: 'From lessons',
+  advisor: 'Advisor tasks',
+  self: 'My tasks',
+  system: 'System',
+  pulse: 'From check-ins',
+};
+
+const STATUS_DOT: Record<string, string> = {
+  todo: 'bg-ink-mute',
+  submitted: 'bg-amber-400',
+  reviewed: 'bg-amber-400',
+  done: 'bg-accent-600',
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  todo: 'to do',
+  submitted: 'in review',
+  reviewed: 'needs work',
+  done: 'done',
+};
+
+const GROUP_ORDER: TaskSource[] = ['program', 'mentor', 'lesson', 'advisor', 'pulse', 'self', 'system'];
+
+interface Props {
+  email: string;
+  onGoToTask: (task: Task) => void;
+  onGoToDashboard: () => void;
+}
+
+export default function Tasks({ email, onGoToTask, onGoToDashboard }: Props) {
+  const [taskList, setTaskList] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [addTitle, setAddTitle] = useState('');
+  const [addInstruction, setAddInstruction] = useState('');
+  const [adding, setAdding] = useState(false);
+
+  useEffect(() => {
+    if (!email) return;
+    fetch(`/api/tasks?email=${encodeURIComponent(email)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        setTaskList(Array.isArray(data.tasks) ? data.tasks : []);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, [email]);
+
+  async function handleAddTask() {
+    if (!addTitle.trim() || !addInstruction.trim()) return;
+    setAdding(true);
+    try {
+      const r = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, title: addTitle.trim(), instruction: addInstruction.trim() }),
+      });
+      const data = await r.json();
+      if (data.task) {
+        setTaskList((prev) => [...prev, data.task]);
+        setAddTitle('');
+        setAddInstruction('');
+        setShowAddForm(false);
+      }
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  const groups: Partial<Record<TaskSource, Task[]>> = {};
+  for (const source of GROUP_ORDER) {
+    const g = taskList.filter((t) => t.source === source && t.status !== 'done');
+    if (g.length > 0) groups[source] = g;
+  }
+  // Always include "self" group even if empty (for the Add button)
+  if (!groups.self) groups.self = [];
+
+  const doneTasks = taskList.filter((t) => t.status === 'done');
+  const totalActive = taskList.filter((t) => t.status !== 'done').length;
+
+  return (
+    <div className="min-h-screen bg-canvas">
+      {/* Header */}
+      <header className="bg-surface border-b border-hairline flex items-center gap-3 px-4 sm:px-6 py-4 sticky top-0 z-30">
+        <button
+          onClick={onGoToDashboard}
+          className="flex items-center gap-1.5 text-ink-soft hover:text-ink transition-colors"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+          <span className="text-sm font-medium">Dashboard</span>
+        </button>
+
+        <span className="text-ink-mute">|</span>
+        <span className="text-sm font-bold text-ink">
+          Tasks
+          {totalActive > 0 && (
+            <span className="ml-1.5 text-xs font-bold bg-brand-100 text-brand-700 rounded-pill px-1.5 py-0.5 tabular-nums">
+              {totalActive}
+            </span>
+          )}
+        </span>
+      </header>
+
+      <main className="max-w-2xl mx-auto px-4 py-8">
+        {loading ? (
+          <div className="flex justify-center py-16">
+            <div className="w-8 h-8 rounded-pill border-2 border-brand-200 border-t-brand-600 animate-spin" />
+          </div>
+        ) : (
+          <div className="flex flex-col gap-8">
+            {GROUP_ORDER.filter((source) => source in groups).map((source) => {
+              const g = groups[source]!;
+              const isSelf = source === 'self';
+              return (
+                <section key={source}>
+                  <div className="flex items-center justify-between mb-3">
+                    <h2 className="text-xs font-bold text-ink-mute uppercase tracking-widest">
+                      {GROUP_LABEL[source]}
+                    </h2>
+                    {isSelf && (
+                      <button
+                        onClick={() => setShowAddForm((v) => !v)}
+                        className="flex items-center gap-1 text-xs font-semibold text-brand hover:text-brand-700 transition-colors"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <line x1="12" y1="5" x2="12" y2="19" />
+                          <line x1="5" y1="12" x2="19" y2="12" />
+                        </svg>
+                        Add task
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Add task form */}
+                  {isSelf && showAddForm && (
+                    <div className="bg-surface border border-brand-100 rounded-card p-5 mb-3 shadow-sm">
+                      <p className="text-sm font-bold text-ink mb-3">New task</p>
+                      <input
+                        type="text"
+                        value={addTitle}
+                        onChange={(e) => setAddTitle(e.target.value)}
+                        placeholder="Task title (short)"
+                        maxLength={60}
+                        className="w-full text-sm border border-hairline rounded-control px-3 py-2 mb-3 outline-none focus:ring-2 focus:ring-brand-200 placeholder-ink-mute"
+                      />
+                      <textarea
+                        value={addInstruction}
+                        onChange={(e) => setAddInstruction(e.target.value)}
+                        placeholder="What do you need to do? Include context and expected outcome…"
+                        rows={3}
+                        className="w-full text-sm border border-hairline rounded-control px-3 py-2 mb-3 outline-none focus:ring-2 focus:ring-brand-200 placeholder-ink-mute resize-none"
+                      />
+                      <div className="flex gap-2 justify-end">
+                        <button
+                          onClick={() => { setShowAddForm(false); setAddTitle(''); setAddInstruction(''); }}
+                          className="text-sm text-ink-mute hover:text-ink-soft px-4 py-2 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleAddTask}
+                          disabled={adding || !addTitle.trim() || !addInstruction.trim()}
+                          className="text-sm font-semibold bg-brand hover:bg-brand-700 text-white px-5 py-2 rounded-pill transition-colors disabled:opacity-50"
+                        >
+                          {adding ? 'Adding…' : 'Add'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Task cards */}
+                  {g.length === 0 && isSelf ? (
+                    <div className="bg-surface border border-dashed border-hairline rounded-card px-5 py-6 text-center">
+                      <p className="text-xs text-ink-mute">
+                        No personal tasks yet. Click "+ Add task" to create one.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      {g.map((task) => (
+                        <TaskCard key={task.id} task={task} onGoToTask={onGoToTask} />
+                      ))}
+                    </div>
+                  )}
+                </section>
+              );
+            })}
+          {/* Completed tasks */}
+          {doneTasks.length > 0 && (
+            <section>
+              <h2 className="text-xs font-bold text-ink-mute uppercase tracking-widest mb-3">
+                Completed
+              </h2>
+              <div className="flex flex-col gap-2">
+                {doneTasks.map((task) => (
+                  <button
+                    key={task.id}
+                    onClick={() => onGoToTask(task)}
+                    className="w-full text-left bg-surface border border-hairline rounded-card px-4 py-4 hover:border-accent-100 hover:bg-accent-50 transition-all duration-150 shadow-sm group"
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className={`text-[10px] font-bold rounded-pill px-2.5 py-0.5 ${SOURCE_CHIP[task.source as TaskSource] ?? 'bg-inset text-ink-soft'}`}>
+                        {SOURCE_LABEL[task.source as TaskSource] ?? task.source}
+                      </span>
+                      <div className="ml-auto flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-pill bg-accent-600" />
+                        <span className="text-[10px] text-accent-600 font-semibold">done</span>
+                      </div>
+                    </div>
+                    <p className="text-sm font-semibold text-ink-soft line-clamp-2 group-hover:text-accent-800 transition-colors leading-snug line-through decoration-gray-300">
+                      {task.title}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
+
+function TaskCard({ task, onGoToTask }: { task: Task; onGoToTask: (t: Task) => void }) {
+  const source = task.source as TaskSource;
+  const status = task.status ?? 'todo';
+  return (
+    <button
+      onClick={() => onGoToTask(task)}
+      className="w-full text-left bg-surface border border-hairline rounded-card px-4 py-4 hover:border-brand-200 hover:bg-brand-50 transition-all duration-150 shadow-sm group"
+    >
+      <div className="flex items-center gap-2 mb-2">
+        <span className={`text-[10px] font-bold rounded-pill px-2.5 py-0.5 ${SOURCE_CHIP[source] ?? 'bg-inset text-ink-soft'}`}>
+          {SOURCE_LABEL[source] ?? source}
+        </span>
+        {(() => {
+          // Interview-log progress counter (§3.3), e.g. "3/10"
+          const ft = task.sourceRef ? FIELD_TASKS[task.sourceRef] : undefined;
+          if (ft?.artifactType !== 'interview_log') return null;
+          const n = task.submissionData?.interviewLog?.length ?? 0;
+          return (
+            <span className={`text-[10px] font-bold rounded-pill px-2 py-0.5 ${n >= (ft.minEntries ?? 1) ? 'bg-accent-50 text-accent-800' : 'bg-inset text-ink-soft'}`}>
+              🎙 {n}/10
+            </span>
+          );
+        })()}
+        <div className="ml-auto flex items-center gap-1.5">
+          <span className={`w-1.5 h-1.5 rounded-pill ${STATUS_DOT[status] ?? 'bg-ink-mute'}`} />
+          <span className="text-[10px] text-ink-mute font-medium">{STATUS_LABEL[status] ?? status}</span>
+        </div>
+      </div>
+      <p className="text-sm font-semibold text-ink line-clamp-2 group-hover:text-brand-700 transition-colors leading-snug">
+        {task.title}
+      </p>
+    </button>
+  );
+}

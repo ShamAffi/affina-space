@@ -2,7 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+:root {
+  --brand: #7150EA;
+  --accent: #119C74;
+  --canvas: #F4F4F5;
+  --surface: #FFFFFF;
+  --inset: #E9E9EC;
+  --hairline: #E0E0E4;
+  --ink: #1F1F23;
+  --ink-soft: #6C6C74;
+  --ink-mute: #9D9DA6;
+}
 
 * {
   box-sizing: border-box;
@@ -10,8 +20,9 @@
 
 body {
   margin: 0;
-  background: #ffffff;
-  font-family: 'Inter', system-ui, sans-serif;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: 'Hanken Grotesk', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 

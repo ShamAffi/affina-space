@@ -4,10 +4,12 @@ const STORAGE_KEY = 'userData';
 
 export const defaultUserData: UserData = {
   name: '',
+  projectName: '',
   idea: '',
   customer: '',
   businessModel: '',
   stage: '',
+  goal: '',
   email: '',
   score: 0,
   lessonInputs: {},
@@ -47,10 +49,13 @@ export async function syncUserToDB(data: UserData): Promise<void> {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         email: data.email,
+        name: data.name,
+        projectName: data.projectName,
         idea: data.idea,
         customer: data.customer,
         businessModel: data.businessModel,
         stage: data.stage,
+        goal: data.goal,
         score: data.score,
       }),
     });
@@ -62,7 +67,7 @@ export async function syncUserToDB(data: UserData): Promise<void> {
 export async function saveLessonInputToDB(email: string, lessonId: string, content: string): Promise<void> {
   if (!email) return;
   try {
-    await fetch('/api/lessons', {
+    await fetch('/api/brain', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'save-input', email, lessonId, content }),
@@ -75,7 +80,7 @@ export async function saveLessonInputToDB(email: string, lessonId: string, conte
 export async function toggleLessonCompleteToDB(email: string, lessonId: string): Promise<void> {
   if (!email) return;
   try {
-    await fetch('/api/lessons', {
+    await fetch('/api/brain', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'toggle-complete', email, lessonId }),

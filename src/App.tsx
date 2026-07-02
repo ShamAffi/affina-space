@@ -1,100 +1,207 @@
 import { useState } from 'react';
-import type { Screen, UserData, OnboardingScore } from './types';
-import { loadUserData, updateUserData, syncUserToDB } from './store';
-import { QUESTIONS } from './data';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams, useLocation } from 'react-router-dom';
+import type { UserData, Task } from './types';
+import { loadUserData, updateUserData, defaultUserData, saveUserData } from './store';
 import Welcome from './screens/Welcome';
-import Question from './screens/Question';
-import EmailCapture from './screens/EmailCapture';
-import Analyzing from './screens/Analyzing';
-import Score from './screens/Score';
+import Onboarding from './screens/Onboarding';
+import Dashboard from './screens/Dashboard';
 import LMS from './screens/LMS';
+import Tasks from './screens/Tasks';
+import TaskDetail from './screens/TaskDetail';
+import MetricPulse from './screens/MetricPulse';
 
-const SCREEN_ORDER: Screen[] = [
-  'welcome', 'q1', 'q2', 'q3', 'q4', 'email', 'analyzing', 'score', 'lms',
-];
-
-const Q_SCREENS: Screen[] = ['q1', 'q2', 'q3', 'q4'];
+// Single course for now; the URL keeps a course segment so parallel courses slot in later.
+const COURSE_SLUG = 'launch';
 
 export default function App() {
-  const [screen, setScreen] = useState<Screen>(() =>
-    loadUserData().email ? 'lms' : 'welcome',
+  return (
+    <BrowserRouter>
+      <AppRoutes />
+    </BrowserRouter>
   );
+}
+
+function AppRoutes() {
+  const navigate = useNavigate();
   const [userData, setUserData] = useState<UserData>(loadUserData);
-  const [scoreResult, setScoreResult] = useState<OnboardingScore | null>(null);
+  const authed = !!userData.email;
 
-  function update(updates: Partial<UserData>) {
-    const updated = updateUserData(updates);
-    setUserData(updated);
+  function update(updates: Partial<UserData>): UserData {
+    const merged = updateUserData(updates);
+    setUserData(merged);
+    return merged;
   }
 
-  function advance() {
-    const idx = SCREEN_ORDER.indexOf(screen);
-    if (idx < SCREEN_ORDER.length - 1) {
-      setScreen(SCREEN_ORDER[idx + 1]);
-    }
+  function logout() {
+    saveUserData(defaultUserData);
+    setUserData(defaultUserData);
+    navigate('/');
   }
 
-  switch (screen) {
-    case 'welcome':
-      return <Welcome onStart={advance} />;
-
-    case 'q1':
-    case 'q2':
-    case 'q3':
-    case 'q4': {
-      const qIdx = Q_SCREENS.indexOf(screen);
-      const question = QUESTIONS[qIdx];
-      const key = question.id as keyof UserData;
-      return (
-        <Question
-          key={screen}
-          question={question}
-          questionNumber={qIdx + 1}
-          totalQuestions={4}
-          initialValue={(userData[key] as string) ?? ''}
-          onNext={(value) => {
-            update({ [question.id]: value });
-            advance();
-          }}
-        />
-      );
-    }
-
-    case 'email':
-      return (
-        <EmailCapture
-          onNext={(email) => {
-            update({ email });
-            advance();
-          }}
-        />
-      );
-
-    case 'analyzing':
-      return (
-        <Analyzing
-          userData={userData}
-          onDone={(result) => {
-            setScoreResult(result);
-            const next = updateUserData({ score: result.score });
-            setUserData(next);
-            syncUserToDB(next);
-            advance();
-          }}
-        />
-      );
-
-    case 'score':
-      return (
-        <Score
-          score={userData.score}
-          summary={scoreResult?.summary ?? ''}
-          steps={scoreResult?.steps ?? []}
-          onStart={advance}
-        />
-      );
-
-    case 'lms':
-      return <LMS userData={userData} onUpdateUserData={update} />;
+  async function signIn(email: string) {
+    const withEmail = update({ email });
+    navigate('/dashboard');
+    try {
+      const res = await fetch(`/api/user?email=${encodeURIComponent(email)}`);
+      if (res.ok) {
+        const db = await res.json();
+        update({
+          name: db.name || withEmail.name,
+          projectName: db.projectName || withEmail.projectName,
+          idea: db.idea || withEmail.idea,
+          customer: db.customer || withEmail.customer,
+          businessModel: db.businessModel || withEmail.businessModel,
+          stage: db.stage || withEmail.stage,
+          goal: db.goal || withEmail.goal,
+          score: db.score || withEmail.score,
+        });
+      }
+    } catch { /* fail silently — localStorage is the fallback */ }
   }
+
+  const toLanding = <Navigate to="/" replace />;
+
+  return (
+    <Routes>
+      {/* Public — / is the (future) landing; for now reuse the hero with a Start CTA */}
+      <Route
+        path="/"
+        element={authed ? <Navigate to="/dashboard" replace /> : <Welcome onStart={() => navigate('/start')} onSignIn={signIn} />}
+      />
+      <Route
+        path="/start"
+        element={<Onboarding userData={userData} update={update} signIn={signIn} onComplete={() => navigate('/dashboard')} />}
+      />
+      <Route path="/login" element={<LoginPlaceholder onSignIn={signIn} />} />
+      <Route path="/auth/verify" element={<VerifyPlaceholder />} />
+
+      {/* App */}
+      <Route
+        path="/dashboard"
+        element={authed ? (
+          <Dashboard
+            userData={userData}
+            onUpdateUserData={update}
+            onGoToLMS={(id) => navigate(id ? `/learning/${COURSE_SLUG}/${id}` : '/learning')}
+            onGoToTasks={() => navigate('/tasks')}
+            onGoToTask={(task) => navigate('/tasks', { state: { task } })}
+            onGoToPulse={() => navigate('/traction')}
+            onLogout={logout}
+          />
+        ) : toLanding}
+      />
+
+      <Route path="/learning/*" element={authed ? <LMSRoute userData={userData} update={update} logout={logout} /> : toLanding} />
+
+      <Route path="/tasks" element={authed ? <TasksRoute email={userData.email} /> : toLanding} />
+
+      <Route
+        path="/traction"
+        element={authed ? <MetricPulse email={userData.email} projectName={userData.projectName} onBack={() => navigate('/dashboard')} /> : toLanding}
+      />
+      <Route
+        path="/traction/check-in"
+        element={authed ? <MetricPulse email={userData.email} projectName={userData.projectName} onBack={() => navigate('/dashboard')} /> : toLanding}
+      />
+
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
+
+// ─── Route wrappers (screen components stay unchanged) ─────────────────────────
+function LMSRoute({ userData, update, logout }: {
+  userData: UserData;
+  update: (updates: Partial<UserData>) => UserData;
+  logout: () => void;
+}) {
+  const navigate = useNavigate();
+  const params = useParams();
+  // Splat "/learning/*" → e.g. "launch/m1l3"; lessonId is the 2nd segment (undefined for bare /learning).
+  const lessonId = (params['*'] ?? '').split('/')[1] || undefined;
+  return (
+    <LMS
+      userData={userData}
+      onUpdateUserData={update}
+      onGoToDashboard={() => navigate('/dashboard')}
+      onLogout={logout}
+      initialLessonId={lessonId}
+      onActiveLessonChange={(id) => navigate(`/learning/${COURSE_SLUG}/${id}`, { replace: true })}
+      onGoToTasks={() => navigate('/tasks')}
+    />
+  );
+}
+
+// Tasks are unique & unbounded per user → no /tasks/:id. Detail opens as in-page state.
+function TasksRoute({ email }: { email: string }) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const initial = (location.state as { task?: Task } | null)?.task ?? null;
+  const [selected, setSelected] = useState<Task | null>(initial);
+
+  if (selected) {
+    return <TaskDetail task={selected} email={email} onBack={() => setSelected(null)} />;
+  }
+  return (
+    <Tasks
+      email={email}
+      onGoToTask={(task) => setSelected(task)}
+      onGoToDashboard={() => navigate('/dashboard')}
+    />
+  );
+}
+
+// ─── Placeholders for /login and /auth/verify (magic-link auth ships later) ────
+function LoginPlaceholder({ onSignIn }: { onSignIn: (email: string) => void }) {
+  const navigate = useNavigate();
+  const [email, setEmail] = useState('');
+  const valid = email.trim().includes('@') && email.trim().includes('.');
+  return (
+    <div className="min-h-screen bg-canvas flex flex-col items-center justify-center px-5">
+      <div className="w-full max-w-sm text-center">
+        <span className="text-brand-700 font-bold text-xl tracking-tight">
+          Affina<span className="text-ink">Space</span>
+        </span>
+        <h1 className="mt-6 text-2xl font-extrabold text-ink mb-2">Welcome back</h1>
+        <p className="text-sm text-ink-soft mb-6">Enter your email to load your account.</p>
+        <input
+          type="email"
+          autoFocus
+          placeholder="you@email.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && valid) onSignIn(email.trim()); }}
+          className="w-full rounded-card border-2 border-hairline focus:border-brand-400 focus:ring-4 focus:ring-brand-100 outline-none px-5 py-4 text-base text-ink placeholder-ink-mute transition mb-3"
+        />
+        <button
+          onClick={() => { if (valid) onSignIn(email.trim()); }}
+          disabled={!valid}
+          className="w-full bg-brand hover:bg-brand-700 active:scale-95 disabled:opacity-40 text-white text-base font-semibold py-4 rounded-pill transition mb-3"
+        >
+          Continue →
+        </button>
+        <button onClick={() => navigate('/')} className="text-sm text-ink-mute hover:text-ink-soft transition">
+          New here? Start free
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function VerifyPlaceholder() {
+  const navigate = useNavigate();
+  return (
+    <div className="min-h-screen bg-canvas flex flex-col items-center justify-center px-5 text-center">
+      <span className="text-brand-700 font-bold text-xl tracking-tight">
+        Affina<span className="text-ink">Space</span>
+      </span>
+      <p className="mt-6 text-ink-soft text-sm">Email verification is coming soon.</p>
+      <button
+        onClick={() => navigate('/')}
+        className="mt-6 bg-brand hover:bg-brand-700 text-white text-sm font-semibold px-8 py-3 rounded-pill transition"
+      >
+        Continue →
+      </button>
+    </div>
+  );
 }

@@ -11,7 +11,7 @@ function getDb() {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
@@ -33,10 +33,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     return res.status(200).json({
+      name: user.name ?? '',
+      projectName: user.projectName ?? '',
       idea: user.idea ?? '',
       customer: user.customer ?? '',
       businessModel: user.businessModel ?? '',
       stage: user.stage ?? '',
+      goal: user.goal ?? '',
       email: user.email,
       score: user.score ?? 0,
       lessonInputs: Object.fromEntries(inputs.map((i) => [i.lessonId, i.content ?? ''])),
@@ -46,22 +49,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // POST /api/user — upsert user with onboarding data
   if (req.method === 'POST') {
-    const { email, idea, customer, businessModel, stage, score } = req.body;
+    const { email, name, projectName, idea, customer, businessModel, stage, goal, score } = req.body;
     if (!email) return res.status(400).json({ error: 'email required' });
 
     const existing = await db.query.users.findFirst({ where: eq(users.email, email) });
 
     if (existing) {
       await db.update(users)
-        .set({ idea, customer, businessModel, stage, score, updatedAt: new Date() })
+        .set({ name, projectName, idea, customer, businessModel, stage, goal, score, updatedAt: new Date() })
         .where(eq(users.email, email));
       return res.status(200).json({ id: existing.id });
     } else {
       const [created] = await db.insert(users)
-        .values({ email, idea, customer, businessModel, stage, score })
+        .values({ email, name, projectName, idea, customer, businessModel, stage, goal, score })
         .returning({ id: users.id });
       return res.status(201).json({ id: created.id });
     }
+  }
+
+  // PATCH /api/user — update account fields (name, projectName)
+  if (req.method === 'PATCH') {
+    const { email, name, projectName } = req.body;
+    if (!email) return res.status(400).json({ error: 'email required' });
+    const patchFields: Record<string, unknown> = { updatedAt: new Date() };
+    if (name !== undefined) patchFields.name = name;
+    if (projectName !== undefined) patchFields.projectName = projectName;
+    await db.update(users).set(patchFields).where(eq(users.email, email));
+    return res.status(200).json({ ok: true });
   }
 
   return res.status(405).json({ error: 'method not allowed' });
