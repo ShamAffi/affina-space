@@ -57,6 +57,57 @@ Rules:
 
 type Snap = { version: number; generatedAt: string; source: string; sections: { title: string; content: string }[] };
 
+// ─── Market Research m2l6 (RULES_DONE_FOR_YOU §1) — test mode, model estimates only ──
+// Tolerant to common LLM looseness: numeric values, missing optionals, odd confidence labels.
+const ResearchReportSchema = z.object({
+  headlineVerdict: z.string(),
+  keyNumbers: z.array(z.object({
+    label: z.coerce.string(),
+    value: z.coerce.string(),
+    logic: z.coerce.string().catch(''),
+  })).min(1).max(5),
+  sections: z.array(z.object({
+    title: z.string(),
+    confidence: z.enum(['high', 'medium', 'low']).catch('medium'),
+    body: z.string(),
+    whatThisMeans: z.coerce.string().catch(''),
+    warning: z.string().nullable().catch(null),
+  })).min(7).max(10),
+});
+const ResearchQuestionsSchema = z.object({
+  questions: z.array(z.object({ id: z.string(), q: z.string() })).min(1).max(5),
+});
+
+const RESEARCH_SYSTEM = `You are Affina's research analyst producing a MARKET RESEARCH report for a first-time female founder — TEST MODE: you have NO live web access. Every external figure is a clearly-labeled estimate.
+
+TRUTH HIERARCHY (strict order):
+1. Her own data from the Brain (Snapshot, her competitor map, her interviews).
+2. Model knowledge — allowed ONLY as clearly labeled estimates ("estimate:", with the calculation logic shown).
+Never present an estimate as a sourced fact. No links — you have none; the method section must say "model estimates only, no live data".
+
+NUMBERS POLICY
+- Every number is labeled "estimate" WITH the calculation logic ("~8,000 coaches: 40k registered nutritionists × ~20% independent").
+- Fake precision is forbidden. TAM is always bottom-up: count × price × reachable share.
+
+HONESTY POLICY
+- If reasoning contradicts her hypothesis or positioning — do not soften it: put it in the section's "warning" field AND mention it in the summary.
+- If the niche is too narrow: say so plainly, research nearest proxy markets, label them as proxies.
+- Every section gets a confidence label (high/medium/low) — in test mode most external sections should be medium or low.
+
+VOICE: address the founder directly ("your market", "your opening"). Every section ends with actionable "whatThisMeans" (1-2 lines).
+
+CLARIFYING QUESTIONS RULE: if critical inputs are missing you may ask INSTEAD of generating — geo/language of the market is mandatory; ideal customer matters most after that. If her competitor map (m2l4) and positioning (m2l5) exist, ask AT MOST 2 questions; otherwise 3–5. NEVER ask something already answered in the context. If you have enough — generate immediately.
+
+OUTPUT — exactly one of:
+{ "questions": [{ "id": "geo", "q": "..." }] }
+or
+{ "headlineVerdict": "<one-paragraph verdict>", "keyNumbers": [{"label","value","logic"}], "sections": [ 9 sections in THIS order:
+  0 "Executive Summary" · 1 "Market: size & timing" · 2 "Customer: segments & evidence" · 3 "Competition: map & models" · 4 "Gaps & white space" · 5 "Distribution & marketing" · 6 "Risks & watchouts" · 7 "Your openings" · 8 "Sources & method"
+  each { "title", "confidence", "body" (test mode: VERY TIGHT — 40-80 words per section as terse bullets; competition = top 4, one short line each), "whatThisMeans" (max 15 words), "warning": null | "<one-sentence contradiction>" } ] }
+Budget discipline: the WHOLE JSON must stay under ~1800 tokens — terse beats complete.
+Section 7 openings must tie to HER edge from the Snapshot, each with a first step and which program module it feeds. Respond ONLY with valid JSON.`;
+
+
 async function generateSnapshot(
   db: ReturnType<typeof getDb>,
   user: typeof users.$inferSelect,
@@ -179,6 +230,110 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const snap = await generateSnapshot(db, user, user.snapshot ? 'manual refresh' : 'Module 0');
       if (!snap) return res.status(502).json({ error: 'ai_unavailable' });
       return res.status(200).json({ snapshot: snap });
+    }
+
+    // 🟢 m2l6 — Market Research, test mode (§1.1–§1.7). answers = replies to clarifying questions.
+    if (action === 'market-research') {
+      const { answers } = req.body as { answers?: Record<string, string> };
+      const entries = await db.query.brainEntries.findMany({ where: eq(brainEntries.userId, user.id) });
+      const byType: Record<string, string> = {};
+      for (const e of entries) byType[e.entryType] = e.content;
+      const snap = (user.snapshot ?? null) as Snap | null;
+
+      const answersBlock = answers && Object.keys(answers).length
+        ? `\nHER ANSWERS TO YOUR CLARIFYING QUESTIONS:\n${Object.entries(answers).map(([k, v]) => `- ${k}: ${v}`).join('\n')}`
+        : '';
+
+      const userMessage = `PROJECT: ${user.projectName || 'unnamed'} — ${user.idea || 'not set'}
+Customer: ${user.customer || 'not set'} · Model: ${user.businessModel || 'not set'} · Stage: ${user.stage || 'not set'}
+
+STARTUP SNAPSHOT:
+${snap ? snap.sections.map((x) => `## ${x.title}\n${x.content}`).join('\n') : '(none yet)'}
+
+HER COMPETITOR MAP (m2l4): ${byType['competitive_landscape'] || '(not filled)'}
+HER POSITIONING (m2l5): ${byType['positioning'] || '(not filled)'}
+HER INTAKE (m0l3): ${byType['founder_intake'] || '(not filled)'}
+IMPORTED LINKS (m0l4): ${byType['imported_assets'] || '(none)'}
+PRIOR RESEARCH INPUTS: ${byType['research_inputs'] || '(none)'}${answersBlock}
+
+Produce the test-mode report — or the clarifying questions if critical inputs are missing.`;
+
+      const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+      try {
+        const msg = await client.messages.create({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 2800,
+          system: RESEARCH_SYSTEM,
+          messages: [{ role: 'user', content: userMessage }],
+        });
+        const raw = msg.content[0].type === 'text' ? msg.content[0].text : '';
+        const match = raw.match(/\{[\s\S]*\}/);
+        if (!match) throw new Error('no JSON');
+        const parsed = JSON.parse(match[0]);
+
+        if (parsed.questions) {
+          const qs = ResearchQuestionsSchema.parse(parsed);
+          return res.status(200).json(qs);
+        }
+
+        const report = ResearchReportSchema.parse(parsed);
+        const full = { mode: 'test' as const, generatedAt: new Date().toISOString(), ...report };
+
+        // §1.2a — clarifying answers enrich the Brain (reused on re-runs)
+        if (answers && Object.keys(answers).length) {
+          const text = Object.entries(answers).map(([k, v]) => `${k}: ${v}`).join('\n');
+          const prior = entries.find((e) => e.entryType === 'research_inputs');
+          if (prior) {
+            await db.update(brainEntries)
+              .set({ content: `${prior.content}\n${text}`, updatedAt: new Date() })
+              .where(eq(brainEntries.id, prior.id));
+          } else {
+            await db.insert(brainEntries).values({
+              userId: user.id, lessonId: 'm2l6_inputs', lessonTitle: 'Research inputs',
+              prompt: 'Clarifying answers for market research', content: text, entryType: 'research_inputs',
+            });
+          }
+        }
+
+        // §1.5 deliver — the report itself lives in the Brain as market_research
+        const existingR = entries.find((e) => e.entryType === 'market_research');
+        if (existingR) {
+          await db.update(brainEntries)
+            .set({ content: JSON.stringify(full), processedByAi: true, updatedAt: new Date() })
+            .where(eq(brainEntries.id, existingR.id));
+        } else {
+          await db.insert(brainEntries).values({
+            userId: user.id, lessonId: 'm2l6', lessonTitle: 'Market Research (test mode)',
+            prompt: 'Done-for-you market research — 9 sections, model estimates only',
+            content: JSON.stringify(full), entryType: 'market_research', processedByAi: true,
+          });
+        }
+
+        // key facts → Snapshot → Market (mechanical, like check-in facts)
+        if (snap) {
+          const sections = snap.sections.map((x) => ({ ...x }));
+          const market = sections.find((x) => /market/i.test(x.title));
+          if (market) {
+            const day = new Date().toISOString().slice(0, 10);
+            const facts = [
+              `• Research verdict: ${report.headlineVerdict.slice(0, 220)} (research ${day})`,
+              ...report.keyNumbers.slice(0, 3).map((k) => `• ${k.label}: ${k.value} — ${k.logic.slice(0, 120)} (research ${day})`),
+            ].join('\n');
+            market.content = `${market.content}\n${facts}`.trim();
+            const history = Array.isArray(user.snapshotHistory) ? (user.snapshotHistory as Snap[]) : [];
+            await db.update(users).set({
+              snapshot: { version: snap.version + 1, generatedAt: new Date().toISOString(), source: 'market research', sections },
+              snapshotHistory: [...history, snap].slice(-5),
+              updatedAt: new Date(),
+            }).where(eq(users.id, user.id));
+          }
+        }
+
+        return res.status(200).json({ report: full });
+      } catch (err) {
+        console.error('market-research error', err instanceof Error ? err.message : JSON.stringify(err).slice(0, 800));
+        return res.status(502).json({ error: 'ai_unavailable' });
+      }
     }
 
     if (action === 'save-input') {

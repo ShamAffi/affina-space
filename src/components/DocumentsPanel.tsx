@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import type { BrainEntry, AiFeedback, CompareResult, Lesson, StartupSnapshot } from '../types';
+import type { BrainEntry, AiFeedback, CompareResult, Lesson, StartupSnapshot, MarketResearchReport } from '../types';
+import MarketResearchView from './MarketResearchView';
 import { MODULES } from '../data';
 
 // Lesson lookup, so Documents edits respect the course's char caps and can re-run the AI mentor.
@@ -36,6 +37,8 @@ export default function DocumentsPanel({ email, onClose, onLessonInputSaved, con
   const [entries, setEntries] = useState<BrainEntry[]>([]);
   const [snapshot, setSnapshot] = useState<StartupSnapshot | null>(null);
   const [snapshotOpen, setSnapshotOpen] = useState(false);
+  const [research, setResearch] = useState<MarketResearchReport | null>(null);
+  const [researchOpen, setResearchOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [modalEntry, setModalEntry] = useState<BrainEntry | null>(null);
 
@@ -46,7 +49,11 @@ export default function DocumentsPanel({ email, onClose, onLessonInputSaved, con
       .then((data) => {
         // Snapshot is pinned separately (§3.4) — keep it out of the regular doc list
         const list: BrainEntry[] = Array.isArray(data.entries) ? data.entries : [];
-        setEntries(list.filter((e) => e.entryType !== 'startup_snapshot'));
+        const researchEntry = list.find((e) => e.entryType === 'market_research');
+        if (researchEntry) {
+          try { setResearch(JSON.parse(researchEntry.content) as MarketResearchReport); } catch { /* skip */ }
+        }
+        setEntries(list.filter((e) => e.entryType !== 'startup_snapshot' && e.entryType !== 'market_research'));
         setSnapshot(data.snapshot ?? null);
         setLoading(false);
       })
@@ -104,6 +111,21 @@ export default function DocumentsPanel({ email, onClose, onLessonInputSaved, con
               </button>
             )}
 
+            {/* 📄 Market research — opens the PDF-style viewer */}
+            {!loading && research && (
+              <button
+                onClick={() => setResearchOpen(true)}
+                className="w-full text-left bg-accent-50 border border-accent-100 rounded-card p-4 hover:border-accent-400 transition-colors"
+              >
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-accent-800">📄 Market Research</span>
+                  <span className="ml-auto text-[10px] font-bold bg-surface text-amber-700 rounded-pill px-2 py-0.5 border border-amber-200">test mode</span>
+                </div>
+                <p className="text-sm font-semibold text-ink leading-snug mb-1">9-section research report</p>
+                <p className="text-[11px] text-accent-800/70 line-clamp-2">{research.headlineVerdict}</p>
+              </button>
+            )}
+
             {!loading && entries.length === 0 && !snapshot && (
               <div className="flex-1 flex flex-col items-center justify-center text-center gap-3 py-16">
                 <div className="w-12 h-12 rounded-pill bg-brand-50 flex items-center justify-center">
@@ -138,6 +160,10 @@ export default function DocumentsPanel({ email, onClose, onLessonInputSaved, con
           onSaved={handleSaved}
           context={context}
         />
+      )}
+
+      {researchOpen && research && (
+        <MarketResearchView report={research} projectName="" onClose={() => setResearchOpen(false)} />
       )}
 
       {/* Snapshot modal — read-only (§3.4): updates flow through the weekly check-in */}

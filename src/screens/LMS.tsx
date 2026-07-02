@@ -1,8 +1,9 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { MODULES } from '../data';
-import type { UserData, Lesson, AiFeedback, CompareResult, BrainEntry, NorthStarSuggestion, NorthStarCandidate, BlockKind, StartupSnapshot, MentorSessionId, MentorSessionsState } from '../types';
+import type { UserData, Lesson, AiFeedback, CompareResult, BrainEntry, NorthStarSuggestion, NorthStarCandidate, BlockKind, StartupSnapshot, MentorSessionId, MentorSessionsState, MarketResearchReport } from '../types';
 import { blockKind } from '../types';
 import MentorSessionModal from '../components/MentorSessionModal';
+import MarketResearchView from '../components/MarketResearchView';
 import { saveLessonInputToDB, toggleLessonCompleteToDB, syncUserToDB, loadProgressFromDB } from '../store';
 import ProfileButton from '../components/ProfileButton';
 import AccountPanel from '../components/AccountPanel';
@@ -63,6 +64,13 @@ export default function LMS({ userData, onUpdateUserData, onGoToDashboard, onLog
   const [pendingVariants, setPendingVariants] = useState<Record<string, { userDraft: string; variants: { label: string; text: string }[] }>>({});
   const [analysisByLesson, setAnalysisByLesson] = useState<Record<string, { for: string[]; against: string[]; recommendation: string }>>({});
   const [clarifyByLesson, setClarifyByLesson] = useState<Record<string, string>>({});
+  // 🟢 m2l6 Market Research (test mode)
+  const [researchReport, setResearchReport] = useState<MarketResearchReport | null>(null);
+  const [researchQuestions, setResearchQuestions] = useState<{ id: string; q: string }[] | null>(null);
+  const [researchAnswers, setResearchAnswers] = useState<Record<string, string>>({});
+  const [researchLoading, setResearchLoading] = useState(false);
+  const [researchOpen, setResearchOpen] = useState(false);
+  const [researchError, setResearchError] = useState('');
 
   const [progressLoading, setProgressLoading] = useState(true);
   const mainRef = useRef<HTMLElement>(null);
@@ -108,6 +116,10 @@ export default function LMS({ userData, onUpdateUserData, onGoToDashboard, onLog
         const feedbackMap: Record<string, AiFeedback & { previousScore?: number }> = {};
         const compareMap: Record<string, CompareResult> = {};
         for (const entry of brainData as BrainEntry[]) {
+          if (entry.entryType === 'market_research') {
+            try { setResearchReport(JSON.parse(entry.content) as MarketResearchReport); } catch { /* skip */ }
+            continue;
+          }
           if (!entry.aiFeedback) continue;
           try {
             const parsed = JSON.parse(entry.aiFeedback);
@@ -223,6 +235,30 @@ My motivation & 12-week goal: …`;
         })
         .catch(() => setSavingLesson(null));
     }, 750);
+  }
+
+  // 🟢 m2l6 — generate the test-mode research (or receive clarifying questions §1.2a)
+  function handleGenerateResearch(answers?: Record<string, string>) {
+    setResearchLoading(true);
+    setResearchError('');
+    fetch('/api/brain', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'market-research', email: userData.email, ...(answers ? { answers } : {}) }),
+    })
+      .then((r) => { if (!r.ok) throw new Error('api'); return r.json(); })
+      .then((d: { report?: MarketResearchReport; questions?: { id: string; q: string }[] }) => {
+        if (d.report) {
+          setResearchReport(d.report);
+          setResearchQuestions(null);
+          setResearchAnswers({});
+          setResearchOpen(true);
+        } else if (d.questions) {
+          setResearchQuestions(d.questions);
+        }
+      })
+      .catch(() => setResearchError('Something went wrong — try again.'))
+      .finally(() => setResearchLoading(false));
   }
 
   // §4 Delegate — RULES §2.2 modes: A one draft (gate: ≥1 attempt) · B variants (gate: ≥1 attempt)
@@ -505,21 +541,70 @@ My motivation & 12-week goal: …`;
               </div>
             )}
 
-            {/* Premium block (🟢) — done-for-you offer, ordering is a placeholder in v2 (§6.4) */}
+            {/* 🟢 Premium m2l6 — done-for-you Market Research, test mode (RULES §1) */}
             {activeKind === 'premium' && (
               <div className="bg-accent-50 border border-accent-100 rounded-card p-5 mb-8">
                 <p className="text-sm font-bold text-accent-800 mb-2">✦ Done-for-you service</p>
                 <ul className="text-xs text-accent-800/80 leading-relaxed mb-4 space-y-1">
-                  <li>· Market size & trends for your exact niche</li>
-                  <li>· Competitor map + gap analysis</li>
-                  <li>· "Where your window is" — delivered into your Brain</li>
+                  <li>· Market size & trends for your exact niche (bottom-up, logic shown)</li>
+                  <li>· Competitor map + gap analysis — checked against YOUR positioning</li>
+                  <li>· "Where your window is" — delivered into your Brain & Snapshot</li>
                 </ul>
-                <button
-                  disabled
-                  className="bg-accent text-white text-sm font-semibold px-5 py-2.5 rounded-pill opacity-60 cursor-not-allowed"
-                >
-                  Order research — opening soon
-                </button>
+
+                {researchLoading ? (
+                  <div className="flex items-center gap-3 py-2">
+                    <div className="w-8 h-8 rounded-pill bg-accent animate-orb-pulse" />
+                    <p className="text-xs font-semibold text-accent-800">Researching your market… ~1 minute</p>
+                  </div>
+                ) : researchQuestions ? (
+                  <div className="bg-surface border border-accent-100 rounded-control p-4 space-y-3">
+                    <p className="text-xs font-bold text-accent-800">A few details first — the research gets a lot sharper:</p>
+                    {researchQuestions.map((q) => (
+                      <div key={q.id}>
+                        <label className="block text-[11px] font-semibold text-ink-soft mb-1">{q.q}</label>
+                        <input
+                          type="text"
+                          value={researchAnswers[q.id] ?? ''}
+                          onChange={(e) => setResearchAnswers((a) => ({ ...a, [q.id]: e.target.value }))}
+                          className="w-full text-sm border border-hairline rounded-control px-3 py-2 outline-none focus:border-accent-400 focus:ring-2 focus:ring-accent-100 transition"
+                        />
+                      </div>
+                    ))}
+                    <button
+                      onClick={() => handleGenerateResearch(researchAnswers)}
+                      disabled={researchQuestions.some((q) => !(researchAnswers[q.id] ?? '').trim())}
+                      className="bg-accent hover:opacity-90 disabled:opacity-40 text-white text-sm font-semibold px-5 py-2.5 rounded-pill transition"
+                    >
+                      Generate my research →
+                    </button>
+                  </div>
+                ) : researchReport ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      onClick={() => setResearchOpen(true)}
+                      className="bg-accent hover:opacity-90 text-white text-sm font-semibold px-5 py-2.5 rounded-pill transition active:scale-95"
+                    >
+                      📄 Open your research report
+                    </button>
+                    <button
+                      onClick={() => handleGenerateResearch()}
+                      className="text-xs font-semibold text-accent-800 hover:underline px-2"
+                    >
+                      Re-run with my latest Brain
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => handleGenerateResearch()}
+                      className="bg-accent hover:opacity-90 text-white text-sm font-semibold px-5 py-2.5 rounded-pill transition active:scale-95"
+                    >
+                      ✦ Generate my research — free in test mode
+                    </button>
+                    <p className="text-[10px] text-accent-800/60 mt-2">Test mode: model estimates only, no live web data — clearly labeled in the report.</p>
+                  </>
+                )}
+                {researchError && <p className="text-xs text-red-500 mt-2">{researchError}</p>}
               </div>
             )}
 
@@ -882,6 +967,14 @@ My motivation & 12-week goal: …`;
           </div>
         </main>
       </div>
+
+      {researchOpen && researchReport && (
+        <MarketResearchView
+          report={researchReport}
+          projectName={userData.projectName}
+          onClose={() => setResearchOpen(false)}
+        />
+      )}
 
       {openSession && (
         <MentorSessionModal

@@ -124,6 +124,23 @@ export type StartupSnapshot = {
 
 export type SnapshotFact = { section: string; fact: string };
 
+// ─── Market Research (m2l6, RULES_DONE_FOR_YOU §1) — test mode: model estimates only ──
+export type ResearchSection = {
+  title: string;
+  confidence: 'high' | 'medium' | 'low';
+  body: string;
+  whatThisMeans: string;
+  warning?: string | null;   // §1.5: contradicts-her-hypothesis callout
+};
+
+export type MarketResearchReport = {
+  mode: 'test';
+  generatedAt: string;
+  headlineVerdict: string;
+  keyNumbers: { label: string; value: string; logic: string }[];
+  sections: ResearchSection[];   // 9 sections per §1.3
+};
+
 export type FeedbackVerdict = 'strong' | 'ok' | 'can_be_stronger';
 
 export type AiFeedback = {
