@@ -405,17 +405,32 @@ My motivation & 12-week goal: …`;
                     })}
                   </div>
 
-                  {/* 📅 §6.5 — mentor session marker after M4/M9/M12 */}
-                  {mod.mentorSessionAfter && (
-                    <button
-                      onClick={() => setOpenSession(mod.mentorSessionAfter!)}
-                      className="mt-1 w-full flex items-center gap-2 px-3 py-2 rounded-control text-xs font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 transition-colors"
-                    >
-                      <span>📅</span>
-                      Mentor Session {mod.mentorSessionAfter}
-                      {sessionsState[mod.mentorSessionAfter!]?.completed && <span className="ml-auto text-accent-600">✓ done</span>}
-                    </button>
-                  )}
+                  {/* 📅 §6.5 — mentor session marker after M4/M9/M12; locked until its module is complete */}
+                  {mod.mentorSessionAfter && (() => {
+                    const sessionUnlocked = mod.lessons.every((l) => userData.completedLessons.includes(l.id));
+                    return (
+                      <button
+                        onClick={() => sessionUnlocked && setOpenSession(mod.mentorSessionAfter!)}
+                        disabled={!sessionUnlocked}
+                        title={sessionUnlocked ? undefined : `Unlocks after Module ${mod.order} is complete`}
+                        className={`mt-1 w-full flex items-center gap-2 px-3 py-2 rounded-control text-xs font-semibold transition-colors ${
+                          sessionUnlocked
+                            ? 'text-brand-700 bg-brand-50 hover:bg-brand-100'
+                            : 'text-ink-mute bg-inset cursor-not-allowed'
+                        }`}
+                      >
+                        <span>📅</span>
+                        Mentor Session {mod.mentorSessionAfter}
+                        {sessionUnlocked ? (
+                          sessionsState[mod.mentorSessionAfter!]?.completed && <span className="ml-auto text-accent-600">✓ done</span>
+                        ) : (
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#9D9DA6" strokeWidth="2.5" className="ml-auto flex-shrink-0">
+                            <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" />
+                          </svg>
+                        )}
+                      </button>
+                    );
+                  })()}
                 </div>
               );
             })}
