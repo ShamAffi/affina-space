@@ -41,7 +41,7 @@ export function updateUserData(updates: Partial<UserData>): UserData {
 
 // --- API (syncs with Neon DB when email is known) ---
 
-export async function syncUserToDB(data: UserData): Promise<void> {
+export async function syncUserToDB(data: UserData, opts?: { freshStart?: boolean }): Promise<void> {
   if (!data.email) return;
   try {
     await fetch('/api/user', {
@@ -57,6 +57,8 @@ export async function syncUserToDB(data: UserData): Promise<void> {
         stage: data.stage,
         goal: data.goal,
         score: data.score,
+        // Register flow only: re-onboarding an existing email wipes its previous life server-side
+        ...(opts?.freshStart ? { freshStart: true } : {}),
       }),
     });
   } catch {

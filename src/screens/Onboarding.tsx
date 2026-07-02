@@ -91,7 +91,8 @@ export default function Onboarding({ userData, update, signIn, onComplete }: Pro
           score={userData.score}
           onRegistered={(name, email) => {
             const u = update({ name, email });
-            syncUserToDB(u);
+            // freshStart: if this email somehow already exists, its previous life is wiped server-side
+            syncUserToDB(u, { freshStart: true });
             setStep('project_name');
           }}
           onSignIn={signIn}
