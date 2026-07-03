@@ -13,15 +13,13 @@ function taskPill(sourceRef: string | null) {
   return c ? COURSES[c] : PERSONAL_PILL;
 }
 
-const GROUP_LABEL: Partial<Record<TaskSource, string>> = {
-  program: 'From program',
-  mentor: 'From mentor',
-  lesson: 'From lessons',
-  advisor: 'Advisor tasks',
-  self: 'My tasks',
-  system: 'System',
-  pulse: 'From check-ins',
-};
+// §6 variant B (Shamil): two buckets. "Real World" = program field missions only;
+// "Practice" = everything platform-generated or self-added (mentor/pulse/self/…).
+type BucketId = 'realworld' | 'practice';
+const BUCKETS: { id: BucketId; label: string; match: (s: TaskSource) => boolean }[] = [
+  { id: 'realworld', label: 'Real World Tasks', match: (s) => s === 'program' },
+  { id: 'practice', label: 'Practice Tasks', match: (s) => s !== 'program' },
+];
 
 const STATUS_DOT: Record<string, string> = {
   todo: 'bg-ink-mute',
@@ -36,8 +34,6 @@ const STATUS_LABEL: Record<string, string> = {
   reviewed: 'needs work',
   done: 'done',
 };
-
-const GROUP_ORDER: TaskSource[] = ['program', 'mentor', 'lesson', 'advisor', 'pulse', 'self', 'system'];
 
 interface Props {
   email: string;
@@ -85,13 +81,11 @@ export default function Tasks({ email, onGoToTask, onGoToDashboard }: Props) {
     }
   }
 
-  const groups: Partial<Record<TaskSource, Task[]>> = {};
-  for (const source of GROUP_ORDER) {
-    const g = taskList.filter((t) => t.source === source && t.status !== 'done');
-    if (g.length > 0) groups[source] = g;
-  }
-  // Always include "self" group even if empty (for the Add button)
-  if (!groups.self) groups.self = [];
+  const active = taskList.filter((t) => t.status !== 'done');
+  const bucketTasks: Record<BucketId, Task[]> = {
+    realworld: active.filter((t) => BUCKETS[0].match(t.source as TaskSource)),
+    practice: active.filter((t) => BUCKETS[1].match(t.source as TaskSource)),
+  };
 
   const doneTasks = taskList.filter((t) => t.status === 'done');
   const totalActive = taskList.filter((t) => t.status !== 'done').length;
@@ -128,16 +122,16 @@ export default function Tasks({ email, onGoToTask, onGoToDashboard }: Props) {
           </div>
         ) : (
           <div className="flex flex-col gap-8">
-            {GROUP_ORDER.filter((source) => source in groups).map((source) => {
-              const g = groups[source]!;
-              const isSelf = source === 'self';
+            {BUCKETS.filter((b) => b.id === 'practice' || bucketTasks[b.id].length > 0).map((bucket) => {
+              const g = bucketTasks[bucket.id];
+              const isPractice = bucket.id === 'practice';  // Add-task lives here (self tasks land in Practice)
               return (
-                <section key={source}>
+                <section key={bucket.id}>
                   <div className="flex items-center justify-between mb-3">
                     <h2 className="text-xs font-bold text-ink-mute uppercase tracking-widest">
-                      {GROUP_LABEL[source]}
+                      {bucket.label}
                     </h2>
-                    {isSelf && (
+                    {isPractice && (
                       <button
                         onClick={() => setShowAddForm((v) => !v)}
                         className="flex items-center gap-1 text-xs font-semibold text-brand hover:text-brand-700 transition-colors"
@@ -152,7 +146,7 @@ export default function Tasks({ email, onGoToTask, onGoToDashboard }: Props) {
                   </div>
 
                   {/* Add task form */}
-                  {isSelf && showAddForm && (
+                  {isPractice && showAddForm && (
                     <div className="bg-surface border border-brand-100 rounded-card p-5 mb-3 shadow-sm">
                       <p className="text-sm font-bold text-ink mb-3">New task</p>
                       <input
@@ -189,10 +183,10 @@ export default function Tasks({ email, onGoToTask, onGoToDashboard }: Props) {
                   )}
 
                   {/* Task cards */}
-                  {g.length === 0 && isSelf ? (
+                  {g.length === 0 && isPractice ? (
                     <div className="bg-surface border border-dashed border-hairline rounded-card px-5 py-6 text-center">
                       <p className="text-xs text-ink-mute">
-                        No personal tasks yet. Click "+ Add task" to create one.
+                        No practice tasks yet. Click "+ Add task" to create one.
                       </p>
                     </div>
                   ) : (
