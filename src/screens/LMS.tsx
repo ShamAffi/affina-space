@@ -638,7 +638,21 @@ My motivation & 12-week goal: …`;
                 key={activeLessonId}
                 initialJson={userData.lessonInputs['m0l4'] ?? ''}
                 onComplete={(json) => {
-                  onUpdateUserData({ lessonInputs: { ...userData.lessonInputs, m0l4: json } });
+                  const inputsPatch: Record<string, string> = { m0l4: json };
+                  // §2 note: URLs pasted into Q1 land in imported_assets too — don't lose
+                  // the signal just because it hit the wrong box.
+                  try {
+                    const dsf: string = JSON.parse(json).doneSoFar ?? '';
+                    const urls = dsf.match(/https?:\/\/[^\s)"',]+/g) ?? [];
+                    const existing = userData.lessonInputs['m0l3'] ?? '';
+                    const fresh = urls.filter((u) => !existing.includes(u));
+                    if (fresh.length > 0) {
+                      const merged = `${existing}\n${fresh.map((u) => `${u} — from your "done so far" answer`).join('\n')}`.trim();
+                      inputsPatch.m0l3 = merged;
+                      saveLessonInputToDB(userData.email, 'm0l3', merged);
+                    }
+                  } catch { /* malformed json — skip extraction */ }
+                  onUpdateUserData({ lessonInputs: { ...userData.lessonInputs, ...inputsPatch } });
                   saveLessonInputToDB(userData.email, 'm0l4', json);
                   if (!isCompleted) {
                     onUpdateUserData({ completedLessons: [...userData.completedLessons, 'm0l4'] });
@@ -1493,15 +1507,13 @@ function ProjectTodayBlock({ userData, onSave, initialLinks }: {
 
 // ─── M0.4 "A few quick questions" — Typeform-style quiz (SPEC_M0_INTAKE_REDESIGN §2) ──
 type IntakeAnswers = {
-  doneSoFar: string[];
-  doneSoFarDetail?: string;
+  doneSoFar: string;   // open text per approved spec (was chip-select in the draft)
   stuckPoint: string;
   capacity: string;
   whyMe: string;
   goal12w: string;
 };
 
-const Q1_CHIPS = ['Nothing yet, just the idea', 'Talked to potential customers', 'Built a landing page or MVP', 'Got my first sign-ups', 'Made a sale'];
 const Q3_OPTIONS: { label: string; value: string }[] = [
   { label: 'Under 5', value: 'under5' },
   { label: '5–10', value: '5to10' },
@@ -1514,8 +1526,13 @@ function IntakeQuizBlock({ initialJson, onComplete }: {
   onComplete: (json: string) => void;
 }) {
   const initial: IntakeAnswers = (() => {
-    try { return { doneSoFar: [], stuckPoint: '', capacity: '', whyMe: '', goal12w: '', ...JSON.parse(initialJson) }; }
-    catch { return { doneSoFar: [], stuckPoint: '', capacity: '', whyMe: '', goal12w: '' }; }
+    const empty: IntakeAnswers = { doneSoFar: '', stuckPoint: '', capacity: '', whyMe: '', goal12w: '' };
+    try {
+      const parsed = { ...empty, ...JSON.parse(initialJson) };
+      // pre-approval drafts stored doneSoFar as a chip array — flatten
+      if (Array.isArray(parsed.doneSoFar)) parsed.doneSoFar = parsed.doneSoFar.join('; ');
+      return parsed;
+    } catch { return empty; }
   })();
   const [a, setA] = useState<IntakeAnswers>(initial);
   const [step, setStep] = useState(0);
@@ -1525,12 +1542,14 @@ function IntakeQuizBlock({ initialJson, onComplete }: {
   const TOTAL = 5;
   const textCls = 'w-full text-base bg-surface border-2 border-hairline rounded-card px-4 py-3.5 outline-none focus:border-brand-400 focus:ring-4 focus:ring-brand-100 placeholder-ink-mute resize-none transition';
 
-  // Soft validation (§2): chips require a pick; free-text gets ONE gentle nudge, never blocks.
+  // Soft validation (§2 approved): only Q3 (chip-select) gates; all free-text
+  // questions (Q1, Q2, Q4, Q5) get ONE gentle nudge if empty, never a hard block.
+  const TEXT_VALUE: Record<number, () => string> = {
+    0: () => a.doneSoFar, 1: () => a.stuckPoint, 3: () => a.whyMe, 4: () => a.goal12w,
+  };
   function tryNext() {
-    if (step === 0 && a.doneSoFar.length === 0) return;
     if (step === 2 && !a.capacity) return;
-    const textVal = step === 1 ? a.stuckPoint : step === 3 ? a.whyMe : step === 4 ? a.goal12w : 'x';
-    if ((step === 1 || step === 3 || step === 4) && !textVal.trim() && !nudged[step]) {
+    if (step !== 2 && !TEXT_VALUE[step]().trim() && !nudged[step]) {
       setNudged((n) => ({ ...n, [step]: true }));
       return;
     }
@@ -1542,7 +1561,7 @@ function IntakeQuizBlock({ initialJson, onComplete }: {
     }
   }
 
-  const chipOk = step === 0 ? a.doneSoFar.length > 0 : step === 2 ? !!a.capacity : true;
+  const chipOk = step === 2 ? !!a.capacity : true;
 
   function onTextKey(e: React.KeyboardEvent) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); tryNext(); }
@@ -1577,30 +1596,19 @@ function IntakeQuizBlock({ initialJson, onComplete }: {
       <div className="min-h-[260px]">
         {step === 0 && (
           <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-ink mb-5">What have you actually done so far?</h2>
-            <div className="flex flex-wrap gap-2 mb-4">
-              {Q1_CHIPS.map((c) => {
-                const on = a.doneSoFar.includes(c);
-                return (
-                  <button
-                    key={c}
-                    onClick={() => setA((p) => ({ ...p, doneSoFar: on ? p.doneSoFar.filter((x) => x !== c) : [...p.doneSoFar, c] }))}
-                    className={`text-sm font-semibold rounded-pill px-4 py-2.5 border-2 transition-all ${on ? 'bg-brand-50 border-brand text-brand-800' : 'bg-surface border-hairline text-ink-soft hover:border-brand-200'}`}
-                  >
-                    {on ? '✓ ' : ''}{c}
-                  </button>
-                );
-              })}
-            </div>
-            {a.doneSoFar.some((c) => c !== 'Nothing yet, just the idea') && (
-              <textarea
-                value={a.doneSoFarDetail ?? ''}
-                onChange={(e) => setA((p) => ({ ...p, doneSoFarDetail: e.target.value }))}
-                rows={2}
-                placeholder="Tell us more — what exactly, and what happened?"
-                className={textCls}
-              />
-            )}
+            <h2 className="text-xl sm:text-2xl font-bold text-ink mb-2">What have you done so far?</h2>
+            <p className="text-sm text-ink-soft mb-4 leading-relaxed">
+              Write it all down — even the small stuff. And if anything's live (a site, an Instagram, a doc, a prototype), drop the links right here.
+            </p>
+            <textarea
+              autoFocus
+              value={a.doneSoFar}
+              onKeyDown={onTextKey}
+              onChange={(e) => setA((p) => ({ ...p, doneSoFar: e.target.value }))}
+              rows={5}
+              placeholder="e.g. Talked to 5 people about this, built a rough landing page (link below), got 3 people to say they'd try it…"
+              className={textCls}
+            />
           </div>
         )}
 
@@ -1653,7 +1661,7 @@ function IntakeQuizBlock({ initialJson, onComplete }: {
 
         {step === 4 && (
           <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-ink mb-5">If you could only be sure of ONE thing 12 weeks from now, what would it be?</h2>
+            <h2 className="text-xl sm:text-2xl font-bold text-ink mb-5">What would make the next 12 weeks feel like a win?</h2>
             <textarea
               autoFocus
               value={a.goal12w}
@@ -1667,7 +1675,7 @@ function IntakeQuizBlock({ initialJson, onComplete }: {
         )}
       </div>
 
-      {nudged[step] && !(step === 1 ? a.stuckPoint : step === 3 ? a.whyMe : a.goal12w).trim() && (
+      {nudged[step] && step !== 2 && !TEXT_VALUE[step]().trim() && (
         <p className="text-xs text-amber-600 mt-2">This one really helps your mentor understand you — sure you want to skip it?</p>
       )}
 
@@ -1678,7 +1686,7 @@ function IntakeQuizBlock({ initialJson, onComplete }: {
       >
         {step === TOTAL - 1 ? 'Finish →' : 'Next →'}
       </button>
-      <p className="text-[11px] text-ink-mute text-center mt-2">Enter ↵ works too{step === 0 || step === 2 ? '' : ' · you can skip this one'}</p>
+      <p className="text-[11px] text-ink-mute text-center mt-2">Enter ↵ works too{step === 2 ? '' : ' · you can skip this one'}</p>
     </div>
   );
 }
