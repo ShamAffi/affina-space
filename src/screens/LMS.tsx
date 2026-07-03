@@ -1378,7 +1378,7 @@ function SnapshotBlock({ email, onComplete, autoStart = false }: { email: string
         >
           This looks right — let's start Module 1 →
         </button>
-        <p className="text-xs text-ink-mute leading-relaxed mt-3 text-center">
+        <p className="text-sm font-semibold text-brand leading-relaxed mt-3 text-center">
           Something looks off? Tell us in your weekly check-in — your Snapshot updates itself.
         </p>
       </div>
