@@ -45,22 +45,38 @@ const SnapshotFactsSchema = z.array(z.object({
   fact: z.string(),
 })).max(6);
 
+// Tolerant to common LLM looseness: numbers-as-strings (z.coerce), missing
+// delta (defaulted), odd period labels (.catch). A card with real traction must
+// not silently vanish to null and drop the dashboard back to Tier 3 (bug §7).
+const num = z.coerce.number();
 const MomentumBlockSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('headline_metric'), label: z.string(), value: z.number(), delta: z.number(), trend: z.array(z.number()).optional(), sentiment: z.string().optional() }),
-  z.object({ type: z.literal('milestone'), text: z.string(), period: z.enum(['3w', 'all']), value: z.number().optional() }),
-  z.object({ type: z.literal('trajectory'), text: z.string(), trend: z.array(z.number()).optional() }),
-  z.object({ type: z.literal('this_week'), items: z.array(z.object({ kind: z.enum(['win', 'learning', 'setback']), text: z.string() })).min(1).max(4) }),
+  z.object({ type: z.literal('headline_metric'), label: z.string(), value: num, delta: num.catch(0), trend: z.array(num).optional(), sentiment: z.string().optional() }),
+  z.object({ type: z.literal('milestone'), text: z.string(), period: z.enum(['3w', 'all']).catch('3w'), value: num.optional() }),
+  z.object({ type: z.literal('trajectory'), text: z.string(), trend: z.array(num).optional() }),
+  z.object({ type: z.literal('this_week'), items: z.array(z.object({ kind: z.enum(['win', 'learning', 'setback']).catch('win'), text: z.string() })).min(1).max(4) }),
   z.object({ type: z.literal('cumulative'), stats: z.array(z.object({ label: z.string(), value: z.union([z.number(), z.string()]) })).min(1).max(4) }),
   z.object({ type: z.literal('learning_progress'), stats: z.array(z.object({ label: z.string(), value: z.union([z.number(), z.string()]) })).min(1).max(4) }),
-  z.object({ type: z.literal('streak'), weeks: z.number(), text: z.string() }),
+  z.object({ type: z.literal('streak'), weeks: num, text: z.string() }),
   z.object({ type: z.literal('encouragement'), text: z.string() }),
   z.object({ type: z.literal('nudge'), text: z.string() }),
 ]);
 
-const MomentumCardSchema = z.object({
-  mood: z.enum(['building', 'progressing', 'traction', 'recovering', 'quiet']),
-  blocks: z.array(MomentumBlockSchema).min(2).max(4),
-});
+const MoodSchema = z.enum(['building', 'progressing', 'traction', 'recovering', 'quiet']).catch('progressing');
+
+// Parse blocks individually and keep the valid ones — one malformed block must
+// not throw away the whole card. Returns null only when nothing survives.
+function parseMomentumCard(raw: unknown): { mood: z.infer<typeof MoodSchema>; blocks: z.infer<typeof MomentumBlockSchema>[] } | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const obj = raw as { mood?: unknown; blocks?: unknown };
+  const blocksIn = Array.isArray(obj.blocks) ? obj.blocks : [];
+  const blocks = blocksIn
+    .map((b) => MomentumBlockSchema.safeParse(b))
+    .filter((r): r is z.SafeParseSuccess<z.infer<typeof MomentumBlockSchema>> => r.success)
+    .map((r) => r.data)
+    .slice(0, 4);
+  if (blocks.length === 0) return null;
+  return { mood: MoodSchema.parse(obj.mood), blocks };
+}
 
 const SYSTEM = `You are Affina — a warm but honest startup mentor for early-stage female founders.
 From one weekly update you do TWO things.
@@ -208,8 +224,7 @@ Return JSON:
     // Momentum + activity parsed leniently — a malformed card must not break the check-in.
     let activity: z.infer<typeof ActivitySchema> = [];
     try { activity = ActivitySchema.parse(parsed.activity); } catch { /* keep [] */ }
-    let momentumCard: z.infer<typeof MomentumCardSchema> | null = null;
-    try { momentumCard = MomentumCardSchema.parse(parsed.momentumCard); } catch { /* keep null */ }
+    const momentumCard = parseMomentumCard(parsed.momentumCard);
     let snapshotFacts: z.infer<typeof SnapshotFactsSchema> = [];
     try { snapshotFacts = SnapshotFactsSchema.parse(parsed.snapshotFacts); } catch { /* keep [] */ }
 
