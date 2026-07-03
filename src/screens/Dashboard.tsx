@@ -293,7 +293,14 @@ export default function Dashboard({ userData, onUpdateUserData, onGoToLMS, onGoT
 
             <div className="flex flex-col gap-2 flex-1 overflow-y-auto">
               {(() => {
-                const activeTasks = taskList.filter((t) => t.status !== 'done');
+                // §5 — dashboard preview only: real-world program tasks that still need
+                // action (todo/reviewed) float to the top slots. Full Tasks page keeps its order.
+                const needsAction = (t: Task) => t.status === 'todo' || t.status === 'reviewed';
+                const isProgramActive = (t: Task) => t.source === 'program' && needsAction(t);
+                const activeTasks = taskList
+                  .filter((t) => t.status !== 'done')
+                  .slice()
+                  .sort((a, b) => (isProgramActive(b) ? 1 : 0) - (isProgramActive(a) ? 1 : 0));
                 if (activeTasks.length === 0) {
                   return (
                     <div className="flex-1 flex items-center justify-center">
