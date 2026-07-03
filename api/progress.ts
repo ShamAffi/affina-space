@@ -2,14 +2,14 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
 import { eq } from 'drizzle-orm';
-import { users, lessonInputs, completedLessons, brainEntries, tasks, checkIns } from '../src/db/schema.js';
+import { users, lessonInputs, completedLessons, brainEntries, tasks, checkIns, achievements } from '../src/db/schema.js';
 import { computeLaunchReadiness, computeGrowth, GROWTH_SEED_XP, onboardingSeed } from './lib/progressUtils.js';
 import { MODULES } from '../src/data.js';
 import { blockKind } from '../src/types.js';
 
 function getDb() {
   const sql = neon(process.env.DATABASE_URL!);
-  return drizzle(sql, { schema: { users, lessonInputs, completedLessons, brainEntries, tasks, checkIns } });
+  return drizzle(sql, { schema: { users, lessonInputs, completedLessons, brainEntries, tasks, checkIns, achievements } });
 }
 
 // Theory lesson ids + checkpoint modules (M4/M9) resolved once from the program map
@@ -17,6 +17,41 @@ const THEORY_IDS = new Set(
   MODULES.flatMap((m) => m.lessons.filter((l) => blockKind(l) === 'theory').map((l) => l.id)),
 );
 const CHECKPOINT_MODULES = MODULES.filter((m) => m.mentorSessionAfter === 'S1' || m.mentorSessionAfter === 'S2');
+
+type KR = { type: string; text: string; metric?: string };
+type Metric = { name: string; value: number; delta: number };
+
+// SPEC_TRACTION_WIDGET — deterministic Business-block source: the latest check-in's
+// numbers/keyResults + the date of the most recent REAL business update (check-in
+// with a win/milestone or a real metric, or an achievements row).
+async function buildTraction(db: ReturnType<typeof getDb>, userId: number) {
+  const [cis, achs] = await Promise.all([
+    db.query.checkIns.findMany({ where: eq(checkIns.userId, userId) }),
+    db.query.achievements.findMany({ where: eq(achievements.userId, userId) }),
+  ]);
+  const sorted = [...cis].sort((a, b) => b.weekOf.localeCompare(a.weekOf));
+  const latest = sorted[0] ?? null;
+  const latestCheckIn = latest
+    ? {
+        weekOf: latest.weekOf,
+        metrics: (Array.isArray(latest.metrics) ? latest.metrics : []) as Metric[],
+        keyResults: (Array.isArray(latest.keyResults) ? latest.keyResults : []) as KR[],
+      }
+    : null;
+
+  const isBusinessCheckIn = (ci: typeof cis[number]) => {
+    const krs = (Array.isArray(ci.keyResults) ? ci.keyResults : []) as KR[];
+    const ms = (Array.isArray(ci.metrics) ? ci.metrics : []) as Metric[];
+    return krs.some((k) => k.type === 'win' || k.type === 'milestone')
+      || ms.some((m) => (m.value ?? 0) > 0 || (m.delta ?? 0) !== 0);
+  };
+  const dates: number[] = [];
+  for (const ci of cis) if (isBusinessCheckIn(ci) && ci.createdAt) dates.push(new Date(ci.createdAt).getTime());
+  for (const a of achs) if (a.createdAt) dates.push(new Date(a.createdAt).getTime());
+  const lastBusinessUpdateAt = dates.length ? new Date(Math.max(...dates)).toISOString() : null;
+
+  return { latestCheckIn, lastBusinessUpdateAt };
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -83,6 +118,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (phase === 'growth') {
       const growth = computeGrowth(user.growthXp ?? 0);
+      const traction = await buildTraction(db, user.id);
       return res.status(200).json({
         phase: 'growth',
         growth,
@@ -94,6 +130,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         lastReadinessGain: user.lastReadinessGain ?? null,
         northStar: user.northStar ?? null,
         mentorSessions: user.mentorSessions ?? null,
+        ...traction,
       });
     }
 
@@ -124,6 +161,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       checkInMetrics,
     });
 
+    const traction = await buildTraction(db, user.id);
     return res.status(200).json({
       phase: 'launch',
       launch: { readiness, seed: onboardingSeed(user.score ?? 0), breakdown },
@@ -135,6 +173,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       lastReadinessGain: user.lastReadinessGain ?? null,
       northStar: user.northStar ?? null,
       mentorSessions: user.mentorSessions ?? null,
+      ...traction,
     });
   } catch (err) {
     console.error('progress error', err);

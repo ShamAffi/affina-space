@@ -97,7 +97,7 @@ PART A — Analyze the check-in:
 PART B — Extract activity, snapshot facts + compose the Momentum card:
 - snapshotFacts: FACTS and DECISIONS from this update that change the startup's one-page Snapshot — new numbers, changed inputs, corrections ("price is now $29", "pivoted to B2B", "first paying customer"). NOT process ("worked hard this week"). section ∈ [Founder, Project & stage, Hypothesis, Market, Customer & persona, Product, Model & North Star, Traction, Risk flags, Next focus]. [] if nothing snapshot-worthy.
 - activity: normalise the REAL-WORLD actions she mentions into [{key,label,count}]. Canonical snake_case keys reused across weeks (people_talked_to, interviews_done, experiments_run, posts_published, demos_given...). Only real actions with a count; [] if none.
-- momentumCard: you are the EDITOR of her progress card. Lead with the HIGHEST tier that has real content; lower tiers drop off as higher ones appear:
+- momentumCard: you are the narrative EDITOR of her Traction card (the deterministic Business block is built from her numbers separately — your job is to pick the MOST RECENT and IMPORTANT business achievements and phrase them well). Business ALWAYS comes first; it is fine to omit Learning entirely when business progress is strong. Lead with the HIGHEST tier that has real content; lower tiers drop off as higher ones appear:
   TIER 1 traction (North Star moving, customers, revenue, milestones) → headline_metric / milestone / trajectory
   TIER 2 real-world effort (activity) → this_week + cumulative
   TIER 3 learning (lessons/exercises/modules) → learning_progress  ← LOWEST. Show ONLY when there is no real-world action yet; it disappears the moment real activity exists.

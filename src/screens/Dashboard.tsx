@@ -335,6 +335,8 @@ export default function Dashboard({ userData, onUpdateUserData, onGoToLMS, onGoT
             modulesCompleted={modulesCompleted}
             streak={streak}
             lastCheckInAt={progressData?.lastCheckInAt ?? null}
+            latestCheckIn={progressData?.latestCheckIn ?? null}
+            lastBusinessUpdateAt={progressData?.lastBusinessUpdateAt ?? null}
             onGoToPulse={onGoToPulse}
           />
         </div>

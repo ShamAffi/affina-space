@@ -277,6 +277,8 @@ export type LaunchProgress = {
   lastReadinessGain?: LastReadinessGain | null;
   northStar?: NorthStarValue | null;
   mentorSessions?: MentorSessionsState | null;
+  latestCheckIn?: LatestCheckIn | null;         // Traction widget business source
+  lastBusinessUpdateAt?: string | null;         // most recent real business update (ISO); null = never
 };
 
 export type GrowthProgress = {
@@ -296,6 +298,8 @@ export type GrowthProgress = {
   lastReadinessGain?: LastReadinessGain | null;
   northStar?: NorthStarValue | null;
   mentorSessions?: MentorSessionsState | null;
+  latestCheckIn?: LatestCheckIn | null;         // Traction widget business source
+  lastBusinessUpdateAt?: string | null;         // most recent real business update (ISO); null = never
 };
 
 export type ProgressResponse = LaunchProgress | GrowthProgress;
@@ -350,6 +354,13 @@ export type MomentumBlock =
 export type MomentumCard = {
   mood: MomentumMood;
   blocks: MomentumBlock[];
+};
+
+// Deterministic Business-block source for the Traction widget (SPEC_TRACTION_WIDGET).
+export type LatestCheckIn = {
+  weekOf: string;
+  metrics: CheckInMetric[];
+  keyResults: CheckInKeyResult[];
 };
 
 export type CheckIn = {
