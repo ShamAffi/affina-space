@@ -384,21 +384,33 @@ Candidate C: [who they are]
         type: 'text',
         kind: 'theory',
         title: 'Full life-cycle use case',
-        body: 'Coming soon — we\'ll map how your customer discovers, tries, and returns to your product. The full arc from stranger to loyal user.',
+        body: `Most founders picture their product at the moment of use — she opens the app, she gets value, done. But that's one frame out of a whole film. Bill Aulet's Disciplined Entrepreneurship calls this the Full Life Cycle Use Case, and it insists you map every stage: how she first hears about you, how she decides to try it, how she gets set up, how she actually uses it day to day, how she pays, and — the stage almost everyone skips — how she comes back or tells someone else.
+
+Here's why this matters more than it sounds: most businesses don't die at "the product doesn't work." They die in the gaps between stages — she heard about it but couldn't figure out how to start, she loved using it but the payment step was confusing, she paid once but nothing brought her back. Each transition is a place a real customer can quietly fall off, and you can't fix what you haven't mapped.
+
+Walk through your own product this way, stage by stage, and ask at each one: what does she actually do here, and where might she get stuck? You already have raw material for this — your interviews told you how she discovers and evaluates things like yours today. Use it.`,
       },
       {
         id: 'm4l3',
         type: 'text',
         kind: 'theory',
         title: 'Sketch your product, not your tech',
-        body: 'Coming soon — how to describe what you\'re building visually and specifically, without writing a line of code.',
+        body: `Here's a trap founders fall into constantly: describing their product by its technology instead of its experience. "An AI-powered platform with a recommendation engine" tells a customer nothing about her life. "You open it, tell it your problem, and get three matched options in ten seconds" — that she can picture.
+
+Aulet's High-Level Product Spec asks for exactly that: a description of what the product does and feels like, not what powers it underneath. Tech stack, architecture, which model you're using — none of that belongs here. It belongs in a different conversation, with different people (engineers, maybe investors doing diligence later). Right now, you're describing an experience.
+
+A useful test: could you sketch this on a napkin as a sequence of screens or moments, with zero jargon, and have a stranger nod along? If the description needs an engineering background to parse, it's not a product spec yet — it's a technical memo wearing a product's clothes. Sketch the moments. Save the stack for later.`,
       },
       {
         id: 'm4l4',
         type: 'text',
         kind: 'theory',
         title: 'Value in numbers: before and after',
-        body: 'Coming soon — how to quantify the change your product creates in terms your customer actually uses and cares about.',
+        body: `"Makes life easier" doesn't sell. "Saves six hours a week" sells. The difference is that one is a vague feeling and the other is a number she can picture in her own calendar. Aulet's Quantified Value Proposition step exists to force exactly this translation — from adjectives to arithmetic.
+
+The method is simple: describe her life before your product (how she currently solves this, what it costs her — in hours, money, or stress) and her life after (what changes, in the same units). Then subtract. If she currently spends 8 hours a week wrestling with something and your product gets it to 2, that's "6 hours a week" — a sentence that survives being repeated to an investor, a partner, or her own skeptical brain at 2am.
+
+Don't invent these numbers — pull them straight from what real people told you in your interviews. A number sourced from an actual conversation ("she told me she spends 5 hours") will always beat a number you guessed at, because it's a number you can defend when someone pushes back.`,
       },
       {
         id: 'm4l5',
@@ -471,7 +483,13 @@ Core advantage & why it's hard to copy: …`,
         type: 'text',
         kind: 'theory',
         title: 'Ways your product makes money',
-        body: 'Coming soon — subscription, transaction, freemium, advertising: how to choose the right model for your audience and problem. Your model choice shapes your product and your goal for the year.',
+        body: `Let me tell you the thing about business models that took most of us embarrassingly long to see: your model isn't a detail you sort out later. It quietly decides everything — what product you build, how you talk to customers, even what your year looks like.
+
+Here's the menu, roughly. Subscription: she pays monthly; you get predictable revenue but must earn her loyalty every single month. One-off purchase: simpler, but you're hunting new buyers forever. Marketplace or commission: you win when others transact — powerful, but you're building two audiences at once. Freemium: free brings the crowd, a few percent pay — works with big volumes, brutal with small ones. Services or productized services: money now, and it doesn't scale — which is completely fine as a starting bridge.
+
+Now the part that matters. Bill Aulet's team at MIT treats choosing a model as its own deliberate step — because "a thousand women on a $15 subscription" and "six companies on a $10K contract" are different companies. Different product depth, different marketing, different pace, different you. Neither is better. But you can't be both at once, and pretending you can is how founders stay stuck.
+
+By the end of this module you'll pick one — and turn it into a goal for the year.`,
       },
       {
         // TODO: rewrite per spec — add women-specific underpricing patterns
@@ -479,7 +497,13 @@ Core advantage & why it's hard to copy: …`,
         type: 'text',
         kind: 'theory',
         title: 'Price from value, not cost',
-        body: 'Coming soon — why cost-plus pricing leaves money on the table, and how to anchor to customer value instead. Includes the underpricing trap female founders fall into most often.',
+        body: `Pricing feels scary because most founders price from the wrong end. They add up their costs, add a modest margin, and hope nobody objects. Flip it. The right question is never "what does this cost me to make?" — it's "what is the change worth to her?"
+
+You already did the hard part in Module 4: you quantified the before-and-after. If your product saves her six hours a week, or brings her three new clients a month, price against that. A rule of thumb the value-pricing world lives by: charge a fraction of the value you create — if she gains €1,000 a month, €100 is not expensive, it's obvious.
+
+Now the sisterly truth, because the data backs it: women founders systematically underprice. We soften the number, add a discount before anyone asked, apologize with our pricing page. Here's the reframe — your price is a signal of what you believe your product does. A too-low price doesn't say "kind"; it says "unsure it works."
+
+You don't have to guess. In this module's interviews you'll ask real people real money questions — what they pay today, what feels cheap, what feels steep. And remember: the easiest test in business is raising a price. If nobody flinches, you were too low.`,
       },
       {
         // TODO: rewrite per spec — merge LTV & CAC (old m8l1+m8l2) with North Star Metric intro
@@ -547,14 +571,22 @@ Core advantage & why it's hard to copy: …`,
         type: 'text',
         kind: 'theory',
         title: 'Identify your riskiest assumptions',
-        body: 'Coming soon — the one assumption that, if wrong, kills everything. How to surface it and test it first.',
+        body: `Every business plan is really a stack of guesses wearing a suit. "Customers will pay $30/month." "She'll find us through Instagram." "She'll use this daily." Some of these guesses, if wrong, quietly cost you a few weeks. Others, if wrong, mean the whole business doesn't work — and you won't know which is which until you name them.
+
+Aulet's framework asks you to list your key assumptions and rank them by how much damage a wrong answer would do, combined with how uncertain you actually are about it. The one assumption that's both high-risk and high-uncertainty — that's the one to test first, before you spend another hour building anything on top of it.
+
+This is the same instinct behind Eric Ries's Lean Startup loop: don't build first and hope: identify the riskiest guess, design the cheapest possible test for it, and let reality answer before your calendar or your bank account has to. The exercise ahead asks you to do exactly that — rank your assumptions, and be honest about which one keeps you up at night.`,
       },
       {
         id: 'm6l2',
         type: 'text',
         kind: 'theory',
         title: 'Pretotyping: fake door, landing page, Wizard of Oz',
-        body: 'Coming soon — three ways to test real demand before you build anything.',
+        body: `Alberto Savoia, who ran experimental innovation efforts at Google, coined a word that deserves to be more famous: pretotyping — testing whether people want a thing before you build the real thing, as opposed to prototyping, which tests whether the thing you already built works. The distinction is small in spelling and enormous in savings.
+
+Three pretotyping moves worth knowing. Fake door: publish a page or button for a feature that doesn't exist yet, and see who clicks it — clicks are your demand signal, and nobody's been lied to, since you build it the moment enough people want it. Landing page test: a page describing the finished product with a signup or "notify me" button, run before a line of product code exists. Wizard of Oz: the customer experiences what looks like a working product, while behind the curtain, a human — usually you — does the work by hand.
+
+This is exactly the spirit of Paul Graham's advice to "do things that don't scale": Airbnb's founders photographed apartments by hand; DoorDash's founders started with a landing page and a PDF menu, delivering orders themselves. None of it looks impressive. All of it is cheaper than building the wrong thing for six months.`,
       },
       {
         // TODO: rewrite per spec — merge MVBP (m10l1) + scope knife/no-code (m10l2) + "how AI changed the game"
@@ -562,7 +594,11 @@ Core advantage & why it's hard to copy: …`,
         type: 'text',
         kind: 'theory',
         title: 'What an MVBP is + the scope knife',
-        body: 'Coming soon — the minimum viable BUSINESS product that delivers and captures value; how to cut scope ruthlessly; and how AI and no-code collapsed the cost of building it.',
+        body: `Forget "MVP" as an excuse to ship something embarrassing. The MIT framing is sharper — a Minimum Viable Business Product: the smallest thing that (a) genuinely delivers the value you promised, (b) someone pays for, and (c) teaches you something real. Payment is part of the definition, not a later milestone. Reid Hoffman's line still stings because it's true — if you're not a little embarrassed by version one, you shipped too late — but embarrassed about polish, never about value.
+
+Getting there takes a knife, not a roadmap. List everything your product "should" do, then cut until what remains barely — barely — delivers the core change for your one persona. Every feature you keep delays the day a real customer teaches you something. When it hurts a little, you're close.
+
+And here's your unfair advantage in 2026: building stopped being the bottleneck. With AI builders and no-code tools, a working landing page is an evening and a first product version is days — Harvard Business School students now ship working demos inside a one-week bootcamp. The scarce skill isn't code anymore; it's clarity — knowing exactly what the smallest valuable thing is. Which, after five modules of evidence, you have. Let's use it.`,
       },
       {
         id: 'm6l4',
@@ -628,14 +664,22 @@ Core advantage & why it's hard to copy: …`,
         type: 'text',
         kind: 'theory',
         title: 'The path to a paying customer',
-        body: 'Coming soon — mapping the realistic journey from stranger to first payment.',
+        body: `Between "she has the problem" and "she paid you" sits an entire process — and it's rarely a straight line. Aulet's framework asks you to map it explicitly: how does the budget for something like this normally get approved? How long does the decision usually take — an impulse buy, or a multi-week deliberation? What has to happen, and in what order, before money actually moves?
+
+This matters because the path shapes everything downstream. A product that gets bought on impulse needs a completely different site, pitch, and sales motion than one that requires her to convince a partner or clear a budget line first. Founders who skip this step often build a beautiful checkout page for a decision that, in reality, takes three weeks and two conversations to reach.
+
+You have real material for this already — your interviews likely surfaced how she buys things like this today, what gives her pause, and who else gets consulted. Map the real path, friction and all, rather than the path you'd prefer she took.`,
       },
       {
         id: 'm7l2',
         type: 'text',
         kind: 'theory',
         title: 'Who really decides',
-        body: 'Coming soon — understanding the decision-making unit for consumer products: her, her influencers, and word of mouth.',
+        body: `A quiet way founders waste months: pitching the right message to the wrong person. Aulet's Decision-Making Unit (DMU) framework breaks a "customer" into the distinct roles actually involved in a purchase — because in most real situations, more than one person matters, even when it's not obvious at first.
+
+The roles worth naming: the champion (who wants this and will push for it), the end user (who'll actually use it day to day — sometimes the same person as the champion, sometimes not), the economic buyer (whoever's money it actually is — herself, a partner, a manager), and anyone who can veto the whole thing even if everyone else says yes.
+
+For a solo consumer buying with her own card, all four roles might collapse into one person — worth saying explicitly rather than assuming. But the moment a partner, a household budget, or a boss enters the picture, treating them as one person leads you to build a pitch that convinces the wrong half of the room. Name every role in your DMU before you write a single word of sales copy.`,
       },
       {
         id: 'm7l3',
@@ -791,7 +835,13 @@ My weekly touch quota: …`,
         type: 'text',
         kind: 'theory',
         title: 'Retention & habit formation',
-        body: 'Coming soon — the Hooked model, retention curves, and the Sean Ellis test: "how disappointed would you be if this product disappeared?" — the single question that measures product-market fit.',
+        body: `Of every metric you own, this one is the most honest: do people come back? Anyone can be persuaded to try something once — curiosity, politeness, a good landing page. Returning is different. Returning means it worked.
+
+The tool here is the cohort curve. Take everyone who started in a given week and watch what fraction is still active one week later, two, four. The curve always drops at first — normal, universal, fine. The question is what it does next. If it keeps sliding toward zero, the bucket leaks and growth would just be expensive water. If it flattens — some stable group stays and uses — congratulations: those people found real value. A flattening retention curve is the closest thing early-stage life has to proof of product-market fit.
+
+Want a second opinion on fit? Sean Ellis — the man who coined "growth hacking" — uses one survey question: "How would you feel if you could no longer use this product?" When 40%+ answer "very disappointed," you're onto something; below that, keep tuning who it's for or what it does. Ask your actives this week — it takes an hour and removes a lot of self-deception.
+
+And if the numbers are small — five users, eight? Then retention is conversations, not curves: you can simply ask each one whether it's working. Smallness is an advantage here. Use it.`,
       },
       {
         // TODO: rewrite per spec — moved from old m11l3; funnel + main leak + AI diagnosis
@@ -994,7 +1044,13 @@ My leaning and why: …`,
         type: 'text',
         kind: 'theory',
         title: 'Founder storytelling & the deck that works',
-        body: 'Coming soon — the narrative arc investors respond to in 90 seconds, mapped onto the Sequoia deck structure: problem, solution, why now, market, traction, team, ask.',
+        body: `Here's what investors actually buy at your stage — because the spreadsheet can't prove much yet: a founder who sees something clearly, and evidence she turns insight into motion. Your story delivers the first; your traction slide delivers the second.
+
+The story isn't biography — it's logic with you inside it: I lived this problem → I went and verified it was real (your interviews!) → here's what I found that others miss → here's the proof people want it → here's why it gets big. Ron Conway, who backed Google early, insists you should manage the two-sentence version: what you do, why it wins. If a stranger can't repeat your idea after hearing it once, the deck won't save it.
+
+The deck itself — the Sequoia-shaped skeleton the whole industry speaks: problem → solution → why now → market size → product → traction → business model → competition → team → the ask. Ten-ish slides, one idea each, readable without you narrating (decks travel; you won't be in the room when partners re-read it).
+
+At your stage, traction is the star slide: your interviews, your conversions, your first payment screenshot, your retention signal. It's the slide that says "this founder doesn't wait for permission" — which, between us, is the whole pitch.`,
       },
       {
         // TODO: rewrite per spec — becomes "Create your pitch deck" with auto-assembly from Brain + Q&A trainer
