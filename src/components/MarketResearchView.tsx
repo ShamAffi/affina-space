@@ -86,13 +86,14 @@ export default function MarketResearchView({ report, projectName, onClose }: Pro
           ))}
         </div>
 
-        {/* §1.7 feedback footer — mandatory (fully automated pipeline) */}
+        {/* §1.7 feedback footer — disclaimer only (no live-human step baked into the flow) */}
         <div className="px-8 py-5 border-t border-hairline bg-inset/50">
           <p className="text-[11px] text-ink-mute leading-relaxed">
-            This report was generated automatically for your project. Something looks off or doesn't match
-            your reality? Tell us — we'll gladly review and re-run it.{' '}
+            This report was generated automatically for your project. If something doesn't sit right or
+            doesn't match your reality, get in touch — we'll re-check it and, if needed, redo it with a
+            research analyst.{' '}
             <a href="mailto:sk@affina.space?subject=Discuss my research report" className="font-semibold text-brand hover:text-brand-700">
-              Discuss this report →
+              Contact us →
             </a>
           </p>
         </div>
