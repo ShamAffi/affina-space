@@ -185,7 +185,7 @@ every word is true for you. You know things I don't."
 | m3l5 Beachhead persona | A ⚠️ | Только при ≥1 интервью или содержательном intake; иначе вопрос вместо черновика |
 | m3l6 Interview script | A | «Делаем для неё» — и так по дизайну блока |
 | m3l7 🟡 interviews | D | Вкл. поля verdict в Interview Log |
-| m4l5 Reality check | C | Compare-карта — AI; рероайт-черновик допустим (A), но «что меняю и почему» — только она |
+| m4l5 Reality check | 3-block | REDESIGNED (SPEC_M4L5_THREE_BLOCK.md): три редактируемых блока For/Against/Conclusion, AI может драфтить любой per-block-кнопкой, она владеет и правит всеми тремя, один Save. Больше не строгий Mode C |
 | m4l6 Use-case map | B | **3 варианта юзер-пути на выбор** — вписывает понравившийся |
 | m4l7 Product sketch | B | 3 варианта описания продукта |
 | m4l8 Quantified value + core | B ⚠️ | Варианты формулировок; числа — только из её данных, нет чисел → вопрос |

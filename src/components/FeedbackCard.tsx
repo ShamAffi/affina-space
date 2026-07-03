@@ -8,6 +8,9 @@ interface Props {
   previousScore?: number;
   onRefine: () => void;
   onContinue: () => void;
+  // When present, the recap renders these labeled sections instead of the raw
+  // answer (m4l5 For/Against/Conclusion, §4b — never a concatenated paragraph).
+  answerBlocks?: { label: string; text: string }[];
 }
 
 const VERDICT_CONFIG = {
@@ -16,7 +19,7 @@ const VERDICT_CONFIG = {
   can_be_stronger:  { label: 'Can be stronger',    bg: 'bg-amber-50',  text: 'text-amber-700',  score: 'text-amber-500' },
 };
 
-export default function FeedbackCard({ lessonTitle, prompt, answer, feedback, previousScore, onRefine, onContinue }: Props) {
+export default function FeedbackCard({ lessonTitle, prompt, answer, feedback, previousScore, onRefine, onContinue, answerBlocks }: Props) {
   const cfg = VERDICT_CONFIG[feedback.verdict];
   const noScore = feedback.score === null;
   const improved = previousScore !== undefined && feedback.score !== null && feedback.score > previousScore;
@@ -28,9 +31,21 @@ export default function FeedbackCard({ lessonTitle, prompt, answer, feedback, pr
       <div className="px-5 pt-5 pb-4 border-b border-hairline">
         <p className="text-xs font-bold text-brand-600 uppercase tracking-wider mb-1">{lessonTitle}</p>
         <p className="text-xs text-ink-mute mb-3">{prompt}</p>
-        <p className="text-sm text-ink leading-relaxed bg-inset rounded-control px-4 py-3 border border-hairline">
-          {answer}
-        </p>
+        {answerBlocks && answerBlocks.length > 0 ? (
+          <div className="flex flex-col gap-2">
+            {answerBlocks.map((b) => (
+              <div key={b.label} className="bg-inset rounded-control px-4 py-3 border border-hairline">
+                <p className="text-[10px] font-bold text-brand-600 uppercase tracking-wider mb-1">{b.label}</p>
+                <p className="text-sm text-ink leading-relaxed whitespace-pre-wrap">{b.text || '—'}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          // fix 0 — whitespace-pre-wrap so multi-line answers don't collapse into a wall
+          <p className="text-sm text-ink leading-relaxed bg-inset rounded-control px-4 py-3 border border-hairline whitespace-pre-wrap">
+            {answer}
+          </p>
+        )}
         <div className="flex items-center gap-3 mt-3">
           <button
             onClick={onRefine}
