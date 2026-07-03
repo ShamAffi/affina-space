@@ -30,7 +30,7 @@ const DraftSchema = z.object({
     title: z.string(),
     instruction: z.string(),
     priority: z.number().int(),
-  })).min(1).max(3),
+  })).min(0).max(3),
 });
 
 const ActivitySchema = z.array(z.object({
@@ -88,7 +88,10 @@ PART A — Analyze the check-in:
 - metrics: extract EVERY number mentioned. value: new value. delta: change vs last week (0 if unknown/first).
 - sentiment: energized | steady | struggling
 - mentorNote: 1–2 warm, honest sentences. No toxic positivity.
-- tasks: 1–3 specific next steps. ≤6-word titles. priority 80/60/40. Skip anything that duplicates an OPEN TASK by meaning (listed in the user message); propose fewer rather than repeat one she already has.
+- tasks: 0–3 next steps. ≤6-word titles. priority 80/60/40. GOAL: keep her task list light, not crowded with small similar chores.
+  - CONSOLIDATE: fold several small related actions into ONE meaningful task instead of listing them separately (e.g. not "DM 3 moms" + "reply to comments" + "post story" → one "Reach 5 target moms this week").
+  - Prefer ONE strong task over three overlapping small ones. It is perfectly fine to return 0 tasks if her update needs no new one.
+  - LOAD-AWARE: look at her OPEN TASKS (in the user message). If she already has several open, add at most one — or none. Never re-create one she already has, even worded differently.
 
 PART B — Extract activity, snapshot facts + compose the Momentum card:
 - snapshotFacts: FACTS and DECISIONS from this update that change the startup's one-page Snapshot — new numbers, changed inputs, corrections ("price is now $29", "pivoted to B2B", "first paying customer"). NOT process ("worked hard this week"). section ∈ [Founder, Project & stage, Hypothesis, Market, Customer & persona, Product, Model & North Star, Traction, Risk flags, Next focus]. [] if nothing snapshot-worthy.
@@ -192,8 +195,9 @@ Recent check-ins (for deltas):
 ${pastContext}
 Last known metrics: ${lastMetrics}
 
-OPEN TASKS she already has (do NOT propose a new task that duplicates any of these
-in MEANING, not just wording — if her update is about one of these, don't re-create it):
+OPEN TASKS she already has (${openTasks.length} open). Do NOT duplicate any of these in
+MEANING (not just wording), and if she already has several open, add at most one new task —
+or none. Keep her list light rather than piling on small similar chores:
 ${openTaskList}
 
 This week's update from the founder:
