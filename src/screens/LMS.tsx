@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { MODULES } from '../data';
+import { MODULES, QUESTIONS } from '../data';
 import type { UserData, Lesson, AiFeedback, CompareResult, BrainEntry, NorthStarSuggestion, NorthStarCandidate, BlockKind, StartupSnapshot, MentorSessionId, MentorSessionsState, MarketResearchReport } from '../types';
 import { blockKind } from '../types';
 import MentorSessionModal from '../components/MentorSessionModal';
@@ -71,6 +71,8 @@ export default function LMS({ userData, onUpdateUserData, onGoToDashboard, onLog
   const [researchLoading, setResearchLoading] = useState(false);
   const [researchOpen, setResearchOpen] = useState(false);
   const [researchError, setResearchError] = useState('');
+  // M0 redesign: после квиза Step 4 снапшот стартует сам (§2 "Generating your Snapshot…")
+  const [autoSnapshot, setAutoSnapshot] = useState(false);
 
   const [progressLoading, setProgressLoading] = useState(true);
   const mainRef = useRef<HTMLElement>(null);
@@ -608,11 +610,52 @@ My motivation & 12-week goal: …`;
               </div>
             )}
 
+            {/* 🧾 M0.3 — Your Project Today (SPEC_M0_INTAKE_REDESIGN §1) */}
+            {activeLesson.id === 'm0l3' && (
+              <ProjectTodayBlock
+                key={activeLessonId}
+                userData={userData}
+                onSave={(fields, links) => {
+                  onUpdateUserData(fields);
+                  syncUserToDB({ ...userData, ...fields });
+                  if (links.trim()) {
+                    onUpdateUserData({ lessonInputs: { ...userData.lessonInputs, m0l3: links } });
+                    saveLessonInputToDB(userData.email, 'm0l3', links);
+                  }
+                  if (!isCompleted) {
+                    onUpdateUserData({ completedLessons: [...userData.completedLessons, 'm0l3'] });
+                    toggleLessonCompleteToDB(userData.email, 'm0l3');
+                  }
+                  if (nextLesson) openLesson(nextLesson.id);
+                }}
+                initialLinks={userData.lessonInputs['m0l3'] ?? ''}
+              />
+            )}
+
+            {/* ❓ M0.4 — A few quick questions, Typeform-style (SPEC_M0_INTAKE_REDESIGN §2) */}
+            {activeLesson.id === 'm0l4' && (
+              <IntakeQuizBlock
+                key={activeLessonId}
+                initialJson={userData.lessonInputs['m0l4'] ?? ''}
+                onComplete={(json) => {
+                  onUpdateUserData({ lessonInputs: { ...userData.lessonInputs, m0l4: json } });
+                  saveLessonInputToDB(userData.email, 'm0l4', json);
+                  if (!isCompleted) {
+                    onUpdateUserData({ completedLessons: [...userData.completedLessons, 'm0l4'] });
+                    toggleLessonCompleteToDB(userData.email, 'm0l4');
+                  }
+                  setAutoSnapshot(true);
+                  if (nextLesson) openLesson(nextLesson.id);
+                }}
+              />
+            )}
+
             {/* ⚙️ M0.5 — Startup Snapshot generation (§6.1, wow moment №1) */}
             {activeLesson.id === 'm0l5' && (
               <SnapshotBlock
                 key={activeLessonId}
                 email={userData.email}
+                autoStart={autoSnapshot}
                 onComplete={() => {
                   if (!isCompleted) {
                     onUpdateUserData({ completedLessons: [...userData.completedLessons, activeLessonId] });
@@ -625,6 +668,8 @@ My motivation & 12-week goal: …`;
 
             {/* Exercise lesson — state machine: input → saving → feedback/compare ⟲ refine */}
             {(activeLesson.type === 'input' || activeLesson.type === 'structured') && (() => {
+              // M0 redesign: Step 3/4 have dedicated components above — no generic exercise flow
+              if (activeLesson.id === 'm0l3' || activeLesson.id === 'm0l4') return null;
               if (activeLesson.aiMode === 'north-star') {
                 const onContinue = () => {
                   if (!isCompleted) {
@@ -928,6 +973,8 @@ My motivation & 12-week goal: …`;
               if (isExercise && activeLesson.aiMode === 'north-star') return null;
               // snapshot block manages its own Continue until generated once
               if (activeLesson.id === 'm0l5' && !isCompleted) return null;
+              // M0.3/M0.4 custom blocks provide their own CTAs until completed
+              if ((activeLesson.id === 'm0l3' || activeLesson.id === 'm0l4') && !isCompleted) return null;
               // delegate views manage their own actions
               if (delegateOpen === activeLessonId || delegating === activeLessonId) return null;
               const hasFeedback = !!(feedbackByLesson[activeLessonId] || compareByLesson[activeLessonId]);
@@ -1242,7 +1289,7 @@ function NorthStarExercise({ email, lessonId, alreadySubmitted, onComplete, onSa
 }
 
 // ─── SnapshotBlock (⚙️ M0.5, §6.1) — generate & present the Startup Snapshot ──
-function SnapshotBlock({ email, onComplete }: { email: string; onComplete: () => void }) {
+function SnapshotBlock({ email, onComplete, autoStart = false }: { email: string; onComplete: () => void; autoStart?: boolean }) {
   type Status = 'checking' | 'idle' | 'generating' | 'ready' | 'error';
   const [status, setStatus] = useState<Status>('checking');
   const [snapshot, setSnapshot] = useState<StartupSnapshot | null>(null);
@@ -1257,6 +1304,12 @@ function SnapshotBlock({ email, onComplete }: { email: string; onComplete: () =>
       })
       .catch(() => setStatus('idle'));
   }, [email]);
+
+  // M0 redesign §2: arriving from the quiz auto-starts generation ("Generating your Snapshot…")
+  useEffect(() => {
+    if (autoStart && status === 'idle') generate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoStart, status]);
 
   function generate() {
     setStatus('generating');
@@ -1305,16 +1358,15 @@ function SnapshotBlock({ email, onComplete }: { email: string; onComplete: () =>
             </div>
           ))}
         </div>
-        <p className="text-xs text-ink-mute leading-relaxed mb-4">
-          Your Snapshot lives in Documents and updates itself after module checkpoints and weekly check-ins.
-          Something changed or looks off? Tell us in your weekly check-in — it updates itself.
-        </p>
         <button
           onClick={onComplete}
           className="w-full bg-brand hover:bg-brand-700 active:scale-95 text-white text-sm font-semibold py-3.5 rounded-pill transition-all duration-150"
         >
-          Continue to Module 1 →
+          This looks right — let's start Module 1 →
         </button>
+        <p className="text-xs text-ink-mute leading-relaxed mt-3 text-center">
+          Something looks off? Tell us in your weekly check-in — your Snapshot updates itself.
+        </p>
       </div>
     );
   }
@@ -1336,6 +1388,297 @@ function SnapshotBlock({ email, onComplete }: { email: string; onComplete: () =>
       >
         ✨ Generate my Startup Snapshot
       </button>
+    </div>
+  );
+}
+
+// ─── M0.3 "Your Project Today" (SPEC_M0_INTAKE_REDESIGN §1) ───────────────────
+// Section A: five separate editable fields prefilled from users columns (source
+// of truth — writes back). Section B: optional "+ Add links" (imported_assets).
+function ProjectTodayBlock({ userData, onSave, initialLinks }: {
+  userData: UserData;
+  onSave: (fields: Partial<UserData>, links: string) => void;
+  initialLinks: string;
+}) {
+  const [idea, setIdea] = useState(userData.idea);
+  const [customer, setCustomer] = useState(userData.customer);
+  const [businessModel, setBusinessModel] = useState(userData.businessModel);
+  const [stage, setStage] = useState(userData.stage);
+  const [goal, setGoal] = useState(userData.goal);
+  const [linksOpen, setLinksOpen] = useState(!!initialLinks);
+  const [links, setLinks] = useState(initialLinks);
+
+  const stageOptions = QUESTIONS.find((q) => q.id === 'stage')?.options ?? [];
+  const goalOptions = QUESTIONS.find((q) => q.id === 'goal')?.options ?? [];
+  const inputCls = 'w-full text-sm bg-surface border border-hairline rounded-control px-3 py-2.5 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 placeholder-ink-mute transition';
+
+  function SelectField({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: string[] }) {
+    const opts = value && !options.includes(value) ? [value, ...options] : options;
+    return (
+      <select value={value} onChange={(e) => onChange(e.target.value)} className={inputCls}>
+        <option value="" disabled>Choose…</option>
+        {opts.map((o) => <option key={o} value={o}>{o}</option>)}
+      </select>
+    );
+  }
+
+  return (
+    <div className="mb-8 flex flex-col gap-4 animate-fade-in">
+      <div className="bg-surface border border-hairline rounded-card p-5">
+        <p className="text-xs font-bold text-ink-mute uppercase tracking-widest mb-4">What we already know — check & correct</p>
+        <div className="flex flex-col gap-4">
+          <div>
+            <label className="block text-[11px] font-bold text-ink-soft uppercase tracking-wider mb-1">What you're building</label>
+            <textarea value={idea} onChange={(e) => setIdea(e.target.value)} rows={3} maxLength={250} className={`${inputCls} resize-none`} />
+          </div>
+          <div>
+            <label className="block text-[11px] font-bold text-ink-soft uppercase tracking-wider mb-1">Who it's for</label>
+            <input type="text" value={customer} onChange={(e) => setCustomer(e.target.value)} className={inputCls} />
+          </div>
+          <div>
+            <label className="block text-[11px] font-bold text-ink-soft uppercase tracking-wider mb-1">How it makes money</label>
+            <input type="text" value={businessModel} onChange={(e) => setBusinessModel(e.target.value)} className={inputCls} />
+          </div>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[11px] font-bold text-ink-soft uppercase tracking-wider mb-1">Stage today</label>
+              <SelectField value={stage} onChange={setStage} options={stageOptions} />
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold text-ink-soft uppercase tracking-wider mb-1">Big goal</label>
+              <SelectField value={goal} onChange={setGoal} options={goalOptions} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Section B — optional links, collapsed by default */}
+      <div className="bg-surface border border-hairline rounded-card p-5">
+        <button
+          type="button"
+          onClick={() => setLinksOpen((v) => !v)}
+          className="w-full flex items-center gap-2 text-left"
+        >
+          <span className="text-sm font-semibold text-ink">＋ Add links</span>
+          <span className="text-xs text-ink-mute">— anything live already? (optional)</span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+            className={`ml-auto text-ink-mute transition-transform ${linksOpen ? 'rotate-180' : ''}`}>
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        {linksOpen && (
+          <div className="mt-3">
+            <textarea
+              value={links}
+              onChange={(e) => setLinks(e.target.value)}
+              rows={4}
+              placeholder={`https://… — landing page\nhttps://… — Instagram\nhttps://… — pitch deck (Google Slides)`}
+              className={`${inputCls} resize-none`}
+            />
+            <p className="text-[11px] text-ink-mute mt-1">Up to 5 links, one per line, with a word on what each is. They sharpen every AI review.</p>
+          </div>
+        )}
+      </div>
+
+      <button
+        onClick={() => onSave({ idea, customer, businessModel, stage, goal }, links)}
+        disabled={!idea.trim()}
+        className="w-full bg-brand hover:bg-brand-700 active:scale-95 disabled:opacity-40 text-white text-sm font-semibold py-3.5 rounded-pill transition-all duration-150"
+      >
+        Continue to a few quick questions →
+      </button>
+    </div>
+  );
+}
+
+// ─── M0.4 "A few quick questions" — Typeform-style quiz (SPEC_M0_INTAKE_REDESIGN §2) ──
+type IntakeAnswers = {
+  doneSoFar: string[];
+  doneSoFarDetail?: string;
+  stuckPoint: string;
+  capacity: string;
+  whyMe: string;
+  goal12w: string;
+};
+
+const Q1_CHIPS = ['Nothing yet, just the idea', 'Talked to potential customers', 'Built a landing page or MVP', 'Got my first sign-ups', 'Made a sale'];
+const Q3_OPTIONS: { label: string; value: string }[] = [
+  { label: 'Under 5', value: 'under5' },
+  { label: '5–10', value: '5to10' },
+  { label: '10–20', value: '10to20' },
+  { label: '20+ (full focus)', value: '20plus' },
+];
+
+function IntakeQuizBlock({ initialJson, onComplete }: {
+  initialJson: string;
+  onComplete: (json: string) => void;
+}) {
+  const initial: IntakeAnswers = (() => {
+    try { return { doneSoFar: [], stuckPoint: '', capacity: '', whyMe: '', goal12w: '', ...JSON.parse(initialJson) }; }
+    catch { return { doneSoFar: [], stuckPoint: '', capacity: '', whyMe: '', goal12w: '' }; }
+  })();
+  const [a, setA] = useState<IntakeAnswers>(initial);
+  const [step, setStep] = useState(0);
+  const [nudged, setNudged] = useState<Record<number, boolean>>({});
+  const [finishing, setFinishing] = useState(false);
+
+  const TOTAL = 5;
+  const textCls = 'w-full text-base bg-surface border-2 border-hairline rounded-card px-4 py-3.5 outline-none focus:border-brand-400 focus:ring-4 focus:ring-brand-100 placeholder-ink-mute resize-none transition';
+
+  // Soft validation (§2): chips require a pick; free-text gets ONE gentle nudge, never blocks.
+  function tryNext() {
+    if (step === 0 && a.doneSoFar.length === 0) return;
+    if (step === 2 && !a.capacity) return;
+    const textVal = step === 1 ? a.stuckPoint : step === 3 ? a.whyMe : step === 4 ? a.goal12w : 'x';
+    if ((step === 1 || step === 3 || step === 4) && !textVal.trim() && !nudged[step]) {
+      setNudged((n) => ({ ...n, [step]: true }));
+      return;
+    }
+    if (step < TOTAL - 1) {
+      setStep(step + 1);
+    } else {
+      setFinishing(true);
+      setTimeout(() => onComplete(JSON.stringify(a)), 1400);
+    }
+  }
+
+  const chipOk = step === 0 ? a.doneSoFar.length > 0 : step === 2 ? !!a.capacity : true;
+
+  function onTextKey(e: React.KeyboardEvent) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); tryNext(); }
+  }
+
+  if (finishing) {
+    return (
+      <div className="bg-surface border border-brand-100 rounded-card mb-8 flex flex-col items-center justify-center gap-4 py-16 animate-fade-in">
+        <div className="w-14 h-14 rounded-pill bg-brand animate-orb-pulse" />
+        <p className="text-sm font-semibold text-ink-soft tracking-wide">Generating your Snapshot…</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-8 animate-fade-in">
+      {/* progress dots + back arrow */}
+      <div className="flex items-center gap-3 mb-6">
+        {step > 0 ? (
+          <button onClick={() => setStep(step - 1)} className="w-8 h-8 flex items-center justify-center rounded-pill hover:bg-inset text-ink-soft transition" aria-label="Back">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6" /></svg>
+          </button>
+        ) : <span className="w-8" />}
+        <div className="flex gap-2 mx-auto">
+          {Array.from({ length: TOTAL }).map((_, i) => (
+            <span key={i} className={`w-2 h-2 rounded-pill transition-all ${i === step ? 'bg-brand scale-125' : i < step ? 'bg-brand-200' : 'bg-inset'}`} />
+          ))}
+        </div>
+        <span className="w-8 text-right text-xs text-ink-mute">{step + 1}/5</span>
+      </div>
+
+      <div className="min-h-[260px]">
+        {step === 0 && (
+          <div>
+            <h2 className="text-xl sm:text-2xl font-bold text-ink mb-5">What have you actually done so far?</h2>
+            <div className="flex flex-wrap gap-2 mb-4">
+              {Q1_CHIPS.map((c) => {
+                const on = a.doneSoFar.includes(c);
+                return (
+                  <button
+                    key={c}
+                    onClick={() => setA((p) => ({ ...p, doneSoFar: on ? p.doneSoFar.filter((x) => x !== c) : [...p.doneSoFar, c] }))}
+                    className={`text-sm font-semibold rounded-pill px-4 py-2.5 border-2 transition-all ${on ? 'bg-brand-50 border-brand text-brand-800' : 'bg-surface border-hairline text-ink-soft hover:border-brand-200'}`}
+                  >
+                    {on ? '✓ ' : ''}{c}
+                  </button>
+                );
+              })}
+            </div>
+            {a.doneSoFar.some((c) => c !== 'Nothing yet, just the idea') && (
+              <textarea
+                value={a.doneSoFarDetail ?? ''}
+                onChange={(e) => setA((p) => ({ ...p, doneSoFarDetail: e.target.value }))}
+                rows={2}
+                placeholder="Tell us more — what exactly, and what happened?"
+                className={textCls}
+              />
+            )}
+          </div>
+        )}
+
+        {step === 1 && (
+          <div>
+            <h2 className="text-xl sm:text-2xl font-bold text-ink mb-5">Where do you feel stuck or unsure right now?</h2>
+            <textarea
+              autoFocus
+              value={a.stuckPoint}
+              onKeyDown={onTextKey}
+              onChange={(e) => setA((p) => ({ ...p, stuckPoint: e.target.value }))}
+              rows={4}
+              placeholder="e.g. I don't know if people would actually pay, I can't pick between two ideas, I launched but nobody came…"
+              className={textCls}
+            />
+          </div>
+        )}
+
+        {step === 2 && (
+          <div>
+            <h2 className="text-xl sm:text-2xl font-bold text-ink mb-5">How many hours a week can you realistically give this?</h2>
+            <div className="flex flex-wrap gap-2">
+              {Q3_OPTIONS.map((o) => (
+                <button
+                  key={o.value}
+                  onClick={() => setA((p) => ({ ...p, capacity: o.value }))}
+                  className={`text-sm font-semibold rounded-pill px-5 py-3 border-2 transition-all ${a.capacity === o.value ? 'bg-brand-50 border-brand text-brand-800' : 'bg-surface border-hairline text-ink-soft hover:border-brand-200'}`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {step === 3 && (
+          <div>
+            <h2 className="text-xl sm:text-2xl font-bold text-ink mb-5">Why does this matter to you — really?</h2>
+            <textarea
+              autoFocus
+              value={a.whyMe}
+              onKeyDown={onTextKey}
+              onChange={(e) => setA((p) => ({ ...p, whyMe: e.target.value }))}
+              rows={4}
+              placeholder="Not the elevator pitch — the real reason. What happens if you don't do this?"
+              className={textCls}
+            />
+          </div>
+        )}
+
+        {step === 4 && (
+          <div>
+            <h2 className="text-xl sm:text-2xl font-bold text-ink mb-5">If you could only be sure of ONE thing 12 weeks from now, what would it be?</h2>
+            <textarea
+              autoFocus
+              value={a.goal12w}
+              onKeyDown={onTextKey}
+              onChange={(e) => setA((p) => ({ ...p, goal12w: e.target.value }))}
+              rows={4}
+              placeholder="e.g. I have a paying customer. I know this idea is right. I've launched, even if small."
+              className={textCls}
+            />
+          </div>
+        )}
+      </div>
+
+      {nudged[step] && !(step === 1 ? a.stuckPoint : step === 3 ? a.whyMe : a.goal12w).trim() && (
+        <p className="text-xs text-amber-600 mt-2">This one really helps your mentor understand you — sure you want to skip it?</p>
+      )}
+
+      <button
+        onClick={tryNext}
+        disabled={!chipOk}
+        className="mt-5 w-full bg-brand hover:bg-brand-700 active:scale-95 disabled:opacity-40 text-white text-sm font-semibold py-3.5 rounded-pill transition-all duration-150"
+      >
+        {step === TOTAL - 1 ? 'Finish →' : 'Next →'}
+      </button>
+      <p className="text-[11px] text-ink-mute text-center mt-2">Enter ↵ works too{step === 0 || step === 2 ? '' : ' · you can skip this one'}</p>
     </div>
   );
 }

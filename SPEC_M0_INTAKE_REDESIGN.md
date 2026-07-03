@@ -50,10 +50,11 @@ Folds in the current m0l4 "Import what you have" functionality as an optional ex
 
 ### The 5 questions
 
-**Q1 — "What have you actually done so far?"**
-Chip multi-select: `Nothing yet, just the idea` · `Talked to potential customers` · `Built a landing page or MVP` · `Got my first sign-ups` · `Made a sale`
-Optional follow-up (appears only if anything besides "Nothing yet" is picked): short text — *"Tell us more — what exactly, and what happened?"*
-→ maps to `doneSoFar: string[]`, `doneSoFarDetail?: string`
+**Q1 — "What have you done so far?"**
+Open text (free-form, generous textarea). Subtitle under the question: *"Write it all down — even the small stuff. And if anything's live (a site, an Instagram, a doc, a prototype), drop the links right here."*
+Placeholder: *"e.g. Talked to 5 people about this, built a rough landing page (link below), got 3 people to say they'd try it…"*
+→ maps to `doneSoFar: string` (single free-text field, replaces the earlier chip+detail design)
+Note for dev: if she pastes a URL inline here, also extract it into the `imported_assets` brain entry alongside whatever she added in Step 3's "+ Add links" — don't lose the signal just because it landed in the wrong box.
 
 **Q2 — "Where do you feel stuck or unsure right now?"**
 Free text, generous textarea. Placeholder: *"e.g. I don't know if people would actually pay, I can't pick between two ideas, I launched but nobody came…"*
@@ -67,7 +68,7 @@ Single-select buttons: `Under 5` · `5–10` · `10–20` · `20+ (full focus)`
 Free text. Placeholder: *"Not the elevator pitch — the real reason. What happens if you don't do this?"*
 → `whyMe: string`
 
-**Q5 — "If you could only be sure of ONE thing 12 weeks from now, what would it be?"**
+**Q5 — "What would make the next 12 weeks feel like a win?"**
 Free text. Placeholder: *"e.g. I have a paying customer. I know this idea is right. I've launched, even if small."*
 → `goal12w: string`
 

@@ -2,8 +2,8 @@ import type { Question, Module } from './types.js';
 
 // Program v2 (SPEC_PROGRAM_V2.md §3.5) — positional lesson IDs m{module}l{block}.
 export const BRAIN_ENTRY_TYPES: Record<string, string> = {
-  m0l3: 'founder_intake',
-  m0l4: 'imported_assets',
+  m0l3: 'imported_assets',   // Step 3 Section B "+ Add links" (SPEC_M0_INTAKE_REDESIGN §1)
+  m0l4: 'founder_intake',    // Step 4 quiz JSON (SPEC_M0_INTAKE_REDESIGN §2, §4)
   m1l4: 'mission_vision',
   m1l5: 'value_proposition',
   m1l6: 'founder_fit',
@@ -117,26 +117,16 @@ export const MODULES: Module[] = [
         type: 'structured',
         kind: 'exercise',
         delegatable: false,
-        prefillFrom: 'onboarding',
-        title: 'Deep intake: your project today',
-        body: `Before the program starts working for you, it needs to know exactly where you stand. Review the prefilled answers from your onboarding, then go deeper: what have you already done, how much time can you give this weekly, and what do you want to be true in 12 weeks?`,
-        inputPrompt: 'Review and complete your intake: stage in detail, what you\'ve already done, links to anything live, hours per week you can commit, and your 12-week goal.',
-        inputPlaceholder: `Stage today: …
-What I've already done: …
-Hours per week I can commit: …
-My motivation & 12-week goal: …`,
+        title: 'Your Project Today',
+        body: `Onboarding already captured the basics — here's your chance to review and correct them. Each field below is editable and becomes the source of truth for your whole program. Got anything live already? Add links too.`,
       },
       {
         id: 'm0l4',
         type: 'input',
         kind: 'exercise',
         delegatable: false,
-        title: 'Import what you have',
-        body: `Already have a website, social profiles, a deck, or docs? Paste up to 5 links. They become part of your Brain and make every AI review sharper. File uploads arrive in a later release — links work today.`,
-        inputPrompt: 'Paste up to 5 links that show what you have so far (website, socials, docs, deck) — one per line, with a word on what each is.',
-        inputPlaceholder: `https://… — landing page
-https://… — Instagram
-https://… — pitch deck (Google Slides)`,
+        title: 'A few quick questions',
+        body: `Five quick questions onboarding didn't ask — what you've actually done, where you're stuck, and what you really want from the next 12 weeks. One at a time, takes about two minutes, and it makes your mentor genuinely useful.`,
       },
       {
         id: 'm0l5',
