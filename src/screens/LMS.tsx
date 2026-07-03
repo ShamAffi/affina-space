@@ -11,6 +11,7 @@ import DocumentsPanel from '../components/DocumentsPanel';
 import FeedbackCard from '../components/FeedbackCard';
 import CompareCard from '../components/CompareCard';
 import LessonBody from '../components/LessonBody';
+import { splitMissionVision, composeMissionVision } from '../missionVision';
 
 // Block-kind chips (§5 LMS sidebar): label + tint per kind. Theory renders no chip.
 const KIND_CHIP: Partial<Record<BlockKind, { label: string; cls: string }>> = {
@@ -32,20 +33,6 @@ interface Props {
 }
 
 const allLessons: Lesson[] = MODULES.flatMap((m) => m.lessons);
-
-// m1l4 Mission & Vision — two inputs, ONE stored text (one brain entry, one combined review).
-function splitMissionVision(text: string): { mission: string; vision: string } {
-  const vIdx = text.search(/(^|\n)\s*Vision:/i);
-  const missionPart = vIdx >= 0 ? text.slice(0, vIdx) : text;
-  const visionPart = vIdx >= 0 ? text.slice(vIdx) : '';
-  return {
-    mission: missionPart.replace(/^\s*Mission:\s*/i, '').trim(),
-    vision: visionPart.replace(/^\s*Vision:\s*/i, '').trim(),
-  };
-}
-function composeMissionVision(mission: string, vision: string): string {
-  return `Mission: ${mission.trim()}\n\nVision: ${vision.trim()}`;
-}
 
 export default function LMS({ userData, onUpdateUserData, onGoToDashboard, onLogout, initialLessonId, onActiveLessonChange, onGoToTasks }: Props) {
   const [activeLessonId, setActiveLessonId] = useState<string>(() => {

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { BrainEntry, AiFeedback, CompareResult, Lesson, StartupSnapshot, MarketResearchReport } from '../types';
 import MarketResearchView from './MarketResearchView';
 import { MODULES } from '../data';
+import { splitMissionVision, composeMissionVision } from '../missionVision';
 
 // Lesson lookup, so Documents edits respect the course's char caps and can re-run the AI mentor.
 const LESSON_BY_ID: Record<string, Lesson> = {};
@@ -234,9 +235,26 @@ function DocCard({ entry, onOpen }: { entry: BrainEntry; onOpen: () => void }) {
           Open
         </button>
       </div>
-      <p className="text-sm text-ink-soft leading-relaxed line-clamp-3">
-        {entry.content || '—'}
-      </p>
+      {entry.entryType === 'mission_vision' ? (() => {
+        // Stored as one combined text — show mission & vision as two labeled blocks (§1).
+        const mv = splitMissionVision(entry.content);
+        return (
+          <div className="flex flex-col gap-2">
+            <div>
+              <p className="text-[10px] font-bold text-brand-600 uppercase tracking-wider">Mission</p>
+              <p className="text-sm text-ink-soft leading-relaxed line-clamp-2">{mv.mission || '—'}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-brand-600 uppercase tracking-wider">Vision</p>
+              <p className="text-sm text-ink-soft leading-relaxed line-clamp-2">{mv.vision || '—'}</p>
+            </div>
+          </div>
+        );
+      })() : (
+        <p className="text-sm text-ink-soft leading-relaxed line-clamp-3">
+          {entry.content || '—'}
+        </p>
+      )}
     </div>
   );
 }
@@ -338,23 +356,51 @@ function EditModal({
 
         {/* Scrollable body */}
         <div className="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-5">
-          {/* Editable text */}
-          <div>
-            <p className="text-xs font-bold text-ink-mute uppercase tracking-widest mb-2">Your answer</p>
-            <textarea
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              rows={6}
-              maxLength={maxLen}
-              className="w-full rounded-control border border-hairline focus:border-brand-400 focus:ring-2 focus:ring-brand-100 outline-none px-4 py-3 text-sm text-ink resize-none transition leading-relaxed"
-              autoFocus
-            />
-            {maxLen && (
-              <p className={`mt-1 text-xs text-right ${draft.length >= maxLen ? 'text-red-400 font-semibold' : draft.length >= maxLen * 0.9 ? 'text-amber-500' : 'text-ink-mute'}`}>
-                {draft.length} / {maxLen}
-              </p>
-            )}
-          </div>
+          {/* Editable text — mission_vision splits into two labeled fields (§1) */}
+          {entry.entryType === 'mission_vision' ? (() => {
+            const mv = splitMissionVision(draft);
+            const fieldCls = 'w-full rounded-control border border-hairline focus:border-brand-400 focus:ring-2 focus:ring-brand-100 outline-none px-4 py-3 text-sm text-ink resize-none transition leading-relaxed';
+            return (
+              <div className="flex flex-col gap-4">
+                <div>
+                  <p className="text-xs font-bold text-brand-700 uppercase tracking-widest mb-2">Mission</p>
+                  <textarea
+                    value={mv.mission}
+                    onChange={(e) => setDraft(composeMissionVision(e.target.value, mv.vision))}
+                    rows={2}
+                    className={fieldCls}
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-brand-700 uppercase tracking-widest mb-2">Vision</p>
+                  <textarea
+                    value={mv.vision}
+                    onChange={(e) => setDraft(composeMissionVision(mv.mission, e.target.value))}
+                    rows={3}
+                    className={fieldCls}
+                  />
+                </div>
+              </div>
+            );
+          })() : (
+            <div>
+              <p className="text-xs font-bold text-ink-mute uppercase tracking-widest mb-2">Your answer</p>
+              <textarea
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                rows={6}
+                maxLength={maxLen}
+                className="w-full rounded-control border border-hairline focus:border-brand-400 focus:ring-2 focus:ring-brand-100 outline-none px-4 py-3 text-sm text-ink resize-none transition leading-relaxed"
+                autoFocus
+              />
+              {maxLen && (
+                <p className={`mt-1 text-xs text-right ${draft.length >= maxLen ? 'text-red-400 font-semibold' : draft.length >= maxLen * 0.9 ? 'text-amber-500' : 'text-ink-mute'}`}>
+                  {draft.length} / {maxLen}
+                </p>
+              )}
+            </div>
+          )}
 
           {/* AI mentor feedback */}
           {entry.aiFeedback && (
