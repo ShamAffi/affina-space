@@ -81,13 +81,18 @@ export default function Tasks({ email, onGoToTask, onGoToDashboard }: Props) {
     }
   }
 
+  // Within each category: newest first (by creation), tiebreak by id.
+  const byNewest = (a: Task, b: Task) => {
+    const d = new Date(b.createdAt ?? '').getTime() - new Date(a.createdAt ?? '').getTime();
+    return d !== 0 ? d : b.id - a.id;
+  };
   const active = taskList.filter((t) => t.status !== 'done');
   const bucketTasks: Record<BucketId, Task[]> = {
-    realworld: active.filter((t) => BUCKETS[0].match(t.source as TaskSource)),
-    practice: active.filter((t) => BUCKETS[1].match(t.source as TaskSource)),
+    realworld: active.filter((t) => BUCKETS[0].match(t.source as TaskSource)).sort(byNewest),
+    practice: active.filter((t) => BUCKETS[1].match(t.source as TaskSource)).sort(byNewest),
   };
 
-  const doneTasks = taskList.filter((t) => t.status === 'done');
+  const doneTasks = taskList.filter((t) => t.status === 'done').sort(byNewest);
   const totalActive = taskList.filter((t) => t.status !== 'done').length;
 
   return (
