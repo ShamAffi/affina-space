@@ -1365,7 +1365,7 @@ function SnapshotBlock({ email, onComplete, autoStart = false }: { email: string
           </span>
         </div>
         <div className="flex flex-col gap-3 mb-4">
-          {snapshot.sections.map((s) => (
+          {snapshot.sections.filter((s) => s.title !== 'Next focus').map((s) => (
             <div key={s.title} className="bg-surface border border-hairline rounded-card p-4">
               <p className="text-[10px] font-bold text-brand-600 uppercase tracking-widest mb-1.5">{s.title}</p>
               <p className="text-sm text-ink-soft leading-relaxed whitespace-pre-wrap">{s.content}</p>

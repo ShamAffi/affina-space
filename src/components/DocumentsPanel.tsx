@@ -186,7 +186,7 @@ export default function DocumentsPanel({ email, onClose, onLessonInputSaved, con
               </button>
             </div>
             <div className="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-3">
-              {snapshot.sections.map((s) => (
+              {snapshot.sections.filter((s) => s.title !== 'Next focus').map((s) => (
                 <div key={s.title}>
                   <p className="text-[10px] font-bold text-brand-600 uppercase tracking-widest mb-1">{s.title}</p>
                   <p className="text-sm text-ink-soft leading-relaxed whitespace-pre-wrap">{s.content}</p>
