@@ -128,15 +128,6 @@ export default function Dashboard({ userData, onUpdateUserData, onGoToLMS, onGoT
     return null;
   })();
 
-  // §5 program map — done / current / locked states for all 13 modules
-  const moduleStates = MODULES.map((m, i) => {
-    const done = m.lessons.every((l) => doneSet.has(l.id));
-    const unlocked = i === 0 || MODULES[i - 1].lessons.every((l) => doneSet.has(l.id));
-    const state: 'done' | 'current' | 'locked' = done ? 'done' : unlocked ? 'current' : 'locked';
-    const firstOpen = m.lessons.find((l) => !doneSet.has(l.id)) ?? m.lessons[0];
-    return { module: m, state, firstOpen };
-  });
-
   return (
     <div className="min-h-screen bg-canvas">
       {/* Header */}
@@ -174,8 +165,8 @@ export default function Dashboard({ userData, onUpdateUserData, onGoToLMS, onGoT
                 Your project
               </p>
               {(() => {
-                // Value proposition (lesson m1l3) upgrades the raw onboarding idea once written — same slot, no extra field.
-                const description = userData.lessonInputs['m1l3'] || userData.idea;
+                // Value proposition (m1l5 in Program v2) upgrades the raw onboarding idea once written — same slot, no extra field.
+                const description = userData.lessonInputs['m1l5'] || userData.idea;
                 if (userData.projectName) {
                   return (
                     <>
@@ -229,62 +220,6 @@ export default function Dashboard({ userData, onUpdateUserData, onGoToLMS, onGoT
             </button>
           </div>
         )}
-
-        {/* 🗺 Program map (§5) + North Star widget */}
-        <div className="bg-surface border border-hairline rounded-card p-5 shadow-sm mb-6">
-          <div className="flex items-center gap-2 mb-4 flex-wrap">
-            <div>
-              <p className="text-sm font-bold text-ink">Program map</p>
-              <p className="text-xs text-ink-mute mt-0.5">{modulesCompleted} of {MODULES.length} modules complete</p>
-            </div>
-            {northStar && (
-              <button
-                onClick={onGoToPulse}
-                className="ml-auto flex items-center gap-2 bg-brand-50 border border-brand-100 hover:border-brand-300 rounded-pill px-4 py-2 transition-colors"
-              >
-                <span className="text-sm">⭐</span>
-                <span className="text-xs font-bold text-brand-800">{northStar.label}</span>
-                <span className="text-[10px] text-brand-600">track weekly →</span>
-              </button>
-            )}
-          </div>
-          <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-            {moduleStates.map(({ module: m, state, firstOpen }) => (
-              <button
-                key={m.id}
-                onClick={() => state !== 'locked' && onGoToLMS(firstOpen.id)}
-                disabled={state === 'locked'}
-                title={`${m.title}${m.paid ? ' · Premium' : ''}`}
-                className={`flex-shrink-0 w-[92px] text-left rounded-control border p-2.5 transition-all duration-150 ${
-                  state === 'done'
-                    ? 'bg-brand border-brand text-white hover:bg-brand-700'
-                    : state === 'current'
-                      ? 'bg-brand-50 border-brand-300 hover:border-brand-400'
-                      : 'bg-inset border-hairline opacity-60 cursor-not-allowed'
-                }`}
-              >
-                <div className="flex items-center gap-1 mb-1">
-                  <span className={`text-[10px] font-bold ${state === 'done' ? 'text-white/80' : state === 'current' ? 'text-brand-700' : 'text-ink-mute'}`}>
-                    M{m.order}
-                  </span>
-                  {state === 'done' && <span className="text-[10px] text-white">✓</span>}
-                  {state === 'current' && <span className="w-1.5 h-1.5 rounded-pill bg-brand animate-pulse" />}
-                  {state === 'locked' && (
-                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#9D9DA6" strokeWidth="2.5" className="flex-shrink-0">
-                      <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" />
-                    </svg>
-                  )}
-                  {m.mentorSessionAfter && <span className="ml-auto text-[9px]">📅</span>}
-                </div>
-                <p className={`text-[10px] font-semibold leading-tight line-clamp-2 ${
-                  state === 'done' ? 'text-white' : state === 'current' ? 'text-ink' : 'text-ink-mute'
-                }`}>
-                  {m.title}
-                </p>
-              </button>
-            ))}
-          </div>
-        </div>
 
         {/* Three columns */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -409,6 +344,7 @@ export default function Dashboard({ userData, onUpdateUserData, onGoToLMS, onGoT
           {/* Momentum — AI-composed dynamic card */}
           <MomentumCard
             card={momentumCard}
+            northStar={northStar}
             lessonsDone={completedCount}
             exercisesScored={exercisesCount}
             modulesCompleted={modulesCompleted}

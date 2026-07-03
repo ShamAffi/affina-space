@@ -1,7 +1,8 @@
-import type { MomentumCard as MomentumCardData, MomentumBlock, MomentumMood } from '../types';
+import type { MomentumCard as MomentumCardData, MomentumBlock, MomentumMood, NorthStarValue } from '../types';
 
 interface Props {
   card: MomentumCardData | null;
+  northStar?: NorthStarValue | null;
   lessonsDone: number;
   exercisesScored: number;
   modulesCompleted: number;
@@ -29,7 +30,7 @@ const MOOD_ACCENT: Record<MomentumMood, string> = {
 const KIND_ICON: Record<string, string> = { win: '▲', learning: '✎', setback: '△' };
 const KIND_COLOR: Record<string, string> = { win: 'text-accent-600', learning: 'text-brand-600', setback: 'text-amber-500' };
 
-export default function MomentumCard({ card, lessonsDone, exercisesScored, modulesCompleted, streak, lastCheckInAt, onGoToPulse }: Props) {
+export default function MomentumCard({ card, northStar, lessonsDone, exercisesScored, modulesCompleted, streak, lastCheckInAt, onGoToPulse }: Props) {
   // A new week began since the last check-in → streak at risk. Pure client-side, no AI.
   const streakAtRisk = !!card && streak > 0 && !!lastCheckInAt && weekOf(new Date(lastCheckInAt)) !== weekOf(new Date());
   // Resolve what to show: AI card → cold-start invite → client-built learning tier.
@@ -60,9 +61,21 @@ export default function MomentumCard({ card, lessonsDone, exercisesScored, modul
 
   return (
     <div className={`bg-surface border border-hairline border-t-4 ${MOOD_ACCENT[mood]} rounded-card p-5 shadow-sm flex flex-col md:h-[500px]`}>
-      <div className="mb-4">
-        <p className="text-sm font-bold text-ink">Traction</p>
-        <p className="text-xs text-ink-mute mt-0.5">Your weekly rhythm</p>
+      <div className="mb-4 flex items-start gap-2">
+        <div className="flex-1">
+          <p className="text-sm font-bold text-ink">Traction</p>
+          <p className="text-xs text-ink-mute mt-0.5">Your weekly rhythm</p>
+        </div>
+        {northStar && (
+          <button
+            onClick={onGoToPulse}
+            title={`North Star: ${northStar.label} — track it weekly`}
+            className="flex items-center gap-1.5 bg-brand-50 border border-brand-100 hover:border-brand-300 rounded-pill px-3 py-1.5 transition-colors max-w-[55%]"
+          >
+            <span className="text-xs">⭐</span>
+            <span className="text-[11px] font-bold text-brand-800 truncate">{northStar.label}</span>
+          </button>
+        )}
       </div>
 
       <div className="flex flex-col gap-3 flex-1 overflow-y-auto">

@@ -70,7 +70,7 @@ function AppRoutes() {
       />
       <Route
         path="/start"
-        element={<Onboarding userData={userData} update={update} signIn={signIn} onComplete={() => navigate('/dashboard')} />}
+        element={<Onboarding userData={userData} update={update} signIn={signIn} onComplete={() => navigate(`/learning/${COURSE_SLUG}/m0l1`)} />}
       />
       <Route path="/login" element={<LoginPlaceholder onSignIn={signIn} />} />
       <Route path="/auth/verify" element={<VerifyPlaceholder />} />
