@@ -10,6 +10,7 @@ import AccountPanel from '../components/AccountPanel';
 import DocumentsPanel from '../components/DocumentsPanel';
 import FeedbackCard from '../components/FeedbackCard';
 import CompareCard from '../components/CompareCard';
+import LessonBody from '../components/LessonBody';
 
 // Block-kind chips (§5 LMS sidebar): label + tint per kind. Theory renders no chip.
 const KIND_CHIP: Partial<Record<BlockKind, { label: string; cls: string }>> = {
@@ -534,9 +535,9 @@ My motivation & 12-week goal: …`;
               </div>
             )}
 
-            <p className="text-ink-soft text-base sm:text-lg leading-relaxed mb-8">
-              {activeLesson.body}
-            </p>
+            <div className="mb-8">
+              <LessonBody body={activeLesson.body} />
+            </div>
 
             {/* Field mission (🟡) — the artifact lives in the Tasks hub (§5) */}
             {activeKind === 'field' && (
