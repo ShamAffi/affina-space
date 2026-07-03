@@ -1,5 +1,5 @@
 // AUTO-GENERATED from RUBRICS_M0-M4.md + RUBRICS_M5-M12.md — edit the MD files and regenerate.
-// Rubric IDs in the MD use the pre-restructure numbering; keys below are CURRENT lessonIds (see mapping in the generator).
+// IDs in the MD files were normalized to LIVE src/data.ts numbering on 2026-07-03 — keys map 1:1, no translation.
 
 // Global rules (§0 + §0a) — appended to EVERY review prompt (exercises and field missions).
 export const GLOBAL_RUBRIC_RULES = `You are the Affina mentor reviewing a first-time female founder's work.
@@ -65,15 +65,15 @@ FINANCIAL / LEGAL DISCLAIMER (Module 12 only)
   in lecture content); for anything numeric/binding, the standard line is:
   "Run any real term sheet by a startup lawyer before signing — this tool
   explains the shape of the deal, not the terms of yours."
-- This disclaimer belongs in AI outputs for m12l3 (deck), m12l4 lecture context,
+- This disclaimer belongs in AI outputs for m12l4 (deck), m12l1 lecture context,
   and any Delegate draft touching valuation/dilution — not just once at module start.`;
 
 // Intake blocks are extracted, not scored (rubric says NO SCORE → score: null).
 export const NO_SCORE_LESSONS = ['m0l3', 'm0l4'];
 
-// Per-block scoring rubrics, keyed by CURRENT lessonId.
+// Per-block scoring rubrics, keyed by lessonId (same numbering as src/data.ts).
 export const RUBRICS: Record<string, string> = {
-  // Deep intake — NO SCORE  [M0-M4 · rubric id m0l3]
+  // Deep intake — NO SCORE  [M0-M4]
   m0l3: `Do not score. Your job: extract structured facts into the Snapshot and improve data quality.
 1) Extract: stage, what's done, stuck point, capacity, 12-week goal, founder edge.
 2) If any answer is <10 words or generic ("an app for everyone"), ask up to 2 clarifying
@@ -83,13 +83,13 @@ export const RUBRICS: Record<string, string> = {
 Output: extracted fields + optional followUps[] (max 2) + one warm sentence of welcome
 that references something specific she wrote.`,
 
-  // Import links — NO SCORE  [M0-M4 · rubric id m0l4]
+  // Import links — NO SCORE  [M0-M4]
   m0l4: `Do not score. Parse each link: what it is, what it claims, what stage it signals.
 Extract into Snapshot: product promises, pricing if visible, audience, tone.
 Note dead/unreachable links matter-of-factly. If assets contradict her intake
 (e.g., site targets different audience), record as a risk flag — phrase neutrally.`,
 
-  // Mission & Vision  [M0-M4 · rubric id m1l6]
+  // Mission & Vision  [M0-M4]
   m1l4: `CRITERIA (weights)
 - Mission clarity (40%): one sentence, one breath, plain words; names who it's for
   and why it matters. No jargon.
@@ -105,7 +105,7 @@ AUTO-FLAGS
 NEXT-STEP LOGIC: say the mission out loud to one person today; note where they squint.
 BRAIN: store mission + vision; update Snapshot → Hypothesis.`,
 
-  // Your value proposition (KEEP-урок, рубрика формализована)  [M0-M4 · rubric id m1l3]
+  // Your value proposition (KEEP-урок, рубрика формализована)  [M0-M4]
   m1l5: `CRITERIA
 - WHO (30%): a specific person you could find this week — not "people who...".
 - PROBLEM (30%): painful and concrete; she'd recognize it instantly.
@@ -119,7 +119,7 @@ CROSS-CHECK: consistent with intake idea (m0l3)? If drifted — flag, don't puni
 NEXT-STEP: read it to someone who's never heard the idea; can they repeat it back?
 BRAIN: value_proposition; Snapshot → Hypothesis.`,
 
-  // Why you? (KEEP)  [M0-M4 · rubric id m1l4]
+  // Why you? (KEEP)  [M0-M4]
   m1l6: `CRITERIA
 - Unfair advantage named (40%): access, lived experience, skill, network, distribution —
   something concrete a random smart person wouldn't have.
@@ -134,7 +134,7 @@ AUTO-FLAGS
 NEXT-STEP: one sentence — "because of X, I can Y that others can't".
 BRAIN: founder_fit; Snapshot → Founder & edge.`,
 
-  // Map your competitive landscape (KEEP)  [M0-M4 · rubric id m2l4]
+  // Map your competitive landscape (KEEP)  [M0-M4]
   m2l4: `CRITERIA
 - Status quo included (25%): the spreadsheet, the WhatsApp group, doing nothing.
   Its absence is the #1 gap.
@@ -149,7 +149,7 @@ AUTO-FLAGS
 NEXT-STEP: feeds directly into m2l7 field task (walk the journeys).
 BRAIN: competitive_landscape; Snapshot → Market.`,
 
-  // Your positioning & differentiation (KEEP)  [M0-M4 · rubric id m2l5]
+  // Your positioning & differentiation (KEEP)  [M0-M4]
   m2l5: `CRITERIA
 - Structure present (30%): "For [X] who [Y], unlike [Z], we [difference]" — or equivalent.
 - Axis that matters (30%): the difference is something the CUSTOMER cares about,
@@ -162,7 +162,7 @@ AUTO-FLAGS
 - Positioning = "better quality" → cap at 55; ask "measured how, by whom?"
 BRAIN: positioning; Snapshot → Market.`,
 
-  // 🟡 Walk your competitors' user journey — field task  [M0-M4 · rubric id m2l7]
+  // 🟡 Walk your competitors' user journey — field task  [M0-M4]
   m2l7: `CRITERIA
 - Coverage (25%): 3+ journeys walked, at least one status-quo workaround included.
 - Walked, not read (35%): step counts, screenshots-level details, actual prices,
@@ -178,7 +178,7 @@ VERDICT: done requires template completed for ≥3 competitors with journey-leve
 CELEBRATE: the act of doing competitor recon properly — most founders never do.
 BRAIN: competitor_journey; Snapshot → Market (openings); cross-link into m2l5 review.`,
 
-  // Three candidate customers (KEEP, aiMode: compare)  [M0-M4 · rubric id m3l3]
+  // Three candidate customers (KEEP, aiMode: compare)  [M0-M4]
   m3l4: `Score each candidate 1–10 on: painIntensity · reachability · abilityToPay · wordOfMouth.
 RULES
 - Every score must carry a one-line justification drawn from HER descriptions.
@@ -188,7 +188,7 @@ RULES
 - runnerUp: always name it + the condition under which she should switch.
 BRAIN: persona_candidates.`,
 
-  // Your beachhead persona (KEEP)  [M0-M4 · rubric id m3l4]
+  // Your beachhead persona (KEEP)  [M0-M4]
   m3l5: `CRITERIA
 - One person, in focus (30%): you can picture her day — context, role, moment of pain.
 - Pain from HER point of view (25%): described in her likely words, not founder's.
@@ -203,7 +203,7 @@ AUTO-FLAGS
 NEXT-STEP: name 3 specific places/communities where she'll find this person this week.
 BRAIN: persona; Snapshot → Customer/Persona.`,
 
-  // Your interview script  [M0-M4 · rubric id m3l6]
+  // Your interview script  [M0-M4]
   m3l6: `CRITERIA
 - No pitching (30%): zero idea-description before or during questions. The wall stands.
 - Past behavior (30%): questions anchor to real events ("walk me through the last
@@ -220,7 +220,7 @@ AUTO-FLAGS — these OVERRIDE everything:
 NEXT-STEP: rehearse once with the AI practice customer, then book the first real one.
 BRAIN: interview_script.`,
 
-  // 🟡 Run 1–2 warm interviews — field task (Interview Log)  [M0-M4 · rubric id m3l7]
+  // 🟡 Run 1–2 warm interviews — field task (Interview Log)  [M0-M4]
   m3l7: `PER-ENTRY CRITERIA
 - Verbatim quotes (30%): her ACTUAL words, with texture. Paraphrase = weak evidence.
 - Pain + current solution (25%): what hurts AND how she copes today.
@@ -241,7 +241,7 @@ NEXT-STEP: tee up M4 explicitly — "your idea now meets this evidence."
 BRAIN: interview_log entries → persona doc update + Snapshot → Customer; quotes
 become raw material for m4l5.`,
 
-  // ⭐ Reality check: your idea vs. your interviews  [M0-M4 · rubric id m4l5]
+  // ⭐ Reality check: your idea vs. your interviews  [M0-M4]
   m4l5: `CONTEXT: AI has already generated the comparison card (Confirmed / Contradicted /
 Surprises) from M1 entries vs interview_log. Now score her REWRITE.
 
@@ -264,7 +264,7 @@ TONE NOTE: if she killed or heavily changed her idea based on evidence — this 
 Say so explicitly. This exercise exists to make changing course feel like skill.
 BRAIN: problem_solution_check; Snapshot → Hypothesis (versioned change, log the pivot).`,
 
-  // Use-case map (KEEP)  [M0-M4 · rubric id m4l3]
+  // Use-case map (KEEP)  [M0-M4]
   m4l6: `CRITERIA
 - Full lifecycle (35%): discover → evaluate → start → use → pay → return. All stages.
 - Concrete steps (30%): where she finds it, what she clicks, who approves, how paying
@@ -275,7 +275,7 @@ AUTO-FLAG: lifecycle starts at "she uses the product" → missing the whole acqu
 half; cap at 60.
 BRAIN: use_case; Snapshot → Product.`,
 
-  // Product sketch (KEEP)  [M0-M4 · rubric id m4l4]
+  // Product sketch (KEEP)  [M0-M4]
   m4l7: `CRITERIA
 - Outcome-first (30%): what it DOES for her, not what it's built with.
 - Core experience (30%): the one screen/step/moment that delivers the value — vivid.
@@ -285,7 +285,7 @@ AUTO-FLAG: feature list with no core loop → "if she opens it once, what happen
 the first 3 minutes?" Cap at 60 until answered.
 BRAIN: product_spec; Snapshot → Product.`,
 
-  // Your value, in numbers — and why it's hard to copy (REWRITE)  [M0-M4 · rubric id m5l3]
+  // Your value, in numbers — and why it's hard to copy (REWRITE)  [M0-M4]
   m4l8: `CRITERIA
 - Before → After in numbers (35%): hours, euros, frequency, stress-proxy — measurable.
 - Sourced (25%): numbers trace to interviews/research, not invented. "She told me she
@@ -300,7 +300,7 @@ AUTO-FLAGS
   ask what structurally can't be.
 BRAIN: quantified_value; Snapshot → Product + Risk flags if core is weak.`,
 
-  // 🟡 Ask for a micro-commitment — field task  [M0-M4 · rubric id m4l9]
+  // 🟡 Ask for a micro-commitment — field task  [M0-M4]
   m4l9: `CRITERIA
 - Volume (30%): 3+ real asks made to matching people.
 - Signal (30%): ≥1 concrete commitment (waitlist email, pilot agreement, pre-order,
@@ -319,7 +319,7 @@ demand signal — the thing investors respect"). Feeds Traction + Launch Readine
 BRAIN: micro_commitment; Snapshot → Traction; "no" reasons cross-linked into M5
 pricing hypotheses.`,
 
-  // Your business model  [M5-M12 · rubric id m7l3]
+  // Your business model  [M5-M12]
   m5l4: `CRITERIA
 - Model named clearly (25%): one of the standard shapes (subscription, one-off,
   marketplace, freemium, services), not a vague hybrid with no primary.
@@ -338,7 +338,7 @@ AUTO-FLAGS
   pick a primary for the next 90 days.
 BRAIN: business_model; Snapshot → Model.`,
 
-  // Unit economics v1  [M5-M12 · rubric id m8l3]
+  // Unit economics v1  [M5-M12]
   m5l5: `CRITERIA
 - Numbers stated (30%): price, retention/repeat estimate, CAC guess — all three
   present, even roughly.
@@ -352,24 +352,24 @@ BRAIN: business_model; Snapshot → Model.`,
 AUTO-FLAGS
 - LTV:CAC wildly above 3:1 (e.g., 50:1) on invented numbers → this reads as
   unexamined optimism, not strength; probe the CAC number specifically.
-- No connection to pricing from m7l3/M4 quantified value → flag inconsistency.
+- No connection to pricing from m5l4/M4 quantified value → flag inconsistency.
 NEXT-STEP: name which shaky number the M5 field interviews (m5l7) should test.
 BRAIN: unit_economics; Snapshot → Model (mark assumptions confidence: high/med/low).`,
 
-  // North Star + year goal (structured, aiMode: north-star)  [M5-M12 · rubric id m11l6]
+  // North Star + year goal (structured, aiMode: north-star)  [M5-M12]
   m5l6: `Do not score as pass/fail. Evaluate the CANDIDATE SET and her SELECTION:
-- Candidates must follow from her business model (m7l3) — subscription model
+- Candidates must follow from her business model (m5l4) — subscription model
   should not suggest "deals closed" as a candidate, for example.
 - Selected metric reflects delivered VALUE, not vanity (revenue alone, follower
   counts, registrations are weak candidates — flag if selected without reasoning).
-- Year goal + quarterly milestones: sanity-check against unit economics (m8l3)
+- Year goal + quarterly milestones: sanity-check against unit economics (m5l5)
   and market size (M2 TAM). "Brave but unrealistic" gets a kind, specific flag
   ("your TAM math suggests ~800 reachable customers — a 5,000-subscriber year
   goal needs either a bigger market story or a longer timeline").
 NEXT-STEP: this becomes the standing weekly check-in question from here forward.
 BRAIN: north_star; Snapshot → Model (pin as headline metric).`,
 
-  // 🟡 5–10 interviews with WTP questions (Interview Log, min 5)  [M5-M12 · rubric id m5l7]
+  // 🟡 5–10 interviews with WTP questions (Interview Log, min 5)  [M5-M12]
   m5l7: `Builds on M3/M3.7 rubric (interview_log) — same per-entry criteria, with one
 weight shift and one addition:
 
@@ -387,7 +387,7 @@ VERDICT: done requires ≥5 entries (up from ≥1 in M3), majority with price si
 CELEBRATE: reaching double-digit interview count is a genuine milestone — name it.
 BRAIN: interview_log entries → pricing hypothesis update; Snapshot → Model + Customer.`,
 
-  // Assumptions map (KEEP-урок, рубрика формализована)  [M5-M12 · rubric id m9l3]
+  // Assumptions map (KEEP-урок, рубрика формализована)  [M5-M12]
   m6l5: `CRITERIA
 - Riskiest-first (35%): assumptions ranked, not just listed — the one that
   kills the business if false is clearly marked as #1.
@@ -399,9 +399,9 @@ BRAIN: interview_log entries → pricing hypothesis update; Snapshot → Model +
   details ("the button should be blue" is not a riskiest assumption).
 AUTO-FLAG: no assumption about willingness to pay anywhere in the list → missing[],
 this is almost always the riskiest one.
-BRAIN: key_assumptions; feeds directly into m10l3 MVBP scope.`,
+BRAIN: key_assumptions; feeds directly into m6l6 MVBP scope.`,
 
-  // MVBP definition (KEEP-урок, рубрика формализована)  [M5-M12 · rubric id m10l3]
+  // MVBP definition (KEEP-урок, рубрика формализована)  [M5-M12]
   m6l6: `CRITERIA
 - Delivers real value (30%): the cut-down version still solves the core job,
   not just a feature demo.
@@ -416,7 +416,7 @@ AUTO-FLAG: scope includes 5+ features → ask her to cut to the single core loop
 cap at 55 until she does.
 BRAIN: mvbp_definition; Snapshot → Product.`,
 
-  // Your site structure  [M5-M12 · rubric id m6l7]
+  // Your site structure  [M5-M12]
   m6l7: `CRITERIA
 - Message-match (30%): hero language echoes actual customer words from
   interview_log — check for verbatim or near-verbatim phrases, not generic copy.
@@ -434,7 +434,7 @@ AUTO-FLAGS
   will tell you this worked?").
 BRAIN: site_structure; Snapshot → Product.`,
 
-  // 🟡 Publish your site/MVP + first traffic — field task  [M5-M12 · rubric id m6l8]
+  // 🟡 Publish your site/MVP + first traffic — field task  [M5-M12]
   m6l8: `CRITERIA
 - Artifact present (25%): live URL, reachable.
 - Threshold pre-declared (25%): she stated success criteria BEFORE seeing
@@ -451,10 +451,10 @@ regardless of whether the threshold was hit — hitting zero conversions with
 good traffic is valid, useful data, not a failed task.
 BELOW-THRESHOLD HANDLING: this is diagnostic, not disappointing — walk through
 message/audience/offer as candidate explanations per the debrief hint in content.
-BRAIN: launch_results; Snapshot → Traction; update unit_economics (m8l3) with
+BRAIN: launch_results; Snapshot → Traction; update unit_economics (m5l5) with
 real conversion data if available.`,
 
-  // Acquisition path (KEEP-урок, рубрика формализована)  [M5-M12 · rubric id m6l3]
+  // Acquisition path (KEEP-урок, рубрика формализована)  [M5-M12]
   m7l5: `CRITERIA
 - Full path mapped (35%): discovery → consideration → decision → payment,
   no stage skipped.
@@ -462,10 +462,10 @@ real conversion data if available.`,
   (budget approval, trust, comparison shopping) — not a frictionless fantasy.
 - Timeframe stated (20%): how long the path typically takes for this customer
   (impulse buy vs multi-week B2B decision) — affects everything downstream.
-- Consistent with DMU (15%): aligns with who actually decides (feeds m6l4).
+- Consistent with DMU (15%): aligns with who actually decides (feeds m7l6).
 BRAIN: acquisition_path; Snapshot → Market.`,
 
-  // Decision & influence map (KEEP-урок, рубрика формализована)  [M5-M12 · rubric id m6l4]
+  // Decision & influence map (KEEP-урок, рубрика формализована)  [M5-M12]
   m7l6: `CRITERIA
 - Roles distinguished (40%): champion / end user / economic buyer / blocker
   named separately, even if one person holds multiple roles for her (common
@@ -480,7 +480,7 @@ AUTO-FLAG: single-person B2C sold as if it needs enterprise-style DMU complexity
 → right-size it down; over-engineering here wastes her time.
 BRAIN: decision_map; Snapshot → Market.`,
 
-  // Five candidate channels, two bets  [M5-M12 · rubric id m7l7]
+  // Five candidate channels, two bets  [M5-M12]
   m7l7: `CRITERIA
 - Ranked, not just listed (25%): candidates ordered by fit to persona +
   reachability, with reasoning.
@@ -498,7 +498,7 @@ AUTO-FLAGS
   against her stated capacity/budget from Snapshot.
 BRAIN: channel_shortlist; feeds m7l8.`,
 
-  // 🟡 First traffic on purpose — field task  [M5-M12 · rubric id m7l8]
+  // 🟡 First traffic on purpose — field task  [M5-M12]
   m7l8: `CRITERIA (per channel, both channels required for "done")
 - Executed as hypothesized (30%): she actually ran what she committed to in
   m7l7, not a different channel entirely (pivoting the test is fine, but say so).
@@ -513,9 +513,9 @@ VERDICT: done requires both channels attempted with real numbers, even if
 results are poor. A channel that clearly failed with honest numbers is a
 completed, valuable task — do not require success for done status.
 BRAIN: acquisition_results; recompute rough CAC per channel into unit_economics
-(m8l3); Snapshot → Market (winning channel flagged).`,
+(m5l5); Snapshot → Market (winning channel flagged).`,
 
-  // Your sales script  [M5-M12 · rubric id m8l4]
+  // Your sales script  [M5-M12]
   m8l4: `CRITERIA
 - Discovery-first open (30%): starts with a question about her situation,
   not an immediate pitch — Mom Test discipline carried into sales context.
@@ -536,7 +536,7 @@ AUTO-FLAGS
 NEXT-STEP: rehearse with AI skeptic before first real use.
 BRAIN: sales_script.`,
 
-  // Your pipeline  [M5-M12 · rubric id m8l5]
+  // Your pipeline  [M5-M12]
   m8l5: `CRITERIA
 - Real prospects only (35%): named individuals traceable to interview_log,
   waitlist, or warm intros — no invented "segments" or placeholder rows.
@@ -552,7 +552,7 @@ AUTO-FLAG: any prospect entry with no name/traceable source → this violates
 no-fabrication; ask her to remove or substantiate it.
 BRAIN: pipeline.`,
 
-  // 🟡 Close your first paid deal — field task  [M5-M12 · rubric id m8l6]
+  // 🟡 Close your first paid deal — field task  [M5-M12]
   m8l6: `Apply the First-Sale Celebration Protocol (§0a) — this overrides normal tone
 defaults for this block specifically.
 
@@ -577,7 +577,7 @@ VERDICT: done = close (celebrate) OR ≥5 honest documented asks with reasons
 BRAIN: first_sale (or no_close_log); Snapshot → Traction (major Launch Readiness
 event on close); feeds M9 funnel analysis either way.`,
 
-  // Traction dashboard  [M5-M12 · rubric id m11l3]
+  // Traction dashboard  [M5-M12]
   m9l4: `Do not score her input heavily — this exercise is mostly AI-assembled (Delegate
 mode A per RULES_DONE_FOR_YOU.md §2.4). Evaluate HER contribution:
 - Leak identification (50%): she names a stage, not "everything needs work"
@@ -590,7 +590,7 @@ AUTO-FLAG: leak identified doesn't match what the assembled funnel actually
 shows → gently point to the data, ask her to reconsider.
 BRAIN: traction_metrics; Snapshot → Traction.`,
 
-  // Progress report + defense  [M5-M12 · rubric id m9l5]
+  // Progress report + defense  [M5-M12]
   m9l5: `CRITERIA
 - Honest win (25%): specific, with the number attached — not generic positivity.
 - Real surprise named (25%): something that contradicted an earlier assumption —
@@ -607,7 +607,7 @@ the same criteria, then output: rating + exactly 3 priorities for next sprint
 (not 1, not 5 — three, matching Founder Institute's format).
 BRAIN: progress_report; Snapshot → Traction (checkpoint snapshot saved).`,
 
-  // 🟡 Talk to the ones who said no — field task  [M5-M12 · rubric id m9l6]
+  // 🟡 Talk to the ones who said no — field task  [M5-M12]
   m9l6: `CRITERIA (per entry)
 - Real conversation happened (30%): evidence of an actual exchange, not
   speculation about why someone didn't convert.
@@ -620,10 +620,10 @@ BRAIN: progress_report; Snapshot → Traction (checkpoint snapshot saved).`,
 FABRICATION PROTOCOL applies with extra weight here — "no" conversations are
 uncomfortable to have, and thin/invented entries are a common failure mode.
 Probe kindly if entries feel generic.
-BRAIN: non_buyer_insights; cross-reference against m11l3 leak; feeds directly
-into m11l7 scorecard as evidence.`,
+BRAIN: non_buyer_insights; cross-reference against m9l4 leak; feeds directly
+into m11l4 scorecard as evidence.`,
 
-  // Audit yourself honestly  [M5-M12 · rubric id m10l8]
+  // Audit yourself honestly  [M5-M12]
   m10l4: `CRITERIA
 - Strengths tied to evidence (35%): each strength references something she
   actually did well in the program (a task that flew, a score, a pattern) —
@@ -638,7 +638,7 @@ into m11l7 scorecard as evidence.`,
   rather than clicking through unchanged.
 BRAIN: strengths_audit; Snapshot → Founder & edge (update).`,
 
-  // Do / Delegate / Automate  [M5-M12 · rubric id m10l5]
+  // Do / Delegate / Automate  [M5-M12]
   m10l5: `CRITERIA
 - Real inventory (30%): actual recurring tasks from her week, not abstract
   categories.
@@ -653,7 +653,7 @@ AUTO-FLAG: everything bucketed as "Do" → gently challenge; the exercise fails
 its purpose if nothing moves.
 BRAIN: delegation_matrix.`,
 
-  // 🟡 Actually offload one thing — field task  [M5-M12 · rubric id m10l9]
+  // 🟡 Actually offload one thing — field task  [M5-M12]
   m10l6: `CRITERIA
 - Handoff genuinely happened (40%): the task ran without her at least once —
   not "I set up the tool" with no evidence it worked.
@@ -666,7 +666,7 @@ BRAIN: delegation_matrix.`,
 VERDICT: done requires evidence of at least one successful autonomous run.
 BRAIN: delegation_action; adjust weekly plan capacity assumptions going forward.`,
 
-  // The scorecard — Delegate mode C, special rubric (see §0a)  [M5-M12 · rubric id m11l7]
+  // The scorecard — Delegate mode C, special rubric (see §0a)  [M5-M12]
   m11l4: `Do NOT score whether she chose pivot, scale, or fix-first — there is no correct
 answer. Score the REASONING:
 
@@ -687,15 +687,15 @@ AUTO-FLAGS
   WHY she disagrees; do not lower score just for disagreeing once she does.
 - Decision matches AI recommendation with zero personal reasoning added
   ("going with what it said") → also flag — rubber-stamping isn't ownership either.
-BRAIN: pivot_scale_decision; this becomes the load-bearing fact for m11l4 and
+BRAIN: pivot_scale_decision; this becomes the load-bearing fact for m11l5 and
 the entire next phase of the program.`,
 
-  // Your 12-month plan  [M5-M12 · rubric id m11l4]
+  // Your 12-month plan  [M5-M12]
   m11l5: `CRITERIA
 - Four real milestones (30%): concrete, dated, different from each other
   (not "grow more" repeated four times).
 - North Star targets attached (25%): each quarter has a number tied to the
-  m11l6 North Star, showing a believable trajectory.
+  m5l6 North Star, showing a believable trajectory.
 - Resources named (25%): hours/money/hiring or agent needs stated per phase,
   checked against her actual capacity (Snapshot).
 - One load-bearing assumption named (20%): she identifies the single thing
@@ -705,7 +705,7 @@ AUTO-FLAG: milestone targets that ignore the unit economics ceiling from M5/M9
 kindly, with the specific numbers.
 BRAIN: roadmap; Snapshot → Model (year plan).`,
 
-  // 🟡 Verification sprint — field task (branching)  [M5-M12 · rubric id m11l11]
+  // 🟡 Verification sprint — field task (branching)  [M5-M12]
   m11l6: `Branch-specific criteria, common verdict logic:
 
 SCALE BRANCH: real test run on the exact motion being bet on (not a different,
@@ -722,10 +722,10 @@ COMMON
 - If evidence contradicts the plan: treat as valuable, not as failure — this
   block exists specifically to catch expensive mistakes early; say so explicitly.
 VERDICT: done requires branch-appropriate artifact + explicit verdict written.
-BRAIN: verification_sprint; updates roadmap (m11l4) and scorecard (m11l7) with
+BRAIN: verification_sprint; updates roadmap (m11l5) and scorecard (m11l4) with
 real results; gates entry to M12 either way once verdict is recorded.`,
 
-  // Build your deck  [M5-M12 · rubric id m12l3]
+  // Build your deck  [M5-M12]
   m12l4: `CRITERIA
 - Hook lands (20%): slide-one sentence makes the stated problem/opportunity
   clear to someone hearing it cold.
@@ -748,7 +748,7 @@ AUTO-FLAGS
 NEXT-STEP: rehearse with AI investor Q&A before real outreach.
 BRAIN: pitch_narrative.`,
 
-  // 🟡 Find 20 investors who actually fit — field task  [M5-M12 · rubric id m12l5]
+  // 🟡 Find 20 investors who actually fit — field task  [M5-M12]
   m12l5: `CRITERIA (aggregate across the list, per-entry lighter touch)
 - Genuine fit evidence (40%): "why they fit" cites actual portfolio companies
   or fund thesis, not "they invest in startups."
@@ -763,7 +763,7 @@ BRAIN: pitch_narrative.`,
 VERDICT: done requires ~20 targets with fit reasoning for each, prioritized.
 BRAIN: investor_targets.`,
 
-  // 🟡 Talk to 10 of them — field task (outreach log)  [M5-M12 · rubric id m12l6]
+  // 🟡 Talk to 10 of them — field task (outreach log)  [M5-M12]
   m12l6: `CRITERIA
 - Volume (30%): ≥10 real contacts attempted, traceable to the m12l5 list.
 - At least one live conversation (30%): a call/meeting/genuine email exchange
@@ -778,7 +778,7 @@ FABRICATION PROTOCOL applies — investor conversations are high-stakes to fake;
 probe kindly if entries feel too smooth/generic.
 CELEBRATION: any live conversation, regardless of outcome, is worth naming as
 genuine progress — most founders never get this far.
-BRAIN: outreach_log; feeds deck iteration (m12l3) and — for anyone continuing —
+BRAIN: outreach_log; feeds deck iteration (m12l4) and — for anyone continuing —
 sets up the S3 graduation session narrative.`,
 
 };

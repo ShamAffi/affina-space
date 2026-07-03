@@ -1,5 +1,7 @@
 # Done-for-You Rules — Market Research (М2) + Delegate Drafts
 
+> **IDs normalized 2026-07-03:** all lesson ids below now use the LIVE `src/data.ts` numbering (this file was originally authored in pre-restructure numbering; the old ids survive only as `old-mXlY` markers on retired blocks).
+
 > Companion to SPEC_PROGRAM_V2.md (§4, §6.4) и RUBRICS_M0-M4.md.
 > Регламент всего, что AI делает ЗА юзера. Промпт-блоки — EN, обвязка — RU.
 > Принцип одной строкой: мы готовим черновики и исследования ДЛЯ неё;
@@ -24,7 +26,7 @@
 1. Startup Snapshot (полностью — ниша, стадия, гео, edge, цель).
 2. m2l4 competitive_landscape + m2l5 positioning (её собственная карта — отчёт обязан
    на неё ссылаться: подтверждать, дополнять, спорить).
-3. Персона-направление (m0l3 intake; если юзер уже в М3 — m3l4 persona).
+3. Персона-направление (m0l3 intake; если юзер уже в М3 — m3l5 persona).
 4. Импортированные ссылки (m0l4).
 5. Гео и язык рынка (из intake; если не указано — спросить, это влияет на всё).
 
@@ -173,20 +175,20 @@ every word is true for you. You know things I don't."
 | Блок | Режим | Примечание |
 |---|---|---|
 | m0l3 intake, m0l4 import | — | Не делегируются (это вход в систему) |
-| m1l6 Mission & Vision | A | Черновик из intake + one-liner |
-| m1l3 Value proposition | B | 3 варианта one-liner с разным акцентом (боль / результат / аудитория) |
-| m1l4 Why you? | A ⚠️ | Из её intake-истории; футер: "Only you know if this story is true — check every sentence." |
+| m1l4 Mission & Vision | A | Черновик из intake + one-liner |
+| m1l5 Value proposition | B | 3 варианта one-liner с разным акцентом (боль / результат / аудитория) |
+| m1l6 Why you? | A ⚠️ | Из её intake-истории; футер: "Only you know if this story is true — check every sentence." |
 | m2l4 Competitive landscape | A ⚠️ | Гипотетичных игроков помечать «verify this one exists in your geo» |
 | m2l5 Positioning | B | 2–3 позиционных угла из m2l4 + persona |
 | m2l7 🟡 journey walk | D | Только сама |
-| m3l3 Three candidates | — | Compare-механика встроена в блок |
-| m3l4 Beachhead persona | A ⚠️ | Только при ≥1 интервью или содержательном intake; иначе вопрос вместо черновика |
+| m3l4 Three candidates | — | Compare-механика встроена в блок |
+| m3l5 Beachhead persona | A ⚠️ | Только при ≥1 интервью или содержательном intake; иначе вопрос вместо черновика |
 | m3l6 Interview script | A | «Делаем для неё» — и так по дизайну блока |
 | m3l7 🟡 interviews | D | Вкл. поля verdict в Interview Log |
 | m4l5 Reality check | C | Compare-карта — AI; рероайт-черновик допустим (A), но «что меняю и почему» — только она |
-| m4l3 Use-case map | B | **3 варианта юзер-пути на выбор** — вписывает понравившийся |
-| m4l4 Product sketch | B | 3 варианта описания продукта |
-| m5l3 Quantified value + core | B ⚠️ | Варианты формулировок; числа — только из её данных, нет чисел → вопрос |
+| m4l6 Use-case map | B | **3 варианта юзер-пути на выбор** — вписывает понравившийся |
+| m4l7 Product sketch | B | 3 варианта описания продукта |
+| m4l8 Quantified value + core | B ⚠️ | Варианты формулировок; числа — только из её данных, нет чисел → вопрос |
 | m4l9 🟡 micro-commitment | D + текст | AI драфтит текст сообщения-аска |
 
 ## 2.4 Карта делегируемости М5–М12

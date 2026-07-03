@@ -1,5 +1,7 @@
 # Content: Modules M5–M12 (EN)
 
+> **IDs normalized 2026-07-03:** all lesson ids below now use the LIVE `src/data.ts` numbering (this file was originally authored in pre-restructure numbering; the old ids survive only as `old-mXlY` markers on retired blocks).
+
 > Companion to SPEC_PROGRAM_V2.md §2 and CONTENT_M0-M4.md. Texts for all NEW and
 > REWRITE blocks. KEEP blocks keep their existing texts (listed for order only).
 > Voice: a seasoned professional telling a friend how this really works. Founder = "you",
@@ -9,70 +11,70 @@
 
 | Block | id | type | kind | status |
 |---|---|---|---|---|
-| 5.1 | m7l1 | text | theory | REWRITE |
-| 5.2 | m7l2 | text | theory | REWRITE |
-| 5.3 | m8l1 | text | theory | REWRITE (merged with m8l2 — retire m8l2) |
-| 5.4 | m7l3 | input | exercise | REWRITE (entryType: business_model) |
-| 5.5 | m8l3 | input | exercise | REWRITE (entryType: unit_economics) |
-| 5.6 | m11l6 | structured | exercise | MOVE+REWRITE (aiMode: north-star; entryType: north_star) |
+| 5.1 | m5l1 | text | theory | REWRITE |
+| 5.2 | m5l2 | text | theory | REWRITE |
+| 5.3 | m5l3 | text | theory | REWRITE (merged with old-m8l2 — retire old-m8l2) |
+| 5.4 | m5l4 | input | exercise | REWRITE (entryType: business_model) |
+| 5.5 | m5l5 | input | exercise | REWRITE (entryType: unit_economics) |
+| 5.6 | m5l6 | structured | exercise | MOVE+REWRITE (aiMode: north-star; entryType: north_star) |
 | 5.7 | m5l7 | field | field | NEW (artifactType: interview_log, minEntries: 5) |
-| 6.1 | m9l1 | text | theory | KEEP |
-| 6.2 | m9l2 | text | theory | KEEP |
-| 6.3 | m10l1 | text | theory | REWRITE (merged with m10l2 — retire m10l2) |
-| 6.4 | m6l5 | text | theory | NEW |
-| 6.5 | m9l3 | input | exercise | KEEP |
-| 6.6 | m10l3 | input | exercise | KEEP |
+| 6.1 | m6l1 | text | theory | KEEP |
+| 6.2 | m6l2 | text | theory | KEEP |
+| 6.3 | m6l3 | text | theory | REWRITE (merged with old-m10l2 — retire old-m10l2) |
+| 6.4 | m6l4 | text | theory | NEW |
+| 6.5 | m6l5 | input | exercise | KEEP |
+| 6.6 | m6l6 | input | exercise | KEEP |
 | 6.7 | m6l7 | input | exercise | NEW (entryType: site_structure) |
 | 6.8 | m6l8 | field | field | NEW (artifactType: url_with_numbers; entryType: launch_results) |
-| 7.1 | m6l1 | text | theory | KEEP |
-| 7.2 | m6l2 | text | theory | KEEP |
-| 7.3 | m7l5 | text | theory | NEW |
-| 7.4 | m7l6 | text | theory | NEW |
-| 7.5 | m6l3 | input | exercise | KEEP |
-| 7.6 | m6l4 | input | exercise | KEEP |
+| 7.1 | m7l1 | text | theory | KEEP |
+| 7.2 | m7l2 | text | theory | KEEP |
+| 7.3 | m7l3 | text | theory | NEW |
+| 7.4 | m7l4 | text | theory | NEW |
+| 7.5 | m7l5 | input | exercise | KEEP |
+| 7.6 | m7l6 | input | exercise | KEEP |
 | 7.7 | m7l7 | input | exercise | NEW (entryType: channel_shortlist) |
 | 7.8 | m7l8 | field | field | NEW (artifactType: text_template; entryType: acquisition_results) |
-| 8.1 | m8l7 | text | theory | NEW |
-| 8.2 | m8l8 | text | theory | NEW |
-| 8.3 | m8l9 | text | theory | NEW |
+| 8.1 | m8l1 | text | theory | NEW |
+| 8.2 | m8l2 | text | theory | NEW |
+| 8.3 | m8l3 | text | theory | NEW |
 | 8.4 | m8l4 | input | exercise | NEW (entryType: sales_script) |
 | 8.5 | m8l5 | input | exercise | NEW (entryType: pipeline) |
 | 8.6 | m8l6 | field | field | NEW (artifactType: screenshot; entryType: first_sale) |
-| 9.1 | m9l7 | text | theory | NEW |
-| 9.2 | m9l8 | text | theory | NEW |
-| 9.3 | m11l2 | text | theory | MOVE+REWRITE |
-| 9.4 | m11l3 | input | exercise | MOVE+REWRITE (entryType: traction_metrics) |
+| 9.1 | m9l1 | text | theory | NEW |
+| 9.2 | m9l2 | text | theory | NEW |
+| 9.3 | m9l3 | text | theory | MOVE+REWRITE |
+| 9.4 | m9l4 | input | exercise | MOVE+REWRITE (entryType: traction_metrics) |
 | 9.5 | m9l5 | input | exercise | NEW (entryType: progress_report) |
 | 9.6 | m9l6 | field | field | NEW (artifactType: text_template; entryType: non_buyer_insights) |
-| 10.1 | m10l4 | text | theory | NEW |
-| 10.2 | m10l6 | text | theory | NEW |
-| 10.3 | m10l7 | text | theory | NEW |
-| 10.4 | m10l8 | input | exercise | NEW (entryType: strengths_audit) |
+| 10.1 | m10l1 | text | theory | NEW |
+| 10.2 | m10l2 | text | theory | NEW |
+| 10.3 | m10l3 | text | theory | NEW |
+| 10.4 | m10l4 | input | exercise | NEW (entryType: strengths_audit) |
 | 10.5 | m10l5 | input | exercise | NEW (entryType: delegation_matrix) |
-| 10.6 | m10l9 | field | field | NEW (artifactType: text_template; entryType: delegation_action) |
-| 11.1 | m11l8 | text | theory | NEW |
-| 11.2 | m11l9 | text | theory | NEW |
-| 11.3 | m11l10 | text | theory | NEW |
-| 11.4 | m11l7 | input | exercise | NEW (Delegate mode C; entryType: pivot_scale_decision) |
-| 11.5 | m11l4 | input | exercise | REWRITE (entryType: roadmap) |
-| 11.6 | m11l11 | field | field | NEW (branching; entryType: verification_sprint) |
-| 12.1 | m12l4 | text | theory | NEW |
-| 12.2 | m12l7 | text | theory | NEW |
-| 12.3 | m12l1 | text | theory | REWRITE (merged with m12l2 — retire m12l2) |
-| 12.4 | m12l3 | input | exercise | REWRITE (entryType: pitch_narrative) |
+| 10.6 | m10l6 | field | field | NEW (artifactType: text_template; entryType: delegation_action) |
+| 11.1 | m11l1 | text | theory | NEW |
+| 11.2 | m11l2 | text | theory | NEW |
+| 11.3 | m11l3 | text | theory | NEW |
+| 11.4 | m11l4 | input | exercise | NEW (Delegate mode C; entryType: pivot_scale_decision) |
+| 11.5 | m11l5 | input | exercise | REWRITE (entryType: roadmap) |
+| 11.6 | m11l6 | field | field | NEW (branching; entryType: verification_sprint) |
+| 12.1 | m12l1 | text | theory | NEW |
+| 12.2 | m12l2 | text | theory | NEW |
+| 12.3 | m12l3 | text | theory | REWRITE (merged with old-m12l2 — retire old-m12l2) |
+| 12.4 | m12l4 | input | exercise | REWRITE (entryType: pitch_narrative) |
 | 12.5 | m12l5 | field | field | NEW (artifactType: text_template; entryType: investor_targets) |
 | 12.6 | m12l6 | field | field | NEW (artifactType: outreach_log; entryType: outreach_log) |
 
-*Retired ids: m8l2, m10l2, m12l2, m11l1, m11l5. Deltas to spec §3.5: `m7l3: business_model`
-(existing), `m11l7: pivot_scale_decision` (was m11l4 — m11l4 stays `roadmap`),
-add `m6l8: launch_results`, `m7l8: acquisition_results`, `m10l8: strengths_audit`,
-`m10l9: delegation_action`, `m11l11: verification_sprint`.*
+*Retired ids: old-m8l2, old-m10l2, old-m12l2, old-m11l1, old-m11l5. Deltas to spec §3.5: `m5l4: business_model`
+(existing), `m11l4: pivot_scale_decision` (was m11l5 — m11l5 stays `roadmap`),
+add `m6l8: launch_results`, `m7l8: acquisition_results`, `m10l4: strengths_audit`,
+`m10l6: delegation_action`, `m11l6: verification_sprint`.*
 
 ---
 
 # MODULE 5 — Business Model & Revenue
 
-## 5.1 · m7l1 · theory — REWRITE
+## 5.1 · m5l1 · theory — REWRITE
 **Title:** How you charge decides what you build
 
 **Body:**
@@ -84,7 +86,7 @@ Now the part that matters. Bill Aulet's team at MIT treats choosing a model as i
 
 By the end of this module you'll pick one — and turn it into a goal for the year.
 
-## 5.2 · m7l2 · theory — REWRITE
+## 5.2 · m5l2 · theory — REWRITE
 **Title:** Price from value — and stop discounting yourself
 
 **Body:**
@@ -96,7 +98,7 @@ Now the sisterly truth, because the data backs it: women founders systematically
 
 You don't have to guess. In this module's interviews you'll ask real people real money questions — what they pay today, what feels cheap, what feels steep. And remember: the easiest test in business is raising a price. If nobody flinches, you were too low.
 
-## 5.3 · m8l1 · theory — REWRITE (merged, retire m8l2)
+## 5.3 · m5l3 · theory — REWRITE (merged, retire old-m8l2)
 **Title:** Napkin math + the one number that steers you
 
 **Body:**
@@ -108,7 +110,7 @@ The big idea: the **North Star Metric** — an approach popularized by Sean Elli
 
 And here's where your model choice pays off: it dictates your North Star's shape. Subscription → active subscribers who stay. Big contracts → deals closed × deal size. Marketplace → completed transactions. Next exercise, you'll pick yours and turn it into a goal for the year. From then on, every week answers one question: did the number move?
 
-## 5.4 · m7l3 · exercise — REWRITE
+## 5.4 · m5l4 · exercise — REWRITE
 **Title:** Your business model — and why this one
 
 **Body:**
@@ -117,7 +119,7 @@ Time to choose. Pick the model that fits three things at once: your customer (ho
 **inputPrompt:** "(1) Your model. (2) Why this one — connect it to your customer, your value, and your own goal. (3) Which alternative you rejected, and what would make you reconsider."
 **inputMaxLength:** 600
 
-## 5.5 · m8l3 · exercise — REWRITE
+## 5.5 · m5l5 · exercise — REWRITE
 **Title:** Unit economics v1 — napkin version
 
 **Body:**
@@ -126,7 +128,7 @@ Rough numbers, honestly stated. Price per customer, months she'll stay (or repea
 **inputPrompt:** "Your napkin math: expected price · how long a customer stays (or how often she buys) · what you think one customer costs to acquire — and which of these numbers you're least sure about."
 **Note for dev:** AI response must mark each assumption confident / shaky and connect shaky ones to upcoming tests (5.7 interviews, M6 launch, M8 sales).
 
-## 5.6 · m11l6 · structured exercise — MOVE+REWRITE (aiMode: north-star)
+## 5.6 · m5l6 · structured exercise — MOVE+REWRITE (aiMode: north-star)
 **Title:** Your North Star — and what "a good year" means
 
 **Body:**
@@ -151,10 +153,10 @@ You're not selling. You're measuring the temperature of money around this pain. 
 
 # MODULE 6 — MVP & Website
 
-## 6.1 · m9l1 — KEEP (Identify your riskiest assumptions)
-## 6.2 · m9l2 — KEEP (Pretotyping: fake door, landing page, Wizard of Oz)
+## 6.1 · m6l1 — KEEP (Identify your riskiest assumptions)
+## 6.2 · m6l2 — KEEP (Pretotyping: fake door, landing page, Wizard of Oz)
 
-## 6.3 · m10l1 · theory — REWRITE (merged, retire m10l2)
+## 6.3 · m6l3 · theory — REWRITE (merged, retire old-m10l2)
 **Title:** MVBP, the scope knife, and why building is the easy part now
 
 **Body:**
@@ -164,7 +166,7 @@ Getting there takes a knife, not a roadmap. List everything your product "should
 
 And here's your unfair advantage in 2026: building stopped being the bottleneck. With AI builders and no-code tools, a working landing page is an evening and a first product version is days — Harvard Business School students now ship working demos inside a one-week bootcamp. The scarce skill isn't code anymore; it's *clarity* — knowing exactly what the smallest valuable thing is. Which, after five modules of evidence, you have. Let's use it.
 
-## 6.4 · m6l5 · theory
+## 6.4 · m6l4 · theory
 **Title:** A landing page has exactly one job
 
 **Body:**
@@ -176,8 +178,8 @@ The shape that works, top to bottom. **Hero**: whose problem you solve and the r
 
 Two notes worth their weight. First — a trick from the StoryBrand school: she is the hero of this story; you're the guide. Pages that brag lose to pages that understand. Second: decide *now* what number tells you the page works (visitors → sign-ups is the usual one). A page without a success metric isn't a test; it's decoration.
 
-## 6.5 · m9l3 — KEEP (Assumptions map)
-## 6.6 · m10l3 — KEEP (MVBP definition)
+## 6.5 · m6l5 — KEEP (Assumptions map)
+## 6.6 · m6l6 — KEEP (MVBP definition)
 
 ## 6.7 · m6l7 · exercise
 **Title:** Your site structure
@@ -205,10 +207,10 @@ Perfect is not the assignment. Live is the assignment.
 
 # MODULE 7 — Customer Acquisition & Marketing
 
-## 7.1 · m6l1 — KEEP (The path to a paying customer)
-## 7.2 · m6l2 — KEEP (Who really decides)
+## 7.1 · m7l1 — KEEP (The path to a paying customer)
+## 7.2 · m7l2 — KEEP (Who really decides)
 
-## 7.3 · m7l5 · theory
+## 7.3 · m7l3 · theory
 **Title:** Nineteen channels exist. You need two.
 
 **Body:**
@@ -218,7 +220,7 @@ Here's the counterintuitive part for your stage, and it's pure Paul Graham: righ
 
 So resist the "be everywhere" itch. At your size, focus isn't a constraint — it's the strategy.
 
-## 7.4 · m7l6 · theory
+## 7.4 · m7l4 · theory
 **Title:** The leaky bucket (or: why retention comes first)
 
 **Body:**
@@ -228,8 +230,8 @@ So before scaling any channel, map the whole journey. The classic frame is Dave 
 
 Two habits to take from this. First, find your product's **magic moment** — the point where she *feels* the value (for Facebook it was seeing friends on the feed; for you, maybe the first result your product delivers) — and shorten the road to it ruthlessly. Second, watch cohorts, not totals: of the ten people who tried it two weeks ago, how many are still here? That flattening curve — people who stay — is the most honest compliment a product can get. We'll measure it properly in Module 9.
 
-## 7.5 · m6l3 — KEEP (Acquisition path)
-## 7.6 · m6l4 — KEEP (Decision & influence map)
+## 7.5 · m7l5 — KEEP (Acquisition path)
+## 7.6 · m7l6 — KEEP (Decision & influence map)
 
 ## 7.7 · m7l7 · exercise
 **Title:** Five candidate channels, two bets
@@ -255,7 +257,7 @@ Track everything simply: how many people saw / clicked / converted per channel. 
 
 # MODULE 8 — Sales: You Are the Founder Who Sells
 
-## 8.1 · m8l7 · theory
+## 8.1 · m8l1 · theory
 **Title:** You are the sales team now (good news, actually)
 
 **Body:**
@@ -265,7 +267,7 @@ And there's a second reason nobody can substitute for you: at this stage, **sell
 
 The shape of the work is simple, and we'll build it step by step: prospecting (who to talk to — you already have a list warmer than most founders dream of), conversations (where you mostly listen), closing (where you ask). It's a craft, not a talent. Crafts are learnable.
 
-## 8.2 · m8l8 · theory
+## 8.2 · m8l2 · theory
 **Title:** You're not selling. You're helping.
 
 **Body:**
@@ -277,7 +279,7 @@ A few beliefs to install permanently. A "no" is information about fit — wrong 
 
 You'll rehearse before anything real. Fear shrinks with repetitions — that's the entire secret.
 
-## 8.3 · m8l9 · theory
+## 8.3 · m8l3 · theory
 **Title:** Funnel math: volume beats perfection
 
 **Body:**
@@ -322,7 +324,7 @@ Go get it. And when the payment lands — screenshot it. That picture goes in yo
 
 # MODULE 9 — Review: Look at the Truth
 
-## 9.1 · m9l7 · theory
+## 9.1 · m9l1 · theory
 **Title:** Three numbers tell the truth
 
 **Body:**
@@ -334,7 +336,7 @@ One distinction before you open your dashboard: **lagging vs leading** numbers. 
 
 This module is a checkpoint, not a course. Less learning, more looking. Let's see what your business is actually saying.
 
-## 9.2 · m9l8 · theory
+## 9.2 · m9l2 · theory
 **Title:** Vanity numbers feel good. Real numbers change decisions.
 
 **Body:**
@@ -344,7 +346,7 @@ The real ones live in your **funnel**: visitors → sign-ups → activated → p
 
 Fixing the bottleneck moves everything downstream of it — which is why one focused fix beats five scattered improvements. Your only job in the next exercise: find yours, and form a hypothesis about *why* it leaks.
 
-## 9.3 · m11l2 · theory — MOVE+REWRITE
+## 9.3 · m9l3 · theory — MOVE+REWRITE
 **Title:** Retention: do they come back?
 
 **Body:**
@@ -356,7 +358,7 @@ Want a second opinion on fit? Sean Ellis — the man who coined "growth hacking"
 
 And if the numbers are small — five users, eight? Then retention is conversations, not curves: you can simply *ask* each one whether it's working. Smallness is an advantage here. Use it.
 
-## 9.4 · m11l3 · exercise — MOVE+REWRITE
+## 9.4 · m9l4 · exercise — MOVE+REWRITE
 **Title:** Your traction dashboard
 
 **Body:**
@@ -391,7 +393,7 @@ Don't defend, don't explain, don't rescue the conversation. Just ask, listen, wr
 
 # MODULE 10 — Be a Solopreneur
 
-## 10.1 · m10l4 · theory
+## 10.1 · m10l1 · theory
 **Title:** Your energy is the company's runway
 
 **Body:**
@@ -403,7 +405,7 @@ Second: manage **energy**, not just time. You have two or three genuinely sharp 
 
 Last, the unglamorous truth: rest is a business function. Burnout doesn't announce itself — it arrives as "I've somehow hated this for a month." The pause button exists in this program on purpose. A rested founder makes better decisions, and decisions are your actual job.
 
-## 10.2 · m10l6 · theory
+## 10.2 · m10l2 · theory
 **Title:** Manage like Horowitz — even a company of one
 
 **Body:**
@@ -415,7 +417,7 @@ His hiring rule: hire for **strength**, not absence of weakness. When you bring 
 
 And his hardest gift: **brutal honesty with yourself**. Horowitz calls running a company "the struggle" — the gap between what you're telling people and what you fear is true. Solo founders have nobody to perform for, which is exactly why self-deception gets comfortable. The dashboard from Module 9 is your antidote: numbers first, story second. When something isn't working, saying it plainly — to yourself — is the beginning of every fix.
 
-## 10.3 · m10l7 · theory
+## 10.3 · m10l3 · theory
 **Title:** Operate like Rabois: be the editor, and automate before you hire
 
 **Body:**
@@ -425,7 +427,7 @@ His other frame: **barrels and ammunition**. Ammunition is capacity — hours, t
 
 Which brings us to the 2026 rule of thumb: **automate before you hire**. The old first hire — an assistant for research, drafts, scheduling, bookkeeping — is now mostly an AI stack plus a few subscriptions, at a fraction of the cost, available at 2am. The honest sequence when you're overloaded: can a tool or agent do it? If not, a freelancer per-task? Only when a *recurring, judgment-light* stream of work outgrows both — hire. And set a **cadence** (Rabois again): a weekly rhythm of review and priorities — which, conveniently, is what your check-in already is.
 
-## 10.4 · m10l8 · exercise
+## 10.4 · m10l4 · exercise
 **Title:** Audit yourself honestly
 
 **Body:**
@@ -443,7 +445,7 @@ List every recurring thing you do in a week — business and busywork alike. Sor
 **inputPrompt:** "Your task inventory in three buckets — and the ONE item you're offloading this week (to what or whom)."
 **Note for dev:** AI suggests automation candidates per item (incl. what Affina's own agents can take).
 
-## 10.6 · m10l9 · field task
+## 10.6 · m10l6 · field task
 **Title:** Actually offload one thing
 
 **Briefing (static part):**
@@ -460,7 +462,7 @@ Founders resist this with a familiar voice: "explaining takes longer than doing 
 
 # MODULE 11 — Pivot or Scale
 
-## 11.1 · m11l8 · theory
+## 11.1 · m11l1 · theory
 **Title:** The fork: let the data vote
 
 **Body:**
@@ -472,7 +474,7 @@ Second, respect the other failure: mood-based decisions. Founders pivot out of a
 
 Third — and hear this properly — **neither road is failure**. A pivot with your evidence in hand is the smartest version of continuing. Scaling something validated is earned momentum, not luck. The only genuinely wrong move at this fork is standing still because choosing is scary. This module exists so the choice is informed, deliberate, and yours.
 
-## 11.2 · m11l9 · theory
+## 11.2 · m11l2 · theory
 **Title:** A pivot is a turn, not a restart
 
 **Body:**
@@ -484,7 +486,7 @@ Notice what every version keeps: your interviews, your persona insights, your qu
 
 Shopify pivoted from selling snowboards. Twitter from a podcast platform. The move has a distinguished history. What it requires is the next lesson's honesty about *when*.
 
-## 11.3 · m11l10 · theory
+## 11.3 · m11l3 · theory
 **Title:** Scale only what repeats
 
 **Body:**
@@ -496,7 +498,7 @@ If that's you, scaling means **more of what works, deliberately**: pour into the
 
 A word on **blitzscaling** — Reid Hoffman's doctrine of speed-over-efficiency: it's real, and it's for winner-take-all markets with capital to burn. That's almost certainly not your next move — and knowing that is wisdom, not smallness. For you, scaling is a bigger flame under a pot that's already cooking. Never a bigger pot with nothing in it.
 
-## 11.4 · m11l7 · exercise (Delegate mode C)
+## 11.4 · m11l4 · exercise (Delegate mode C)
 **Title:** The scorecard
 
 **Body:**
@@ -507,7 +509,7 @@ Then the part no AI should ever do for you: **the decision**. Pivot (which type,
 **inputPrompt:** "Your decision — pivot / scale / fix-first — and your reasoning: which evidence weighed most, what you're consciously betting on, and what would make you revisit."
 **Note for dev:** mode C strictly — analysis panel renders above; decision field never pre-filled.
 
-## 11.5 · m11l4 · exercise — REWRITE
+## 11.5 · m11l5 · exercise — REWRITE
 **Title:** Your 12-month plan
 
 **Body:**
@@ -516,7 +518,7 @@ Whatever you chose, give it a spine. Four quarters, each with: the milestone (wh
 **inputPrompt:** "Four quarters: milestone → North Star target → resources needed. Plus the one assumption your whole plan leans on."
 **Note for dev:** Delegate mode A⚠ — AI drafts skeleton from scorecard + North Star; milestones confirmed by her.
 
-## 11.6 · m11l11 · field task (branching)
+## 11.6 · m11l6 · field task (branching)
 **Title:** Verify before you commit
 
 **Briefing (static part — branch by 11.4 decision):**
@@ -537,7 +539,7 @@ One week. Real people. Then — and only then — the plan gets your full commit
 
 # MODULE 12 — Fundraising & Your Story
 
-## 12.1 · m12l4 · theory
+## 12.1 · m12l1 · theory
 **Title:** Do you actually need investors?
 
 **Body:**
@@ -549,7 +551,7 @@ The full menu: **Revenue** — the least dilutive financing on earth; every sale
 
 Whatever you pick, the next lessons still matter: how rounds work is negotiation literacy, and a sharp pitch opens doors that have nothing to do with money.
 
-## 12.2 · m12l7 · theory
+## 12.2 · m12l2 · theory
 **Title:** How a round actually works (plain words, no mystique)
 
 **Body:**
@@ -563,7 +565,7 @@ Let's demystify the machine, because founders negotiate badly when the other sid
 
 **The process:** fundraising is a parallel sprint, not a sequential stroll — talk to many investors in the same window, let momentum build, close fast, and get back to the actual business. Marc Andreessen's crowd says it plainly: the raise is fuel, not the destination.
 
-## 12.3 · m12l1 · theory — REWRITE (merged, retire m12l2)
+## 12.3 · m12l3 · theory — REWRITE (merged, retire old-m12l2)
 **Title:** Your story, and the deck that carries it
 
 **Body:**
@@ -575,7 +577,7 @@ The deck itself — the Sequoia-shaped skeleton the whole industry speaks: **pro
 
 At your stage, **traction is the star slide**: your interviews, your conversions, your first payment screenshot, your retention signal. It's the slide that says "this founder doesn't wait for permission" — which, between us, is the whole pitch.
 
-## 12.4 · m12l3 · exercise — REWRITE
+## 12.4 · m12l4 · exercise — REWRITE
 **Title:** Build your deck
 
 **Body:**

@@ -1,5 +1,7 @@
 # Content: Modules M0–M4 (EN) — pre-paywall "wow" modules
 
+> **IDs normalized 2026-07-03:** all lesson ids below now use the LIVE `src/data.ts` numbering (this file was originally authored in pre-restructure numbering; the old ids survive only as `old-mXlY` markers on retired blocks).
+
 > Companion to SPEC_PROGRAM_V2.md §2. Ready-to-paste lecture texts, exercise prompts,
 > and field-task briefings for all NEW and REWRITE blocks. KEEP blocks are listed for
 > order/ID reference only — their existing texts in `data.ts` stay unchanged.
@@ -14,12 +16,12 @@
 | 0.3 | m0l3 | structured | exercise | NEW (entryType: founder_intake) |
 | 0.4 | m0l4 | input | exercise | NEW (entryType: imported_assets) |
 | 0.5 | m0l5 | system | system | NEW (Snapshot generation) |
-| 1.1 | m1l5 | text | theory | NEW (order: first in M1) |
-| 1.2 | m1l1 | text | theory | KEEP |
-| 1.3 | m1l2 | text | theory | KEEP |
-| 1.4 | m1l6 | input | exercise | NEW (entryType: mission_vision) |
-| 1.5 | m1l3 | input | exercise | KEEP |
-| 1.6 | m1l4 | input | exercise | KEEP |
+| 1.1 | m1l1 | text | theory | NEW (order: first in M1) |
+| 1.2 | m1l2 | text | theory | KEEP |
+| 1.3 | m1l3 | text | theory | KEEP |
+| 1.4 | m1l4 | input | exercise | NEW (entryType: mission_vision) |
+| 1.5 | m1l5 | input | exercise | KEEP |
+| 1.6 | m1l6 | input | exercise | KEEP |
 | 2.1 | m2l1 | text | theory | REWRITE |
 | 2.2 | m2l2 | text | theory | KEEP |
 | 2.3 | m2l3 | text | theory | REWRITE (new topic: TAM) |
@@ -29,22 +31,22 @@
 | 2.7 | m2l7 | field | field | NEW (artifactType: text_template; entryType: competitor_journey) |
 | 3.1 | m3l1 | text | theory | KEEP |
 | 3.2 | m3l2 | text | theory | KEEP |
-| 3.3 | m3l5 | text | theory | NEW |
-| 3.4 | m3l3 | input | exercise | KEEP |
-| 3.5 | m3l4 | input | exercise | KEEP |
+| 3.3 | m3l3 | text | theory | NEW |
+| 3.4 | m3l4 | input | exercise | KEEP |
+| 3.5 | m3l5 | input | exercise | KEEP |
 | 3.6 | m3l6 | input | exercise | NEW (entryType: interview_script) |
 | 3.7 | m3l7 | field | field | NEW (artifactType: interview_log, minEntries: 1) |
-| 4.1 | m4l6 | text | theory | NEW |
-| 4.2 | m4l1 | text | theory | KEEP |
-| 4.3 | m4l2 | text | theory | KEEP |
-| 4.4 | m5l1 | text | theory | KEEP (moved from old M5) |
+| 4.1 | m4l1 | text | theory | NEW |
+| 4.2 | m4l2 | text | theory | KEEP |
+| 4.3 | m4l3 | text | theory | KEEP |
+| 4.4 | m4l4 | text | theory | KEEP (moved from old M5) |
 | 4.5 | m4l5 | input | exercise | NEW ⭐ (entryType: problem_solution_check) |
-| 4.6 | m4l3 | input | exercise | KEEP |
-| 4.7 | m4l4 | input | exercise | KEEP |
-| 4.8 | m5l3 | input | exercise | REWRITE (merged with old m5l4; entryType: quantified_value) |
+| 4.6 | m4l6 | input | exercise | KEEP |
+| 4.7 | m4l7 | input | exercise | KEEP |
+| 4.8 | m4l8 | input | exercise | REWRITE (merged with old old-m5l4; entryType: quantified_value) |
 | 4.9 | m4l9 | field | field | NEW (artifactType: screenshot; entryType: micro_commitment) |
 
-*Delta to spec §3.5: add `m1l6: mission_vision`, `m2l7: competitor_journey`, `m4l9: micro_commitment`.*
+*Delta to spec §3.5: add `m1l4: mission_vision`, `m2l7: competitor_journey`, `m4l9: micro_commitment`.*
 
 ---
 
@@ -110,7 +112,7 @@ If your project already lives somewhere — a website, an Instagram, a pitch doc
 
 # MODULE 1 — Find Your Focus
 
-## 1.1 · m1l5 · theory (place first in module)
+## 1.1 · m1l1 · theory (place first in module)
 **Title:** Everything you believe is a hypothesis
 
 **Body:**
@@ -120,10 +122,10 @@ That's the loop this whole program runs on: state a hypothesis → design the ch
 
 One consequence, and read this twice: **changing your idea based on evidence is not failure — it's the skill.** Slack started as a gaming company. Instagram was a check-in app. Their founders weren't lucky; they were paying attention. If somewhere in the next weeks you discover your real customer isn't who you thought — that's not the program breaking your idea. That's the program doing exactly what it's for, while the discovery is still cheap.
 
-## 1.2 · m1l1 — KEEP (Why a clear idea beats a big idea)
-## 1.3 · m1l2 — KEEP (The shape of a one-liner that lands)
+## 1.2 · m1l2 — KEEP (Why a clear idea beats a big idea)
+## 1.3 · m1l3 — KEEP (The shape of a one-liner that lands)
 
-## 1.4 · m1l6 · exercise
+## 1.4 · m1l4 · exercise
 **Title:** Mission & Vision
 
 **Body:**
@@ -132,8 +134,8 @@ Two sentences will steer thousands of decisions you can't foresee yet. Your **mi
 **inputPrompt:** "Your mission (1 sentence: why this company exists) and your vision (2–3 sentences: the world in 10 years if you succeed)."
 **inputMaxLength:** 500
 
-## 1.5 · m1l3 — KEEP (Your value proposition)
-## 1.6 · m1l4 — KEEP (Why you?)
+## 1.5 · m1l5 — KEEP (Your value proposition)
+## 1.6 · m1l6 — KEEP (Why you?)
 
 ---
 
@@ -198,7 +200,7 @@ Time to stop reading about competitors and *feel* them. Pick 3–5 from your lan
 ## 3.1 · m3l1 — KEEP (You can't build for everyone)
 ## 3.2 · m3l2 — KEEP (What makes a great first customer)
 
-## 3.3 · m3l5 · theory
+## 3.3 · m3l3 · theory
 **Title:** Interviews that tell the truth
 
 **Body:**
@@ -210,8 +212,8 @@ Three rules for the room. Don't pitch — the moment you start selling, honest d
 
 You'll practice on friendly people first. The craft comes before the volume.
 
-## 3.4 · m3l3 — KEEP (Three candidate customers)
-## 3.5 · m3l4 — KEEP (Your beachhead persona)
+## 3.4 · m3l4 — KEEP (Three candidate customers)
+## 3.5 · m3l5 — KEEP (Your beachhead persona)
 
 ## 3.6 · m3l6 · exercise
 **Title:** Your interview script
@@ -220,7 +222,7 @@ You'll practice on friendly people first. The craft comes before the volume.
 A good script is a safety net, not a cage — you'll improvise once the conversation flows, but you'll never freeze. Below, your mentor has drafted a script for *your* persona from everything in your Brain. It follows the shape that works: a warm open ("I'm researching how women like you handle X — no selling, I promise"), her context, past behavior ("walk me through the last time…"), the pain and what it costs her, what she's tried, and a soft close ("who else should I talk to?"). Edit it until it sounds like you — you're the one who'll be saying it out loud. Then rehearse once with your AI practice customer before the real thing.
 
 **inputPrompt:** "Review and edit your interview script. Make it sound like you — you'll be saying these words to a real person this week."
-**Note for dev:** AI pre-generates the draft from persona (m3l4) + problem hypothesis; "Practice with AI customer" button = v1 chat rehearsal or tips panel per spec §2.
+**Note for dev:** AI pre-generates the draft from persona (m3l5) + problem hypothesis; "Practice with AI customer" button = v1 chat rehearsal or tips panel per spec §2.
 
 ## 3.7 · m3l7 · field task
 **Title:** Run your first real interviews (1–2, warm)
@@ -243,7 +245,7 @@ Nervous? Every founder is, the first time. Remember: you're not imposing, and yo
 
 # MODULE 4 — Problem, Solution & Product
 
-## 4.1 · m4l6 · theory (place first in module)
+## 4.1 · m4l1 · theory (place first in module)
 **Title:** Fall in love with the problem, not the solution
 
 **Body:**
@@ -255,9 +257,9 @@ Test your problem against three bars. **Intensity** — painkiller or vitamin? *
 
 You now hold something most founders skip straight past: real interview data. In this module we put your original idea on the table next to what real women actually told you — and keep what survives.
 
-## 4.2 · m4l1 — KEEP (Full life-cycle use case)
-## 4.3 · m4l2 — KEEP (Sketch your product, not your tech)
-## 4.4 · m5l1 — KEEP, moved into M4 (Value in numbers: before and after)
+## 4.2 · m4l2 — KEEP (Full life-cycle use case)
+## 4.3 · m4l3 — KEEP (Sketch your product, not your tech)
+## 4.4 · m4l4 — KEEP, moved into M4 (Value in numbers: before and after)
 
 ## 4.5 · m4l5 · exercise ⭐ (wow moment)
 **Title:** Reality check: your idea vs. your interviews
@@ -266,12 +268,12 @@ You now hold something most founders skip straight past: real interview data. In
 This is where Affina earns its keep. Your mentor has just cross-referenced the idea you arrived with (Module 1) against everything real people told you (Module 3) — and laid out the verdict below: where you were right, where reality disagrees, and what surprised us. Read it slowly. Being wrong somewhere is not bad news; it's the cheapest correction you'll ever get — you're fixing your aim before you've built anything. Now rewrite your problem and solution the way the evidence points. This becomes the foundation for your product, your pricing, and your pitch.
 
 **inputPrompt:** "Rewrite with the evidence in mind: (1) The problem — in your customer's own words. (2) Your solution — what you'll actually build or do. (3) What you changed from your original idea, and why."
-**Note for dev:** on open, AI generates comparison card: Confirmed ✓ / Contradicted ✗ / Surprises ! — from m1l3 + m1l6 vs interview_log entries; render above input.
+**Note for dev:** on open, AI generates comparison card: Confirmed ✓ / Contradicted ✗ / Surprises ! — from m1l5 + m1l4 vs interview_log entries; render above input.
 
-## 4.6 · m4l3 — KEEP (Use-case map)
-## 4.7 · m4l4 — KEEP (Product sketch)
+## 4.6 · m4l6 — KEEP (Use-case map)
+## 4.7 · m4l7 — KEEP (Product sketch)
 
-## 4.8 · m5l3 · exercise — REWRITE (merged with old m5l4)
+## 4.8 · m4l8 · exercise — REWRITE (merged with old old-m5l4)
 **Title:** Your value, in numbers — and why it's hard to copy
 
 **Body:**

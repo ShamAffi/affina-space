@@ -46,7 +46,7 @@ Folds in the current m0l4 "Import what you have" functionality as an optional ex
 
 **Mechanic:** one question per screen, large centered type, progress dots (1–5) at top, **back arrow** (returns to previous question, answer preserved and editable), forward via button or Enter. Counts as **ONE lesson/block** for program tracking (completedLessons, progress %) — internally it's a 5-step component, not 5 separate lessons.
 
-**Validation:** soft, not hard-gated (consistent with M0's welcoming tone). Chip-select questions (Q1, Q3) require a selection to advance. Free-text questions (Q2, Q4, Q5) show a gentle one-time nudge if left empty ("This one really helps your mentor understand you — sure you want to skip it?") but never hard-block.
+**Validation:** soft, not hard-gated (consistent with M0's welcoming tone). Q3 (chip-select) requires a selection to advance. All free-text questions (Q1, Q2, Q4, Q5) show a gentle one-time nudge if left empty ("This one really helps your mentor understand you — sure you want to skip it?") but never hard-block.
 
 ### The 5 questions
 
@@ -91,10 +91,10 @@ No edit mode on the Snapshot itself — approval is acknowledgment, not editing 
 
 ## §4 — Data model changes
 
-- `submissionData`/`lessonInputs` for m0l4 (the quiz) stores one JSON object with the 5 named fields above (`doneSoFar`, `doneSoFarDetail`, `stuckPoint`, `capacity`, `whyMe`, `goal12w`) — one brain entry, `entryType: 'founder_intake'` (already exists in BRAIN_ENTRY_TYPES).
+- `submissionData`/`lessonInputs` for m0l4 (the quiz) stores one JSON object with the 5 named fields above (`doneSoFar`, `stuckPoint`, `capacity`, `whyMe`, `goal12w` — all plain strings except `capacity`, which is the enum) — one brain entry, `entryType: 'founder_intake'` (already exists in BRAIN_ENTRY_TYPES).
 - m0l3 edits write directly to `users.idea/customer/businessModel/stage/goal` (same columns onboarding already populates) — no separate brain entry needed for Section A; Section B (links) keeps existing `imported_assets` entry type.
 - No schema migration needed — same columns/entry types as before, just redistributed across screens.
 
 ---
 
-*Question for Shamil: any of the 5 quiz questions you'd cut, reorder, or reword before this goes to dev?*
+**Status: approved by Shamil, ready for dev.** Q1 reworded to open text (was chip-select), Q5 reworded to a warmer, friend-to-friend phrasing. No further changes pending.

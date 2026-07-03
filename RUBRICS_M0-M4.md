@@ -1,5 +1,7 @@
 # AI Mentor Scoring Rubrics — M0–M4
 
+> **IDs normalized 2026-07-03:** all lesson ids below now use the LIVE `src/data.ts` numbering (this file was originally authored in pre-restructure numbering; the old ids survive only as `old-mXlY` markers on retired blocks).
+
 > Companion to SPEC_PROGRAM_V2.md (§3.2, §4, §4b) and CONTENT_M0-M4.md.
 > Назначение: эти рубрики встраиваются в системные промпты AI-ревью.
 > Формат вывода совместим с типами `AiFeedback` (уроки-упражнения) и `TaskReview` (задачи).
@@ -80,7 +82,7 @@ Note dead/unreachable links matter-of-factly. If assets contradict her intake
 
 ## 2. MODULE 1 — упражнения
 
-### m1l6 · Mission & Vision
+### m1l4 · Mission & Vision
 ```
 CRITERIA (weights)
 - Mission clarity (40%): one sentence, one breath, plain words; names who it's for
@@ -98,7 +100,7 @@ NEXT-STEP LOGIC: say the mission out loud to one person today; note where they s
 BRAIN: store mission + vision; update Snapshot → Hypothesis.
 ```
 
-### m1l3 · Your value proposition (KEEP-урок, рубрика формализована)
+### m1l5 · Your value proposition (KEEP-урок, рубрика формализована)
 ```
 CRITERIA
 - WHO (30%): a specific person you could find this week — not "people who...".
@@ -114,7 +116,7 @@ NEXT-STEP: read it to someone who's never heard the idea; can they repeat it bac
 BRAIN: value_proposition; Snapshot → Hypothesis.
 ```
 
-### m1l4 · Why you? (KEEP)
+### m1l6 · Why you? (KEEP)
 ```
 CRITERIA
 - Unfair advantage named (40%): access, lived experience, skill, network, distribution —
@@ -189,7 +191,7 @@ BRAIN: competitor_journey; Snapshot → Market (openings); cross-link into m2l5 
 
 ## 4. MODULE 3 — упражнения и первое интервью
 
-### m3l3 · Three candidate customers (KEEP, aiMode: compare)
+### m3l4 · Three candidate customers (KEEP, aiMode: compare)
 ```
 Score each candidate 1–10 on: painIntensity · reachability · abilityToPay · wordOfMouth.
 RULES
@@ -201,7 +203,7 @@ RULES
 BRAIN: persona_candidates.
 ```
 
-### m3l4 · Your beachhead persona (KEEP)
+### m3l5 · Your beachhead persona (KEEP)
 ```
 CRITERIA
 - One person, in focus (30%): you can picture her day — context, role, moment of pain.
@@ -289,7 +291,7 @@ Say so explicitly. This exercise exists to make changing course feel like skill.
 BRAIN: problem_solution_check; Snapshot → Hypothesis (versioned change, log the pivot).
 ```
 
-### m4l3 · Use-case map (KEEP)
+### m4l6 · Use-case map (KEEP)
 ```
 CRITERIA
 - Full lifecycle (35%): discover → evaluate → start → use → pay → return. All stages.
@@ -302,7 +304,7 @@ half; cap at 60.
 BRAIN: use_case; Snapshot → Product.
 ```
 
-### m4l4 · Product sketch (KEEP)
+### m4l7 · Product sketch (KEEP)
 ```
 CRITERIA
 - Outcome-first (30%): what it DOES for her, not what it's built with.
@@ -314,7 +316,7 @@ the first 3 minutes?" Cap at 60 until answered.
 BRAIN: product_spec; Snapshot → Product.
 ```
 
-### m5l3 · Your value, in numbers — and why it's hard to copy (REWRITE)
+### m4l8 · Your value, in numbers — and why it's hard to copy (REWRITE)
 ```
 CRITERIA
 - Before → After in numbers (35%): hours, euros, frequency, stress-proxy — measurable.
@@ -359,14 +361,14 @@ pricing hypotheses.
 | Блок | Тип | Проходной (счёт в Readiness) | needs_work триггеры |
 |---|---|---|---|
 | m0l3, m0l4 | intake | не скорится | — |
-| m1l6, m1l3, m1l4 | 🔴 | ≥50 | <50 после ревью |
+| m1l4, m1l5, m1l6 | 🔴 | ≥50 | <50 после ревью |
 | m2l4, m2l5 | 🔴 | ≥50 | «нет конкурентов»; «дешевле/качественнее» как позиция |
 | m2l7 | 🟡 | done (≥3 журнея с деталями) | пересказ сайтов; нет цен |
-| m3l3, m3l4 | 🔴 | ≥50 | демографическая персона (cap 50) |
+| m3l4, m3l5 | 🔴 | ≥50 | демографическая персона (cap 50) |
 | m3l6 | 🔴 | ≥50 | любой «would you…» — авто-override |
 | m3l7 | 🟡 | done (≥1 запись с цитатами) | нет цитат и конкретики |
 | m4l5 | 🔴 | ≥50 | игнор противоречащих интервью (cap 45) |
-| m4l3, m4l4, m5l3 | 🔴 | ≥50 | см. авто-флаги |
+| m4l6, m4l7, m4l8 | 🔴 | ≥50 | см. авто-флаги |
 | m4l9 | 🟡 | done (≥3 ask + артефакт + вывод) | нет артефакта — всегда |
 
 ---

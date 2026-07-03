@@ -1,5 +1,7 @@
 # AI Mentor Scoring Rubrics — M5–M12
 
+> **IDs normalized 2026-07-03:** all lesson ids below now use the LIVE `src/data.ts` numbering (this file was originally authored in pre-restructure numbering; the old ids survive only as `old-mXlY` markers on retired blocks).
+
 > Companion to CONTENT_M5-M12.md, RULES_DONE_FOR_YOU.md, and RUBRICS_M0-M4.md.
 > Global rules (§0 of RUBRICS_M0-M4.md — scoring philosophy, feedback recipe,
 > context/consistency, fabrication protocol) apply unchanged. This file adds
@@ -36,7 +38,7 @@ FINANCIAL / LEGAL DISCLAIMER (Module 12 only)
   in lecture content); for anything numeric/binding, the standard line is:
   "Run any real term sheet by a startup lawyer before signing — this tool
   explains the shape of the deal, not the terms of yours."
-- This disclaimer belongs in AI outputs for m12l3 (deck), m12l4 lecture context,
+- This disclaimer belongs in AI outputs for m12l4 (deck), m12l1 lecture context,
   and any Delegate draft touching valuation/dilution — not just once at module start.
 ```
 
@@ -44,7 +46,7 @@ FINANCIAL / LEGAL DISCLAIMER (Module 12 only)
 
 ## 1. MODULE 5 — Business Model & Revenue
 
-### m7l3 · Your business model
+### m5l4 · Your business model
 ```
 CRITERIA
 - Model named clearly (25%): one of the standard shapes (subscription, one-off,
@@ -65,7 +67,7 @@ AUTO-FLAGS
 BRAIN: business_model; Snapshot → Model.
 ```
 
-### m8l3 · Unit economics v1
+### m5l5 · Unit economics v1
 ```
 CRITERIA
 - Numbers stated (30%): price, retention/repeat estimate, CAC guess — all three
@@ -80,19 +82,19 @@ CRITERIA
 AUTO-FLAGS
 - LTV:CAC wildly above 3:1 (e.g., 50:1) on invented numbers → this reads as
   unexamined optimism, not strength; probe the CAC number specifically.
-- No connection to pricing from m7l3/M4 quantified value → flag inconsistency.
+- No connection to pricing from m5l4/M4 quantified value → flag inconsistency.
 NEXT-STEP: name which shaky number the M5 field interviews (m5l7) should test.
 BRAIN: unit_economics; Snapshot → Model (mark assumptions confidence: high/med/low).
 ```
 
-### m11l6 · North Star + year goal (structured, aiMode: north-star)
+### m5l6 · North Star + year goal (structured, aiMode: north-star)
 ```
 Do not score as pass/fail. Evaluate the CANDIDATE SET and her SELECTION:
-- Candidates must follow from her business model (m7l3) — subscription model
+- Candidates must follow from her business model (m5l4) — subscription model
   should not suggest "deals closed" as a candidate, for example.
 - Selected metric reflects delivered VALUE, not vanity (revenue alone, follower
   counts, registrations are weak candidates — flag if selected without reasoning).
-- Year goal + quarterly milestones: sanity-check against unit economics (m8l3)
+- Year goal + quarterly milestones: sanity-check against unit economics (m5l5)
   and market size (M2 TAM). "Brave but unrealistic" gets a kind, specific flag
   ("your TAM math suggests ~800 reachable customers — a 5,000-subscriber year
   goal needs either a bigger market story or a longer timeline").
@@ -124,7 +126,7 @@ BRAIN: interview_log entries → pricing hypothesis update; Snapshot → Model +
 
 ## 2. MODULE 6 — MVP & Website
 
-### m9l3 · Assumptions map (KEEP-урок, рубрика формализована)
+### m6l5 · Assumptions map (KEEP-урок, рубрика формализована)
 ```
 CRITERIA
 - Riskiest-first (35%): assumptions ranked, not just listed — the one that
@@ -137,10 +139,10 @@ CRITERIA
   details ("the button should be blue" is not a riskiest assumption).
 AUTO-FLAG: no assumption about willingness to pay anywhere in the list → missing[],
 this is almost always the riskiest one.
-BRAIN: key_assumptions; feeds directly into m10l3 MVBP scope.
+BRAIN: key_assumptions; feeds directly into m6l6 MVBP scope.
 ```
 
-### m10l3 · MVBP definition (KEEP-урок, рубрика формализована)
+### m6l6 · MVBP definition (KEEP-урок, рубрика формализована)
 ```
 CRITERIA
 - Delivers real value (30%): the cut-down version still solves the core job,
@@ -195,7 +197,7 @@ regardless of whether the threshold was hit — hitting zero conversions with
 good traffic is valid, useful data, not a failed task.
 BELOW-THRESHOLD HANDLING: this is diagnostic, not disappointing — walk through
 message/audience/offer as candidate explanations per the debrief hint in content.
-BRAIN: launch_results; Snapshot → Traction; update unit_economics (m8l3) with
+BRAIN: launch_results; Snapshot → Traction; update unit_economics (m5l5) with
 real conversion data if available.
 ```
 
@@ -203,7 +205,7 @@ real conversion data if available.
 
 ## 3. MODULE 7 — Customer Acquisition & Marketing
 
-### m6l3 · Acquisition path (KEEP-урок, рубрика формализована)
+### m7l5 · Acquisition path (KEEP-урок, рубрика формализована)
 ```
 CRITERIA
 - Full path mapped (35%): discovery → consideration → decision → payment,
@@ -212,11 +214,11 @@ CRITERIA
   (budget approval, trust, comparison shopping) — not a frictionless fantasy.
 - Timeframe stated (20%): how long the path typically takes for this customer
   (impulse buy vs multi-week B2B decision) — affects everything downstream.
-- Consistent with DMU (15%): aligns with who actually decides (feeds m6l4).
+- Consistent with DMU (15%): aligns with who actually decides (feeds m7l6).
 BRAIN: acquisition_path; Snapshot → Market.
 ```
 
-### m6l4 · Decision & influence map (KEEP-урок, рубрика формализована)
+### m7l6 · Decision & influence map (KEEP-урок, рубрика формализована)
 ```
 CRITERIA
 - Roles distinguished (40%): champion / end user / economic buyer / blocker
@@ -269,7 +271,7 @@ VERDICT: done requires both channels attempted with real numbers, even if
 results are poor. A channel that clearly failed with honest numbers is a
 completed, valuable task — do not require success for done status.
 BRAIN: acquisition_results; recompute rough CAC per channel into unit_economics
-(m8l3); Snapshot → Market (winning channel flagged).
+(m5l5); Snapshot → Market (winning channel flagged).
 ```
 
 ---
@@ -348,7 +350,7 @@ event on close); feeds M9 funnel analysis either way.
 
 ## 5. MODULE 9 — Review Block
 
-### m11l3 · Traction dashboard
+### m9l4 · Traction dashboard
 ```
 Do not score her input heavily — this exercise is mostly AI-assembled (Delegate
 mode A per RULES_DONE_FOR_YOU.md §2.4). Evaluate HER contribution:
@@ -396,15 +398,15 @@ CRITERIA (per entry)
 FABRICATION PROTOCOL applies with extra weight here — "no" conversations are
 uncomfortable to have, and thin/invented entries are a common failure mode.
 Probe kindly if entries feel generic.
-BRAIN: non_buyer_insights; cross-reference against m11l3 leak; feeds directly
-into m11l7 scorecard as evidence.
+BRAIN: non_buyer_insights; cross-reference against m9l4 leak; feeds directly
+into m11l4 scorecard as evidence.
 ```
 
 ---
 
 ## 6. MODULE 10 — Be a Solopreneur
 
-### m10l8 · Audit yourself honestly
+### m10l4 · Audit yourself honestly
 ```
 CRITERIA
 - Strengths tied to evidence (35%): each strength references something she
@@ -438,7 +440,7 @@ its purpose if nothing moves.
 BRAIN: delegation_matrix.
 ```
 
-### m10l9 · 🟡 Actually offload one thing — field task
+### m10l6 · 🟡 Actually offload one thing — field task
 ```
 CRITERIA
 - Handoff genuinely happened (40%): the task ran without her at least once —
@@ -457,7 +459,7 @@ BRAIN: delegation_action; adjust weekly plan capacity assumptions going forward.
 
 ## 7. MODULE 11 — Pivot or Scale
 
-### m11l7 · The scorecard — Delegate mode C, special rubric (see §0a)
+### m11l4 · The scorecard — Delegate mode C, special rubric (see §0a)
 ```
 Do NOT score whether she chose pivot, scale, or fix-first — there is no correct
 answer. Score the REASONING:
@@ -479,17 +481,17 @@ AUTO-FLAGS
   WHY she disagrees; do not lower score just for disagreeing once she does.
 - Decision matches AI recommendation with zero personal reasoning added
   ("going with what it said") → also flag — rubber-stamping isn't ownership either.
-BRAIN: pivot_scale_decision; this becomes the load-bearing fact for m11l4 and
+BRAIN: pivot_scale_decision; this becomes the load-bearing fact for m11l5 and
 the entire next phase of the program.
 ```
 
-### m11l4 · Your 12-month plan
+### m11l5 · Your 12-month plan
 ```
 CRITERIA
 - Four real milestones (30%): concrete, dated, different from each other
   (not "grow more" repeated four times).
 - North Star targets attached (25%): each quarter has a number tied to the
-  m11l6 North Star, showing a believable trajectory.
+  m5l6 North Star, showing a believable trajectory.
 - Resources named (25%): hours/money/hiring or agent needs stated per phase,
   checked against her actual capacity (Snapshot).
 - One load-bearing assumption named (20%): she identifies the single thing
@@ -500,7 +502,7 @@ kindly, with the specific numbers.
 BRAIN: roadmap; Snapshot → Model (year plan).
 ```
 
-### m11l11 · 🟡 Verification sprint — field task (branching)
+### m11l6 · 🟡 Verification sprint — field task (branching)
 ```
 Branch-specific criteria, common verdict logic:
 
@@ -518,7 +520,7 @@ COMMON
 - If evidence contradicts the plan: treat as valuable, not as failure — this
   block exists specifically to catch expensive mistakes early; say so explicitly.
 VERDICT: done requires branch-appropriate artifact + explicit verdict written.
-BRAIN: verification_sprint; updates roadmap (m11l4) and scorecard (m11l7) with
+BRAIN: verification_sprint; updates roadmap (m11l5) and scorecard (m11l4) with
 real results; gates entry to M12 either way once verdict is recorded.
 ```
 
@@ -528,7 +530,7 @@ real results; gates entry to M12 either way once verdict is recorded.
 
 *Financial/Legal Disclaimer (§0a) applies to every AI output in this section.*
 
-### m12l3 · Build your deck
+### m12l4 · Build your deck
 ```
 CRITERIA
 - Hook lands (20%): slide-one sentence makes the stated problem/opportunity
@@ -586,7 +588,7 @@ FABRICATION PROTOCOL applies — investor conversations are high-stakes to fake;
 probe kindly if entries feel too smooth/generic.
 CELEBRATION: any live conversation, regardless of outcome, is worth naming as
 genuine progress — most founders never get this far.
-BRAIN: outreach_log; feeds deck iteration (m12l3) and — for anyone continuing —
+BRAIN: outreach_log; feeds deck iteration (m12l4) and — for anyone continuing —
 sets up the S3 graduation session narrative.
 ```
 
@@ -596,27 +598,27 @@ sets up the S3 graduation session narrative.
 
 | Блок | Тип | Проходной (Readiness) | Особый режим |
 |---|---|---|---|
-| m7l3, m8l3 | 🔴 | ≥50 | — |
-| m11l6 North Star | 🔴 | не pass/fail | sanity-check реалистичности |
+| m5l4, m5l5 | 🔴 | ≥50 | — |
+| m5l6 North Star | 🔴 | не pass/fail | sanity-check реалистичности |
 | m5l7 | 🟡 | done: ≥5 записей, б.ч. с ценовым сигналом | — |
-| m9l3, m10l3 | 🔴 | ≥50 | — |
+| m6l5, m6l6 | 🔴 | ≥50 | — |
 | m6l7 | 🔴 | ≥50 | блок success-metric перед прогрессом |
 | m6l8 | 🟡 | done: URL + цифры (успех не обязателен) | — |
-| m6l3, m6l4 | 🔴 | ≥50 | — |
+| m7l5, m7l6 | 🔴 | ≥50 | — |
 | m7l7 | 🔴 | ≥50 | override: нет числа в гипотезе |
 | m7l8 | 🟡 | done: оба канала + цифры (успех не обязателен) | — |
 | m8l4 | 🔴 | ≥50 | override: нет explicit ask |
 | m8l5 | 🔴 | ≥50 | fabrication check на именах |
 | m8l6 | 🟡 | done: close ИЛИ ≥5 asks с причинами | **Celebration Protocol** |
-| m11l3 | 🔴 | ≥50 | AI-assembled, оценка её вклада |
+| m9l4 | 🔴 | ≥50 | AI-assembled, оценка её вклада |
 | m9l5 | 🔴 | ≥50 | defense panel: 3 приоритета фикс |
 | m9l6 | 🟡 | done: записи с реальными словами | fabrication check |
-| m10l8, m10l5 | 🔴 | ≥50 | — |
-| m10l9 | 🟡 | done: доказанный автономный прогон | — |
-| m11l7 | 🔴 | **Mode C** — оценка reasoning, не решения | **особая рубрика §0a** |
-| m11l4 | 🔴 | ≥50 | сверка с потолком юнит-экономики |
-| m11l11 | 🟡 | done: branch-artifact + verdict | ветвление по 11.4 |
-| m12l3 | 🔴 | ≥50 | traction-слайд весит 30%, cap 60 если пуст |
+| m10l4, m10l5 | 🔴 | ≥50 | — |
+| m10l6 | 🟡 | done: доказанный автономный прогон | — |
+| m11l4 | 🔴 | **Mode C** — оценка reasoning, не решения | **особая рубрика §0a** |
+| m11l5 | 🔴 | ≥50 | сверка с потолком юнит-экономики |
+| m11l6 | 🟡 | done: branch-artifact + verdict | ветвление по 11.4 |
+| m12l4 | 🔴 | ≥50 | traction-слайд весит 30%, cap 60 если пуст |
 | m12l5 | 🟡 | done: ~20 целей с обоснованием | — |
 | m12l6 | 🟡 | done: ≥1 живой разговор | fabrication check |
 

@@ -16,7 +16,7 @@ Brand in one line: **editorial, confident, minimal — royal-violet primary (`#7
 - **RUBRICS_M0-M4.md / RUBRICS_M5-M12.md** — per-block AI-review rubrics → generated into `src/rubrics.ts` (44 rubrics + global rules). Edit the MD, regenerate.
 - **CONTENT_*.md** — final lecture texts. All "Coming soon" stubs are filled; 12 `// TODO: rewrite per spec` blocks in data.ts still have old text while their REWRITE versions sit ready in CONTENT_M5-M12.md.
 
-⚠️ **ID mapping trap:** the content/rubrics docs use PRE-restructure lesson numbering; live ids in `src/data.ts` differ (e.g. docs "m11l4 12-month plan" = live `m11l5`; docs "m1l3 VP" = live `m1l5`). Never copy by id — match by lesson TITLE. A verified old→new map lives in the rubrics generator comment and in each doc's "ID map" section.
+**ID numbering:** all working docs (CONTENT_*, RUBRICS_*, RULES_DONE_FOR_YOU) were normalized to the live `src/data.ts` numbering on 2026-07-03 — ids now match 1:1 (retired old blocks appear as `old-mXlY` markers). The only doc still in pre-restructure numbering is the historical SPEC_PROGRAM_V2.md (flagged in its header) — for it, match by block title.
 
 ## Dev workflow & constraints (hard-won, follow these)
 - **Deploy:** `npx vercel build --prod` → `npx vercel deploy --prebuilt --prod` → smoke via `/usr/bin/curl` (homepage 200, `/api/progress?email=…` returns JSON — SPA rewrite must not shadow `/api`). Vercel preview URLs are SSO-gated (unusable); test on prod.
