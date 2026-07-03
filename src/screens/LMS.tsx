@@ -985,10 +985,11 @@ My motivation & 12-week goal: …`;
               const isExercise = activeLesson.type === 'input' || activeLesson.type === 'structured';
               // north-star exercise manages its own navigation
               if (isExercise && activeLesson.aiMode === 'north-star') return null;
-              // snapshot block manages its own Continue until generated once
-              if (activeLesson.id === 'm0l5' && !isCompleted) return null;
-              // M0.3/M0.4 custom blocks provide their own CTAs until completed
-              if ((activeLesson.id === 'm0l3' || activeLesson.id === 'm0l4') && !isCompleted) return null;
+              // m0l5: the big approve button IS the navigation — never show Next lesson here.
+              // m0l3: same — "Continue to a few quick questions" always advances.
+              if (activeLesson.id === 'm0l5' || activeLesson.id === 'm0l3') return null;
+              // m0l4 quiz keeps default Next after completion (revisit shouldn't force a re-take)
+              if (activeLesson.id === 'm0l4' && !isCompleted) return null;
               // delegate views manage their own actions
               if (delegateOpen === activeLessonId || delegating === activeLessonId) return null;
               const hasFeedback = !!(feedbackByLesson[activeLessonId] || compareByLesson[activeLessonId]);
