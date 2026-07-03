@@ -929,6 +929,31 @@ My motivation & 12-week goal: …`;
                     )
                   )}
 
+                  {/* Value-prop formula reminder — duplicated inline from lecture m1l3 (§2) */}
+                  {showInput && activeLessonId === 'm1l5' && (
+                    <div className="bg-surface border border-hairline rounded-card p-5 mb-4">
+                      <p className="text-xs font-bold text-ink-mute uppercase tracking-widest mb-3">The formula</p>
+                      <div className="flex flex-wrap items-center gap-2 mb-4">
+                        <span className="text-sm font-bold text-brand-700 bg-brand-50 rounded-pill px-3 py-1">Who you help</span>
+                        <span className="text-ink-mute">+</span>
+                        <span className="text-sm font-bold text-brand-700 bg-brand-50 rounded-pill px-3 py-1">The painful problem</span>
+                        <span className="text-ink-mute">+</span>
+                        <span className="text-sm font-bold text-brand-700 bg-brand-50 rounded-pill px-3 py-1">The concrete result</span>
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <div className="flex gap-2 items-start">
+                          <span className="text-[10px] font-bold text-ink-mute uppercase tracking-wider mt-0.5 w-12 flex-shrink-0">Vague</span>
+                          <p className="text-sm text-ink-soft leading-relaxed">"A marketplace platform with smart matching for flexible work."</p>
+                        </div>
+                        <div className="flex gap-2 items-start">
+                          <span className="text-[10px] font-bold text-accent-600 uppercase tracking-wider mt-0.5 w-12 flex-shrink-0">Sharp</span>
+                          <p className="text-sm text-ink leading-relaxed font-medium">"I help moms on maternity leave earn 2–3 hours a day from home, without going back to an office."</p>
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-ink-mute mt-3">No tech words — customers buy the change in their life, not your "AI-powered platform."</p>
+                    </div>
+                  )}
+
                   {/* 3. Input form (idle or refining) */}
                   {showInput && (
                     <div className="bg-brand-50 border border-brand-100 rounded-card p-5 mb-8">
