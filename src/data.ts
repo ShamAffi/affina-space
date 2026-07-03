@@ -1,4 +1,4 @@
-import type { Question, Module } from './types.js';
+import type { Question, Module, CourseId } from './types.js';
 
 // Program v2 (SPEC_PROGRAM_V2.md §3.5) — positional lesson IDs m{module}l{block}.
 export const BRAIN_ENTRY_TYPES: Record<string, string> = {
@@ -47,6 +47,18 @@ export const BRAIN_ENTRY_TYPES: Record<string, string> = {
   m12l5: 'investor_targets',
   m12l6: 'outreach_log',
 };
+
+// Courses (SPEC pill = course level). One course today; add entries for parallel courses.
+export const COURSES: Record<CourseId, { name: string; color: string }> = {
+  launching: { name: 'Launching', color: 'bg-brand-100 text-brand-700' },
+};
+
+// lessonId → its course (via the owning module). null = not part of any course.
+export function courseForLessonId(lessonId: string | null | undefined): CourseId | null {
+  if (!lessonId) return null;
+  for (const m of MODULES) if (m.lessons.some((l) => l.id === lessonId)) return m.courseId;
+  return null;
+}
 
 export const QUESTIONS: Question[] = [
   {
@@ -97,6 +109,7 @@ export const MODULES: Module[] = [
     order: 0,
     title: 'Welcome to Affina Space',
     track: 'Foundations',
+    courseId: 'launching',
     lessons: [
       {
         id: 'm0l1',
@@ -170,6 +183,7 @@ Sara Blakely started Spanx with $5,000 and zero industry contacts. Nobody gave e
     order: 1,
     title: 'Find Your Focus',
     track: 'Foundations',
+    courseId: 'launching',
     lessons: [
       {
         id: 'm1l1',
@@ -271,6 +285,7 @@ Your job next, in the exercise that follows: write the sharp version of your own
     order: 2,
     title: 'Research the Market',
     track: 'Validation',
+    courseId: 'launching',
     lessons: [
       {
         // TODO: rewrite per spec — add Thiel's "own a small market" thesis
@@ -390,6 +405,7 @@ You don't need a forty-tab spreadsheet for this. You need a napkin, three honest
     order: 3,
     title: 'Customer Discovery',
     track: 'Validation',
+    courseId: 'launching',
     lessons: [
       {
         id: 'm3l1',
@@ -502,6 +518,7 @@ Candidate C: [who they are]
     order: 4,
     title: 'Problem, Solution & Product',
     track: 'Validation',
+    courseId: 'launching',
     mentorSessionAfter: 'S1',
     lessons: [
       {
@@ -633,6 +650,7 @@ Core advantage & why it's hard to copy: …`,
     order: 5,
     title: 'Business Model & Revenue',
     track: 'Validation',
+    courseId: 'launching',
     paid: true,
     lessons: [
       {
@@ -722,6 +740,7 @@ You don't have to guess. In this module's interviews you'll ask real people real
     order: 6,
     title: 'MVP & Website',
     track: 'Building',
+    courseId: 'launching',
     paid: true,
     lessons: [
       {
@@ -815,6 +834,7 @@ And here's your unfair advantage in 2026: building stopped being the bottleneck.
     order: 7,
     title: 'Customer Acquisition & Marketing',
     track: 'Launch',
+    courseId: 'launching',
     paid: true,
     lessons: [
       {
@@ -909,6 +929,7 @@ My top 2 and why: …`,
     order: 8,
     title: 'Sales: You Are the Founder Who Sells',
     track: 'Launch',
+    courseId: 'launching',
     paid: true,
     lessons: [
       {
@@ -970,6 +991,7 @@ My weekly touch quota: …`,
     order: 9,
     title: 'Review: Look at the Truth',
     track: 'Launch',
+    courseId: 'launching',
     paid: true,
     mentorSessionAfter: 'S2',
     lessons: [
@@ -1048,6 +1070,7 @@ Top 3 priorities next sprint: …`,
     order: 10,
     title: 'Be a Solopreneur',
     track: 'Growth',
+    courseId: 'launching',
     paid: true,
     lessons: [
       {
@@ -1115,6 +1138,7 @@ AUTOMATE: …`,
     order: 11,
     title: 'Pivot or Scale',
     track: 'Growth',
+    courseId: 'launching',
     paid: true,
     lessons: [
       {
@@ -1179,6 +1203,7 @@ My leaning and why: …`,
     order: 12,
     title: 'Fundraising & Your Story',
     track: 'Growth',
+    courseId: 'launching',
     paid: true,
     mentorSessionAfter: 'S3',
     lessons: [

@@ -66,11 +66,16 @@ export type Lesson = {
   prefillFrom?: 'onboarding'; // exercise: compose initial draft from onboarding answers (M0 intake)
 };
 
+// Course = a whole track of modules under one name/color. Today the entire
+// M0–M12 program is one course ('launching'); parallel courses slot in later.
+export type CourseId = 'launching';
+
 export type Module = {
   id: string;
   order: number;
   title: string;
-  track: TrackName;
+  track: TrackName;                          // legacy per-module label (kept; no longer drives pills)
+  courseId: CourseId;                        // pill color/name is course-level now
   lessons: Lesson[];
   paid?: boolean;                            // paywall flag (M5+ = true; NOT enforced in v2)
   mentorSessionAfter?: 'S1' | 'S2' | 'S3';   // M4→S1, M9→S2, M12→S3

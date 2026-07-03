@@ -1,31 +1,11 @@
 import { useEffect, useState, useCallback } from 'react';
-import { MODULES } from '../data';
-import type { UserData, BrainEntry, TrackName, ProgressResponse, Task, TaskSource, MentorSessionId, MentorSessionsState } from '../types';
+import { MODULES, COURSES, courseForLessonId } from '../data';
+import type { UserData, BrainEntry, ProgressResponse, Task, MentorSessionId, MentorSessionsState } from '../types';
 import ProfileButton from '../components/ProfileButton';
 import AccountPanel from '../components/AccountPanel';
 import DocumentsPanel from '../components/DocumentsPanel';
 import MomentumCard from '../components/MomentumCard';
 import MentorSessionModal from '../components/MentorSessionModal';
-
-const TASK_SOURCE_CHIP: Record<TaskSource, string> = {
-  program: 'bg-brand-100 text-brand-800',
-  mentor: 'bg-brand-50 text-brand',
-  lesson: 'bg-inset text-ink-soft',
-  advisor: 'bg-amber-50 text-amber-600',
-  self: 'bg-brand-50 text-brand',
-  system: 'bg-inset text-ink-mute',
-  pulse: 'bg-accent-50 text-accent-600',
-};
-
-const TASK_SOURCE_LABEL: Record<TaskSource, string> = {
-  program: 'Program',
-  mentor: 'Mentor',
-  lesson: 'Lesson',
-  advisor: 'Advisor',
-  self: 'You',
-  system: 'System',
-  pulse: 'Pulse',
-};
 
 const TASK_STATUS_DOT: Record<string, string> = {
   todo: 'bg-ink-mute',
@@ -34,13 +14,12 @@ const TASK_STATUS_DOT: Record<string, string> = {
   done: 'bg-accent-600',
 };
 
-const TRACK_COLORS: Record<TrackName, string> = {
-  Foundations: 'bg-brand-100 text-brand-700',
-  Validation:  'bg-accent-100 text-accent-800',
-  Building:    'bg-brand-100 text-brand-700',
-  Launch:      'bg-amber-100 text-amber-700',
-  Growth:      'bg-accent-100 text-accent-800',
-};
+// Task pill = its course (via sourceRef → lesson → module); unlinked = neutral "Personal".
+const PERSONAL_PILL = { name: 'Personal', color: 'bg-inset text-ink-soft' };
+function taskPill(sourceRef: string | null) {
+  const c = courseForLessonId(sourceRef);
+  return c ? COURSES[c] : PERSONAL_PILL;
+}
 
 const allLessons = MODULES.flatMap((m) => m.lessons);
 
@@ -258,9 +237,9 @@ export default function Dashboard({ userData, onUpdateUserData, onGoToLMS, onGoT
                       }`}
                     >
                       <span
-                        className={`inline-block text-[10px] font-bold rounded-pill px-2.5 py-0.5 mb-2 ${TRACK_COLORS[mod.track]}`}
+                        className={`inline-block text-[10px] font-bold rounded-pill px-2.5 py-0.5 mb-2 ${COURSES[mod.courseId].color}`}
                       >
-                        {mod.track}
+                        {COURSES[mod.courseId].name}
                       </span>
                       <p className="text-sm font-semibold text-ink leading-snug group-hover:text-brand-700 transition-colors">
                         {lesson.title}
@@ -315,7 +294,6 @@ export default function Dashboard({ userData, onUpdateUserData, onGoToLMS, onGoT
                   );
                 }
                 return activeTasks.slice(0, 4).map((task) => {
-                  const source = task.source as TaskSource;
                   const status = task.status ?? 'todo';
                   return (
                     <button
@@ -324,9 +302,9 @@ export default function Dashboard({ userData, onUpdateUserData, onGoToLMS, onGoT
                       className="w-full text-left bg-inset border border-hairline rounded-control px-3 py-3 hover:bg-brand-50 hover:border-brand-200 transition-all duration-150 group"
                     >
                       <div className="flex items-center gap-1.5 mb-1.5">
-                        <span className={`text-[10px] font-bold rounded-pill px-2 py-0.5 ${TASK_SOURCE_CHIP[source] ?? 'bg-inset text-ink-soft'}`}>
-                          {TASK_SOURCE_LABEL[source] ?? source}
-                        </span>
+                        {(() => { const pill = taskPill(task.sourceRef); return (
+                          <span className={`text-[10px] font-bold rounded-pill px-2 py-0.5 ${pill.color}`}>{pill.name}</span>
+                        ); })()}
                         <span className={`ml-auto w-1.5 h-1.5 rounded-pill flex-shrink-0 ${TASK_STATUS_DOT[status] ?? 'bg-ink-mute'}`} />
                       </div>
                       <p className="text-sm font-semibold text-ink line-clamp-2 group-hover:text-brand-700 transition-colors leading-snug">

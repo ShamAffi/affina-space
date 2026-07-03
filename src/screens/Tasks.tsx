@@ -1,30 +1,17 @@
 import { useEffect, useState } from 'react';
 import type { Task, TaskSource } from '../types';
-import { MODULES } from '../data';
+import { MODULES, COURSES, courseForLessonId } from '../data';
 
 // lessonId → fieldTask config (for interview-log progress counters on program cards)
 const FIELD_TASKS: Record<string, { artifactType: string; minEntries?: number }> = {};
 for (const m of MODULES) for (const l of m.lessons) if (l.fieldTask) FIELD_TASKS[l.id] = l.fieldTask;
 
-const SOURCE_LABEL: Record<TaskSource, string> = {
-  program: 'Program',
-  mentor: 'Mentor',
-  lesson: 'Lesson',
-  advisor: 'Advisor',
-  self: 'You',
-  system: 'System',
-  pulse: 'Pulse',
-};
-
-const SOURCE_CHIP: Record<TaskSource, string> = {
-  program: 'bg-brand-100 text-brand-800',
-  mentor: 'bg-brand-50 text-brand',
-  lesson: 'bg-inset text-ink-soft',
-  advisor: 'bg-amber-50 text-amber-600',
-  self: 'bg-brand-50 text-brand',
-  system: 'bg-inset text-ink-mute',
-  pulse: 'bg-accent-50 text-accent-600',
-};
+// Card pill = its course (via sourceRef → lesson → module); unlinked = neutral "Personal" (§6).
+const PERSONAL_PILL = { name: 'Personal', color: 'bg-inset text-ink-soft' };
+function taskPill(sourceRef: string | null) {
+  const c = courseForLessonId(sourceRef);
+  return c ? COURSES[c] : PERSONAL_PILL;
+}
 
 const GROUP_LABEL: Partial<Record<TaskSource, string>> = {
   program: 'From program',
@@ -232,9 +219,9 @@ export default function Tasks({ email, onGoToTask, onGoToDashboard }: Props) {
                     className="w-full text-left bg-surface border border-hairline rounded-card px-4 py-4 hover:border-accent-100 hover:bg-accent-50 transition-all duration-150 shadow-sm group"
                   >
                     <div className="flex items-center gap-2 mb-2">
-                      <span className={`text-[10px] font-bold rounded-pill px-2.5 py-0.5 ${SOURCE_CHIP[task.source as TaskSource] ?? 'bg-inset text-ink-soft'}`}>
-                        {SOURCE_LABEL[task.source as TaskSource] ?? task.source}
-                      </span>
+                      {(() => { const pill = taskPill(task.sourceRef); return (
+                        <span className={`text-[10px] font-bold rounded-pill px-2.5 py-0.5 ${pill.color}`}>{pill.name}</span>
+                      ); })()}
                       <div className="ml-auto flex items-center gap-1.5">
                         <span className="w-1.5 h-1.5 rounded-pill bg-accent-600" />
                         <span className="text-[10px] text-accent-600 font-semibold">done</span>
@@ -256,7 +243,6 @@ export default function Tasks({ email, onGoToTask, onGoToDashboard }: Props) {
 }
 
 function TaskCard({ task, onGoToTask }: { task: Task; onGoToTask: (t: Task) => void }) {
-  const source = task.source as TaskSource;
   const status = task.status ?? 'todo';
   return (
     <button
@@ -264,9 +250,9 @@ function TaskCard({ task, onGoToTask }: { task: Task; onGoToTask: (t: Task) => v
       className="w-full text-left bg-surface border border-hairline rounded-card px-4 py-4 hover:border-brand-200 hover:bg-brand-50 transition-all duration-150 shadow-sm group"
     >
       <div className="flex items-center gap-2 mb-2">
-        <span className={`text-[10px] font-bold rounded-pill px-2.5 py-0.5 ${SOURCE_CHIP[source] ?? 'bg-inset text-ink-soft'}`}>
-          {SOURCE_LABEL[source] ?? source}
-        </span>
+        {(() => { const pill = taskPill(task.sourceRef); return (
+          <span className={`text-[10px] font-bold rounded-pill px-2.5 py-0.5 ${pill.color}`}>{pill.name}</span>
+        ); })()}
         {(() => {
           // Interview-log progress counter (§3.3), e.g. "3/10"
           const ft = task.sourceRef ? FIELD_TASKS[task.sourceRef] : undefined;
