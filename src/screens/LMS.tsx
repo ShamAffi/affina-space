@@ -31,11 +31,12 @@ interface Props {
   initialLessonId?: string;
   onActiveLessonChange?: (lessonId: string) => void;
   onGoToTasks?: () => void;
+  onGoToPaywall?: () => void;
 }
 
 const allLessons: Lesson[] = MODULES.flatMap((m) => m.lessons);
 
-export default function LMS({ userData, onUpdateUserData, onGoToDashboard, onLogout, initialLessonId, onActiveLessonChange, onGoToTasks }: Props) {
+export default function LMS({ userData, onUpdateUserData, onGoToDashboard, onLogout, initialLessonId, onActiveLessonChange, onGoToTasks, onGoToPaywall }: Props) {
   const [activeLessonId, setActiveLessonId] = useState<string>(() => {
     if (initialLessonId) return initialLessonId;
     const first = allLessons.find((l) => !userData.completedLessons.includes(l.id));
@@ -153,6 +154,14 @@ export default function LMS({ userData, onUpdateUserData, onGoToDashboard, onLog
   const isCompleted = userData.completedLessons.includes(activeLessonId);
   const activeModule = MODULES.find((m) => m.lessons.some((l) => l.id === activeLesson.id));
   const activeKind = blockKind(activeLesson);
+
+  // SPEC_PAYWALL — landing on a paid (M5+) lesson while unsubscribed (e.g. bare
+  // /learning picks the first uncompleted lesson) reopens the paywall.
+  const activePaidLocked = !!activeModule?.paid && !userData.subscribed;
+  useEffect(() => {
+    if (activePaidLocked) onGoToPaywall?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activePaidLocked]);
 
   function isModuleLocked(modIdx: number): boolean {
     if (modIdx === 0) return false;
@@ -404,6 +413,10 @@ My motivation & 12-week goal: …`;
 
             {MODULES.map((mod, modIdx) => {
               const locked = isModuleLocked(modIdx);
+              // SPEC_PAYWALL — paid modules (M5+) are paywall-locked until subscribed;
+              // clicking opens the paywall (not a no-op like completion-locks).
+              const paidLocked = !!mod.paid && !userData.subscribed;
+              const dimmed = locked || paidLocked;
               const modCompleted = mod.lessons.filter((l) =>
                 userData.completedLessons.includes(l.id),
               ).length;
@@ -411,18 +424,18 @@ My motivation & 12-week goal: …`;
               return (
                 <div key={mod.id} className="mb-6">
                   <div className="flex items-center gap-2 px-2 mb-2">
-                    <span className={`text-xs font-bold rounded-md px-1.5 py-0.5 ${locked ? 'text-ink-mute bg-inset' : 'text-brand-600 bg-brand-50'}`}>
+                    <span className={`text-xs font-bold rounded-md px-1.5 py-0.5 ${dimmed ? 'text-ink-mute bg-inset' : 'text-brand-600 bg-brand-50'}`}>
                       {String(mod.order).padStart(2, '0')}
                     </span>
-                    <span className={`text-sm font-semibold flex-1 ${locked ? 'text-ink-mute' : 'text-ink'}`}>
+                    <span className={`text-sm font-semibold flex-1 ${dimmed ? 'text-ink-mute' : 'text-ink'}`}>
                       {mod.title}
                     </span>
                     {mod.paid && (
-                      <span className="text-[9px] font-bold bg-accent-50 text-accent-800 rounded-pill px-1.5 py-0.5" title="Premium module (not enforced yet)">
+                      <span className="text-[9px] font-bold bg-accent-50 text-accent-800 rounded-pill px-1.5 py-0.5" title={paidLocked ? 'Premium — unlock the full program' : 'Premium module'}>
                         ✦
                       </span>
                     )}
-                    {locked ? (
+                    {dimmed ? (
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9D9DA6" strokeWidth="2">
                         <rect x="3" y="11" width="18" height="11" rx="2" />
                         <path d="M7 11V7a5 5 0 0110 0v4" />
@@ -440,11 +453,14 @@ My motivation & 12-week goal: …`;
                       return (
                         <button
                           key={lesson.id}
-                          onClick={() => !locked && openLesson(lesson.id)}
-                          disabled={locked}
+                          onClick={() => {
+                            if (paidLocked) onGoToPaywall?.();      // paid-lock → open paywall
+                            else if (!locked) openLesson(lesson.id); // completion-lock → no-op
+                          }}
+                          disabled={locked && !paidLocked}
                           className={`w-full text-left flex items-start gap-2.5 px-3 py-2.5 rounded-control text-sm transition-all duration-150 ${
-                            locked
-                              ? 'text-ink-mute cursor-not-allowed'
+                            dimmed
+                              ? paidLocked ? 'text-ink-mute hover:bg-inset cursor-pointer' : 'text-ink-mute cursor-not-allowed'
                               : active
                                 ? 'bg-brand-50 text-brand-700 font-medium'
                                 : 'text-ink-soft hover:bg-inset hover:text-ink'
@@ -507,6 +523,20 @@ My motivation & 12-week goal: …`;
 
         {/* Lesson content */}
         <main ref={mainRef} className="flex-1 overflow-y-auto">
+          {activePaidLocked ? (
+            // Content withheld while the paywall redirect fires (no locked-lesson flash)
+            <div className="max-w-md mx-auto px-5 py-24 text-center animate-fade-in">
+              <p className="text-3xl mb-3">🔒</p>
+              <p className="text-sm font-semibold text-ink mb-1">This module is part of the full program</p>
+              <p className="text-xs text-ink-mute mb-5">Unlock Modules 5–12 to continue.</p>
+              <button
+                onClick={() => onGoToPaywall?.()}
+                className="bg-brand hover:bg-brand-700 active:scale-95 text-white text-sm font-semibold px-6 py-3 rounded-pill transition-all duration-150"
+              >
+                Unlock the full program →
+              </button>
+            </div>
+          ) : (
           <div className="max-w-2xl mx-auto px-5 sm:px-8 py-10 animate-fade-in" key={activeLessonId}>
             <div className="flex items-center gap-2 mb-6">
               <span className="text-xs font-semibold text-brand-600 bg-brand-50 rounded-pill px-3 py-1">
@@ -688,6 +718,21 @@ My motivation & 12-week goal: …`;
                     toggleLessonCompleteToDB(userData.email, activeLessonId);
                   }
                   if (nextLesson) openLesson(nextLesson.id);
+                }}
+              />
+            )}
+
+            {/* 🏛 m4l10 The Founder's Case — free reveal; its CTA opens the paywall (SPEC_PAYWALL §0) */}
+            {activeLesson.id === 'm4l10' && (
+              <FoundersCaseBlock
+                key={activeLessonId}
+                email={userData.email}
+                onContinue={() => {
+                  if (!isCompleted) {
+                    onUpdateUserData({ completedLessons: [...userData.completedLessons, activeLessonId] });
+                    toggleLessonCompleteToDB(userData.email, activeLessonId);
+                  }
+                  onGoToPaywall?.();
                 }}
               />
             )}
@@ -1102,7 +1147,8 @@ My motivation & 12-week goal: …`;
               if (isExercise && activeLesson.aiMode === 'north-star') return null;
               // m0l5: the big approve button IS the navigation — never show Next lesson here.
               // m0l3: same — "Continue to a few quick questions" always advances.
-              if (activeLesson.id === 'm0l5' || activeLesson.id === 'm0l3') return null;
+              // m4l10: its "Sounds great — continue" CTA opens the paywall, not a Next lesson.
+              if (activeLesson.id === 'm0l5' || activeLesson.id === 'm0l3' || activeLesson.id === 'm4l10') return null;
               // m0l4 quiz keeps default Next after completion (revisit shouldn't force a re-take)
               if (activeLesson.id === 'm0l4' && !isCompleted) return null;
               // delegate views manage their own actions
@@ -1142,6 +1188,7 @@ My motivation & 12-week goal: …`;
               );
             })()}
           </div>
+          )}
         </main>
       </div>
 
@@ -1937,6 +1984,113 @@ function ProblemSolutionBlock({ email, initialContent, onSave }: {
         className="w-full bg-brand hover:bg-brand-700 active:scale-95 disabled:opacity-40 text-white text-sm font-semibold py-3 rounded-pill transition-all duration-150"
       >
         Save & get mentor feedback
+      </button>
+    </div>
+  );
+}
+
+// ─── m4l10 "The Founder's Case" (SPEC_PAYWALL §0) — full-page milestone reveal ──
+// Vision · Proof · Potential (napkin math, optimistic, NOT a forecast). CTA → paywall.
+type FoundersCase = {
+  vision: string;
+  proof: string[];
+  potential: { reachableCustomers: string; illustrativePrice: string; annualRevenue: string; valuationRange: string; math: string };
+};
+function FoundersCaseBlock({ email, onContinue }: { email: string; onContinue: () => void }) {
+  type Status = 'loading' | 'ready' | 'error';
+  const [status, setStatus] = useState<Status>('loading');
+  const [data, setData] = useState<FoundersCase | null>(null);
+
+  useEffect(() => {
+    if (!email) { setStatus('error'); return; }
+    fetch('/api/brain', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'founders-case', email }),
+    })
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((d) => { setData(d.case); setStatus('ready'); })
+      .catch(() => setStatus('error'));
+  }, [email]);
+
+  if (status === 'loading') {
+    return (
+      <div className="bg-surface border border-brand-100 rounded-card mb-8 flex flex-col items-center justify-center gap-4 py-16 animate-fade-in">
+        <div className="w-14 h-14 rounded-pill bg-brand animate-orb-pulse" />
+        <p className="text-sm font-semibold text-ink-soft tracking-wide">Building your case…</p>
+        <p className="text-xs text-ink-mute">Vision, proof, and what it could become</p>
+      </div>
+    );
+  }
+
+  if (status === 'error' || !data) {
+    return (
+      <div className="bg-brand-50 border border-brand-100 rounded-card p-6 mb-8 text-center animate-fade-in">
+        <p className="text-sm text-ink-soft mb-4">Couldn't assemble your case just now — you can continue anyway.</p>
+        <button onClick={onContinue} className="bg-brand hover:bg-brand-700 active:scale-95 text-white text-sm font-semibold px-6 py-3 rounded-pill transition-all duration-150">
+          Sounds great — continue →
+        </button>
+      </div>
+    );
+  }
+
+  const p = data.potential;
+  return (
+    <div className="mb-8 animate-slide-up flex flex-col gap-5">
+      {/* The Vision */}
+      <div>
+        <p className="text-[10px] font-bold text-brand-600 uppercase tracking-widest mb-2">The Vision</p>
+        <p className="font-display text-xl sm:text-2xl font-medium tracking-tight text-ink leading-snug">{data.vision}</p>
+      </div>
+
+      {/* The Proof */}
+      <div className="bg-surface border border-hairline rounded-card p-5 shadow-sm">
+        <p className="text-[10px] font-bold text-accent-700 uppercase tracking-widest mb-3">The Proof — what you've already done</p>
+        <ul className="flex flex-col gap-2.5">
+          {data.proof.map((b, i) => (
+            <li key={i} className="flex gap-2.5 text-sm text-ink leading-relaxed">
+              <span className="mt-0.5 flex-shrink-0 w-5 h-5 rounded-pill bg-accent-50 flex items-center justify-center">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#119C74" strokeWidth="2.5"><polyline points="20 6 9 17 4 12" /></svg>
+              </span>
+              {b}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {/* The Potential — napkin */}
+      <div className="bg-brand-50 border border-brand-100 rounded-card p-5">
+        <p className="text-[10px] font-bold text-brand-700 uppercase tracking-widest mb-3">The Potential — a napkin, not a forecast</p>
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          <div className="bg-surface border border-brand-100 rounded-control p-3">
+            <p className="text-[10px] font-bold text-ink-mute uppercase tracking-wider">Reachable customers</p>
+            <p className="text-lg font-bold text-ink leading-tight mt-0.5">{p.reachableCustomers}</p>
+          </div>
+          <div className="bg-surface border border-brand-100 rounded-control p-3">
+            <p className="text-[10px] font-bold text-ink-mute uppercase tracking-wider">Illustrative price</p>
+            <p className="text-lg font-bold text-ink leading-tight mt-0.5">{p.illustrativePrice}</p>
+          </div>
+          <div className="bg-surface border border-brand-100 rounded-control p-3">
+            <p className="text-[10px] font-bold text-ink-mute uppercase tracking-wider">Annual revenue</p>
+            <p className="text-lg font-bold text-brand-800 leading-tight mt-0.5">{p.annualRevenue}</p>
+          </div>
+          <div className="bg-surface border border-brand-100 rounded-control p-3">
+            <p className="text-[10px] font-bold text-ink-mute uppercase tracking-wider">Rough valuation</p>
+            <p className="text-lg font-bold text-brand-800 leading-tight mt-0.5">{p.valuationRange}</p>
+          </div>
+        </div>
+        <p className="text-xs text-ink-soft leading-relaxed">✏️ {p.math}</p>
+        <p className="text-[11px] text-ink-mute mt-3 leading-relaxed">
+          These are napkin numbers — the optimistic case if you hit it, not a promise.
+          <span className="font-semibold text-brand-700"> Module 5 is where these guesses become your real numbers.</span>
+        </p>
+      </div>
+
+      <button
+        onClick={onContinue}
+        className="w-full bg-brand hover:bg-brand-700 active:scale-95 text-white text-sm font-semibold py-3.5 rounded-pill transition-all duration-150"
+      >
+        Sounds great — continue →
       </button>
     </div>
   );

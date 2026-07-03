@@ -30,10 +30,11 @@ interface Props {
   onGoToTasks: () => void;
   onGoToTask: (task: Task) => void;
   onGoToPulse: () => void;
+  onGoToPaywall: () => void;
   onLogout: () => void;
 }
 
-export default function Dashboard({ userData, onUpdateUserData, onGoToLMS, onGoToTasks, onGoToTask, onGoToPulse, onLogout }: Props) {
+export default function Dashboard({ userData, onUpdateUserData, onGoToLMS, onGoToTasks, onGoToTask, onGoToPulse, onGoToPaywall, onLogout }: Props) {
   const [progressData, setProgressData] = useState<ProgressResponse | null>(null);
   const [brainEntries, setBrainEntries] = useState<BrainEntry[]>([]);
   const [taskList, setTaskList] = useState<Task[]>([]);
@@ -55,6 +56,7 @@ export default function Dashboard({ userData, onUpdateUserData, onGoToLMS, onGoT
               ...new Set([...userData.completedLessons, ...(data.completedLessons ?? [])]),
             ],
             lessonInputs: { ...userData.lessonInputs, ...(data.lessonInputs ?? {}) },
+            ...(data.subscribed !== undefined ? { subscribed: data.subscribed } : {}),
           });
         }
       })
@@ -102,7 +104,10 @@ export default function Dashboard({ userData, onUpdateUserData, onGoToLMS, onGoT
     for (const m of MODULES) {
       if (!m.mentorSessionAfter) continue;
       const complete = m.lessons.every((l) => doneSet.has(l.id));
-      if (complete && !sessionsState[m.mentorSessionAfter]?.completed) return m.mentorSessionAfter;
+      const st = sessionsState[m.mentorSessionAfter];
+      // SPEC_PAYWALL §4/§5: S1 now surfaces on the post-paywall full page — don't
+      // double-prompt here once she's booked it (only nudge if she chose "book later").
+      if (complete && !st?.completed && !st?.booked) return m.mentorSessionAfter;
     }
     return null;
   })();
@@ -225,13 +230,18 @@ export default function Dashboard({ userData, onUpdateUserData, onGoToLMS, onGoT
                     !MODULES[modIdx - 1].lessons.every((l) =>
                       userData.completedLessons.includes(l.id),
                     );
+                  // SPEC_PAYWALL — a paid (M5+) next lesson while unsubscribed opens the paywall.
+                  const paidLocked = !!mod.paid && !userData.subscribed;
                   return (
                     <button
                       key={lesson.id}
-                      onClick={() => !isLocked && onGoToLMS(lesson.id)}
-                      disabled={isLocked}
+                      onClick={() => {
+                        if (paidLocked) onGoToPaywall();
+                        else if (!isLocked) onGoToLMS(lesson.id);
+                      }}
+                      disabled={isLocked && !paidLocked}
                       className={`w-full text-left bg-inset border border-hairline rounded-control p-4 transition-all duration-150 group ${
-                        isLocked
+                        isLocked && !paidLocked
                           ? 'opacity-50 cursor-not-allowed'
                           : 'hover:bg-brand-50 hover:border-brand-200 cursor-pointer'
                       }`}
@@ -245,9 +255,11 @@ export default function Dashboard({ userData, onUpdateUserData, onGoToLMS, onGoT
                         {lesson.title}
                       </p>
                       <p className="text-xs text-ink-mute mt-1">
-                        {isLocked
-                          ? `Module ${mod.order} · locked`
-                          : `Module ${mod.order} · ${lesson.type !== 'text' ? 'exercise' : 'lesson'}`}
+                        {paidLocked
+                          ? `Module ${mod.order} · 🔒 unlock the full program`
+                          : isLocked
+                            ? `Module ${mod.order} · locked`
+                            : `Module ${mod.order} · ${lesson.type !== 'text' ? 'exercise' : 'lesson'}`}
                       </p>
                     </button>
                   );

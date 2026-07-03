@@ -639,6 +639,15 @@ Core advantage & why it's hard to copy: …`,
           artifactType: 'screenshot',
         },
       },
+      {
+        // The Founder's Case (SPEC_PAYWALL §0) — last block of M4, free, not scored.
+        // A milestone reveal (like m0l5) generated from her Brain; its CTA opens the paywall.
+        id: 'm4l10',
+        type: 'text',
+        kind: 'system',
+        title: "The Founder's Case",
+        body: `You've done what most people only talk about: sharpened an idea, sized a market, talked to real people, and tested your hypothesis against what they actually said. Before you go on, take a moment to see the whole picture — your vision, your proof, and what it could become.`,
+      },
     ],
   },
 

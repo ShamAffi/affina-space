@@ -12,6 +12,7 @@ export const defaultUserData: UserData = {
   goal: '',
   email: '',
   score: 0,
+  subscribed: false,
   lessonInputs: {},
   completedLessons: [],
 };

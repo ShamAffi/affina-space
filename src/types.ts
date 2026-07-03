@@ -29,6 +29,7 @@ export type UserData = {
   goal: string;
   email: string;
   score: number;
+  subscribed: boolean;   // paywall entitlement (SPEC_PAYWALL) — M5–M12 gated on this
   lessonInputs: Record<string, string>;
   completedLessons: string[];
 };
@@ -260,7 +261,7 @@ export type ReadinessBreakdown = {
 
 // §6.5 mentor sessions state — completion is set manually in v2
 export type MentorSessionId = 'S1' | 'S2' | 'S3';
-export type MentorSessionsState = Partial<Record<MentorSessionId, { completed?: boolean }>>;
+export type MentorSessionsState = Partial<Record<MentorSessionId, { completed?: boolean; booked?: boolean; seen?: boolean }>>;
 
 export type LaunchProgress = {
   phase: 'launch';
@@ -279,6 +280,7 @@ export type LaunchProgress = {
   mentorSessions?: MentorSessionsState | null;
   latestCheckIn?: LatestCheckIn | null;         // Traction widget business source
   lastBusinessUpdateAt?: string | null;         // most recent real business update (ISO); null = never
+  subscribed?: boolean;                         // paywall entitlement
 };
 
 export type GrowthProgress = {
@@ -300,6 +302,7 @@ export type GrowthProgress = {
   mentorSessions?: MentorSessionsState | null;
   latestCheckIn?: LatestCheckIn | null;         // Traction widget business source
   lastBusinessUpdateAt?: string | null;         // most recent real business update (ISO); null = never
+  subscribed?: boolean;                         // paywall entitlement
 };
 
 export type ProgressResponse = LaunchProgress | GrowthProgress;

@@ -130,6 +130,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         lastReadinessGain: user.lastReadinessGain ?? null,
         northStar: user.northStar ?? null,
         mentorSessions: user.mentorSessions ?? null,
+        subscribed: user.subscribed ?? false,
         ...traction,
       });
     }
@@ -173,6 +174,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       lastReadinessGain: user.lastReadinessGain ?? null,
       northStar: user.northStar ?? null,
       mentorSessions: user.mentorSessions ?? null,
+      subscribed: user.subscribed ?? false,
       ...traction,
     });
   } catch (err) {

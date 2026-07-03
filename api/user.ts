@@ -58,6 +58,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       goal: user.goal ?? '',
       email: user.email,
       score: user.score ?? 0,
+      subscribed: user.subscribed ?? false,
+      mentorSessions: user.mentorSessions ?? null,
       lessonInputs: Object.fromEntries(inputs.map((i) => [i.lessonId, i.content ?? ''])),
       completedLessons: completed.map((c) => c.lessonId),
     });
@@ -91,6 +93,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             snapshot: null,
             snapshotHistory: null,
             mentorSessions: null,
+            subscribed: false,
             updatedAt: new Date(),
           })
           .where(eq(users.email, email));
@@ -109,20 +112,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 
-  // PATCH /api/user — update account fields (name, projectName, mentorSessions)
+  // PATCH /api/user — update account fields (name, projectName, mentorSessions, subscribed)
   if (req.method === 'PATCH') {
-    const { email, name, projectName, mentorSessions } = req.body;
+    const { email, name, projectName, mentorSessions, subscribed } = req.body;
     if (!email) return res.status(400).json({ error: 'email required' });
+    const existingUser = await db.query.users.findFirst({ where: eq(users.email, email) });
     const patchFields: Record<string, unknown> = { updatedAt: new Date() };
     if (name !== undefined) patchFields.name = name;
     if (projectName !== undefined) patchFields.projectName = projectName;
-    if (mentorSessions !== undefined) patchFields.mentorSessions = mentorSessions;
+    if (subscribed !== undefined) patchFields.subscribed = subscribed;
+    // Merge mentorSessions (partial patch per session) — never clobber other sessions.
+    if (mentorSessions !== undefined) {
+      const prev = (existingUser?.mentorSessions ?? {}) as Record<string, unknown>;
+      const merged: Record<string, unknown> = { ...prev };
+      for (const [k, v] of Object.entries(mentorSessions as Record<string, unknown>)) {
+        merged[k] = { ...(prev[k] as object ?? {}), ...(v as object) };
+      }
+      patchFields.mentorSessions = merged;
+    }
 
     // Graduation (решение Шамиля): completing mentor session S3 IS the launch→growth
     // moment — the post-program Growth/XP phase starts here with its seed points.
     if (mentorSessions?.S3?.completed === true) {
-      const u = await db.query.users.findFirst({ where: eq(users.email, email) });
-      if (u && (u.phase ?? 'launch') === 'launch') {
+      if (existingUser && (existingUser.phase ?? 'launch') === 'launch') {
         patchFields.phase = 'growth';
         patchFields.launchValidatedAt = new Date();
         patchFields.growthXp = GROWTH_SEED_XP;

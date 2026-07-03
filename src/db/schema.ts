@@ -24,8 +24,10 @@ export const users = pgTable('users', {
   // Startup Snapshot (§3.4)
   snapshot: jsonb('snapshot'),                 // current StartupSnapshot | null
   snapshotHistory: jsonb('snapshot_history'),  // StartupSnapshot[] — last 5 versions
-  // Mentor sessions (§6.5): { S1?: { completed?: boolean }, S2?: ..., S3?: ... }
+  // Mentor sessions (§6.5): { S1?: { completed?, booked?, seen? }, S2?: ..., S3?: ... }
   mentorSessions: jsonb('mentor_sessions'),
+  // Paywall entitlement (SPEC_PAYWALL) — M5–M12 gated on this. Stripe sets it later.
+  subscribed: boolean('subscribed').default(false),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });

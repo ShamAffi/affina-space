@@ -232,6 +232,74 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ snapshot: snap });
     }
 
+    // 🏛 m4l10 "The Founder's Case" (SPEC_PAYWALL §0) — pre-paywall milestone reveal.
+    // Vision + Proof (real Brain data) + Potential (napkin math, optimistic, NOT a forecast).
+    if (action === 'founders-case') {
+      const entries = await db.query.brainEntries.findMany({ where: eq(brainEntries.userId, user.id) });
+      const cached = entries.find((e) => e.entryType === 'founders_case');
+      if (cached && req.body.refresh !== true) {
+        try { return res.status(200).json({ case: JSON.parse(cached.content) }); } catch { /* regen */ }
+      }
+      const byType: Record<string, string> = {};
+      for (const e of entries) if (e.content) byType[e.entryType] = e.content;
+      const snap = user.snapshot as { sections: { title: string; content: string }[] } | null;
+      const CaseSchema = z.object({
+        vision: z.coerce.string(),
+        proof: z.array(z.coerce.string()).min(1).max(6),
+        potential: z.object({
+          reachableCustomers: z.coerce.string(),
+          illustrativePrice: z.coerce.string(),
+          annualRevenue: z.coerce.string(),
+          valuationRange: z.coerce.string(),
+          math: z.coerce.string(),         // the napkin line, calculation shown
+        }),
+      });
+      const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+      try {
+        const msg = await client.messages.create({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 1200,
+          system: `You are Affina, writing "The Founder's Case" — a milestone reveal for a founder who just finished Module 4, right before she decides to continue. Tone: inspiring but HONEST (results-not-hype). Three parts, all from HER real data — never generic, never invented:
+- vision: her project one-liner + why it matters in the world (2-3 sentences, from her value proposition + validated problem).
+- proof: 3-6 bullet strings of what she actually did/validated across 4 modules (real numbers from her Brain: interviews run, problem validated, first demand signals). Each bullet concrete and hers.
+- potential: a VENTURE NAPKIN, optimistic upside — NOT a forecast:
+  · reachableCustomers: from her M2 market/TAM (a number or honest range; if absent, a reasonable estimate labeled as such)
+  · illustrativePrice: a plausible ILLUSTRATIVE monthly/annual price (she has no pricing yet — that's M5), clearly illustrative
+  · annualRevenue: reachableCustomers × price (show the multiplication in 'math')
+  · valuationRange: annualRevenue × a simple revenue multiple (e.g. 3–5×) as a rough range
+  · math: one line showing the napkin calculation transparently
+  NEVER present price/revenue/valuation as a promise or prediction — it is the "if you hit it" upside.
+Respond ONLY with valid JSON: {"vision":"...","proof":["..."],"potential":{"reachableCustomers":"...","illustrativePrice":"...","annualRevenue":"...","valuationRange":"...","math":"..."}}`,
+          messages: [{ role: 'user', content: `PROJECT: ${user.projectName || 'unnamed'} — ${user.idea || 'not set'}
+STARTUP SNAPSHOT:\n${snap ? snap.sections.map((x) => `## ${x.title}\n${x.content}`).join('\n') : '(none)'}
+VALUE PROP: ${byType['value_proposition'] || '(none)'}
+PERSONA: ${byType['persona'] || '(none)'}
+MARKET / TAM: ${byType['competitive_landscape'] || byType['market_research'] || '(none)'}
+PROBLEM-SOLUTION CHECK: ${byType['problem_solution_check'] || '(none)'}
+QUANTIFIED VALUE: ${byType['value_advantage'] || byType['quantified_value'] || '(none)'}
+MICRO-COMMITMENT / DEMAND: ${byType['micro_commitment'] || '(none)'}
+
+Write her Founder's Case.` }],
+        });
+        const raw = msg.content[0].type === 'text' ? msg.content[0].text : '';
+        const match = raw.match(/\{[\s\S]*\}/);
+        if (!match) throw new Error('no JSON');
+        const parsed = CaseSchema.parse(JSON.parse(match[0]));
+        if (cached) {
+          await db.update(brainEntries).set({ content: JSON.stringify(parsed), updatedAt: new Date() }).where(eq(brainEntries.id, cached.id));
+        } else {
+          await db.insert(brainEntries).values({
+            userId: user.id, lessonId: 'm4l10', lessonTitle: "The Founder's Case",
+            prompt: 'Vision · Proof · Potential — your case, before Module 5', content: JSON.stringify(parsed),
+            entryType: 'founders_case', processedByAi: true,
+          });
+        }
+        return res.status(200).json({ case: parsed });
+      } catch {
+        return res.status(502).json({ error: 'ai_unavailable' });
+      }
+    }
+
     // 🟢 m2l6 — Market Research, test mode (§1.1–§1.7). answers = replies to clarifying questions.
     if (action === 'market-research') {
       const { answers } = req.body as { answers?: Record<string, string> };
