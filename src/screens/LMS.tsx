@@ -12,6 +12,7 @@ import FeedbackCard from '../components/FeedbackCard';
 import CompareCard from '../components/CompareCard';
 import LessonBody from '../components/LessonBody';
 import { splitMissionVision, composeMissionVision } from '../missionVision';
+import { composePSC, splitPSC, pscRecapBlocks, PSC_LABELS, type PscBlocks } from '../problemSolution';
 
 // Block-kind chips (§5 LMS sidebar): label + tint per kind. Theory renders no chip.
 const KIND_CHIP: Partial<Record<BlockKind, { label: string; cls: string }>> = {
@@ -179,7 +180,7 @@ My motivation & 12-week goal: …`;
     return '';
   }
 
-  function handleSaveInput(lessonId: string, contentOverride?: string) {
+  function handleSaveInput(lessonId: string, contentOverride?: string, opts?: { provenance?: unknown }) {
     const val = contentOverride ?? getInputValue(lessonId);
     if (!val.trim()) return;
     setAiErrorLesson(null);
@@ -218,6 +219,7 @@ My motivation & 12-week goal: …`;
           prompt: lesson.inputPrompt ?? '',
           answer: val,
           aiMode: lesson.aiMode ?? 'feedback',
+          ...(opts?.provenance ? { provenance: opts.provenance } : {}),
           context: {
             name: userData.name,
             idea: userData.idea,
@@ -906,6 +908,7 @@ My motivation & 12-week goal: …`;
                         previousScore={lessonFeedback.previousScore}
                         onRefine={() => setRefiningLesson(activeLessonId)}
                         onContinue={onContinue}
+                        answerBlocks={activeLessonId === 'm4l5' ? pscRecapBlocks(getInputValue('m4l5')) : undefined}
                       />
                       {delegateButton && <div className="-mt-5 mb-8">{delegateButton}</div>}
                     </>
@@ -996,8 +999,18 @@ My motivation & 12-week goal: …`;
                     </div>
                   )}
 
-                  {/* 3. Input form (idle or refining) */}
-                  {showInput && (
+                  {/* m4l5 — three editable evidence blocks (SPEC_M4L5_THREE_BLOCK) */}
+                  {showInput && activeLessonId === 'm4l5' && (
+                    <ProblemSolutionBlock
+                      key={activeLessonId + String(isRefining)}
+                      email={userData.email}
+                      initialContent={getInputValue('m4l5')}
+                      onSave={(text, provenance) => handleSaveInput('m4l5', text, { provenance })}
+                    />
+                  )}
+
+                  {/* 3. Input form (idle or refining) — generic exercises */}
+                  {showInput && activeLessonId !== 'm4l5' && (
                     <div className="bg-brand-50 border border-brand-100 rounded-card p-5 mb-8">
                       {activeLesson.inputPrompt && (
                         <p className="text-sm font-semibold text-brand-700 mb-3">{activeLesson.inputPrompt}</p>
@@ -1790,6 +1803,141 @@ function IntakeQuizBlock({ initialJson, onComplete }: {
         {step === TOTAL - 1 ? 'Finish →' : 'Next →'}
       </button>
       <p className="text-[11px] text-ink-mute text-center mt-2">Enter ↵ works too{step === 2 ? '' : ' · you can skip this one'}</p>
+    </div>
+  );
+}
+
+// ─── m4l5 Problem–Solution check — three editable evidence blocks (SPEC_M4L5_THREE_BLOCK) ──
+// Not Delegate/Mode C: AI may draft any block from her Brain, she owns & edits all three,
+// one Save commits. Each AI button refills ONLY its own block(s); edits are never clobbered.
+function ProblemSolutionBlock({ email, initialContent, onSave }: {
+  email: string;
+  initialContent: string;
+  onSave: (text: string, provenance: { forAgainstDrafted: boolean; conclusionDrafted: boolean; conclusionEditedAfterDraft: boolean }) => void;
+}) {
+  const [blocks, setBlocks] = useState<PscBlocks>(() => splitPSC(initialContent));
+  const [draftingFA, setDraftingFA] = useState(false);
+  const [draftingC, setDraftingC] = useState(false);
+  const [faError, setFaError] = useState(false);
+  const [cError, setCError] = useState(false);
+  // §6 provenance (for the review only — not shown to her)
+  const [forAgainstDrafted, setForAgainstDrafted] = useState(false);
+  const [conclusionDrafted, setConclusionDrafted] = useState(false);
+  const [conclusionEdited, setConclusionEdited] = useState(false);
+
+  const fieldCls = 'w-full text-sm bg-surface border border-hairline rounded-control px-3 py-2.5 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 placeholder-ink-mute resize-none transition';
+  const canSave = !!(blocks.for.trim() || blocks.against.trim() || blocks.conclusion.trim());
+  const canGenConclusion = !!(blocks.for.trim() || blocks.against.trim());
+
+  function draftForAgainst() {
+    setDraftingFA(true); setFaError(false);
+    fetch('/api/ai', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: 'psc-for-against', email }),
+    })
+      .then((r) => { if (!r.ok) throw new Error('api'); return r.json(); })
+      .then((d: { for: string; against: string }) => {
+        setBlocks((b) => ({ ...b, for: d.for ?? '', against: d.against ?? '' })); // Conclusion untouched
+        setForAgainstDrafted(true);
+      })
+      .catch(() => setFaError(true))
+      .finally(() => setDraftingFA(false));
+  }
+
+  function generateConclusion() {
+    setDraftingC(true); setCError(false);
+    fetch('/api/ai', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: 'psc-conclusion', forText: blocks.for, againstText: blocks.against }),
+    })
+      .then((r) => { if (!r.ok) throw new Error('api'); return r.json(); })
+      .then((d: { conclusion: string }) => {
+        setBlocks((b) => ({ ...b, conclusion: d.conclusion ?? '' })); // For/Against untouched
+        setConclusionDrafted(true);
+        setConclusionEdited(false);
+      })
+      .catch(() => setCError(true))
+      .finally(() => setDraftingC(false));
+  }
+
+  return (
+    <div className="flex flex-col gap-4 mb-8">
+      {/* For / Against area */}
+      <div className="bg-brand-50 border border-brand-100 rounded-card p-5">
+        <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+          <p className="text-sm font-semibold text-brand-700">Weigh your idea against your interviews</p>
+          <button
+            type="button"
+            onClick={draftForAgainst}
+            disabled={draftingFA}
+            className="text-xs font-semibold text-brand border-[1.5px] border-brand rounded-pill px-3 py-1.5 hover:bg-brand-100 disabled:opacity-50 transition"
+          >
+            {draftingFA ? 'Reading your Brain…' : '✨ Draft For & Against from my interviews'}
+          </button>
+        </div>
+        {faError && <p className="text-[11px] text-amber-700 mb-2">Couldn't draft just now — try again, or write them yourself.</p>}
+        <div className="flex flex-col gap-4">
+          <div>
+            <label className="block text-[11px] font-bold text-accent-700 uppercase tracking-wider mb-1">{PSC_LABELS.for}</label>
+            <textarea
+              value={blocks.for}
+              onChange={(e) => setBlocks((b) => ({ ...b, for: e.target.value }))}
+              rows={3}
+              placeholder="Evidence from your interviews that backs up your Module 1 hypothesis…"
+              className={fieldCls}
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] font-bold text-amber-700 uppercase tracking-wider mb-1">{PSC_LABELS.against}</label>
+            <textarea
+              value={blocks.against}
+              onChange={(e) => setBlocks((b) => ({ ...b, against: e.target.value }))}
+              rows={3}
+              placeholder="What they said that challenged it, or surprised you…"
+              className={fieldCls}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Conclusion */}
+      <div className="bg-surface border border-hairline rounded-card p-5">
+        <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+          <p className="text-sm font-semibold text-ink">Your call</p>
+          <button
+            type="button"
+            onClick={generateConclusion}
+            disabled={draftingC || !canGenConclusion}
+            className="text-xs font-semibold text-brand border-[1.5px] border-brand rounded-pill px-3 py-1.5 hover:bg-brand-50 disabled:opacity-40 transition"
+            title={canGenConclusion ? undefined : 'Write or draft For & Against first'}
+          >
+            {draftingC ? 'Thinking…' : '✨ Generate conclusion from For & Against'}
+          </button>
+        </div>
+        {cError && <p className="text-[11px] text-amber-700 mb-2">Couldn't draft the conclusion — try again, or write it yourself.</p>}
+        <label className="block text-[11px] font-bold text-brand-700 uppercase tracking-wider mb-1">
+          {PSC_LABELS.conclusion} · <span className="text-ink-mute normal-case font-semibold">your call</span>
+        </label>
+        <textarea
+          value={blocks.conclusion}
+          onChange={(e) => {
+            setBlocks((b) => ({ ...b, conclusion: e.target.value }));
+            if (conclusionDrafted) setConclusionEdited(true);  // she's engaging with the AI draft
+          }}
+          rows={4}
+          placeholder="In your own words: what are you keeping, what are you changing, and why?"
+          className={fieldCls}
+        />
+      </div>
+
+      <button
+        type="button"
+        onClick={() => onSave(composePSC(blocks), { forAgainstDrafted, conclusionDrafted, conclusionEditedAfterDraft: conclusionEdited })}
+        disabled={!canSave}
+        className="w-full bg-brand hover:bg-brand-700 active:scale-95 disabled:opacity-40 text-white text-sm font-semibold py-3 rounded-pill transition-all duration-150"
+      >
+        Save & get mentor feedback
+      </button>
     </div>
   );
 }

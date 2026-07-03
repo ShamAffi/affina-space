@@ -172,6 +172,66 @@ Respond ONLY with valid JSON:
     }
   }
 
+  // m4l5 per-block AI assist (SPEC_M4L5_THREE_BLOCK). Structures her own Brain data
+  // into evidence blocks; each mode fills ONLY its own block(s), never the others.
+  if (req.body.mode === 'psc-for-against') {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'email required' });
+    const db = getDb();
+    const user = await db.query.users.findFirst({ where: eq(users.email, email) });
+    if (!user) return res.status(404).json({ error: 'user not found' });
+    const entries = await db.query.brainEntries.findMany({ where: eq(brainEntries.userId, user.id) });
+    const byType: Record<string, string> = {};
+    for (const e of entries) if (e.content) byType[e.entryType] = e.content;
+    const Schema = z.object({ for: z.coerce.string().catch(''), against: z.coerce.string().catch('') });
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    try {
+      const msg = await client.messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 900,
+        system: `You are helping a founder check her Module 1 idea against her real Module 3 customer interviews. From her Brain ONLY, draft two evidence blocks in her first person ("I"/"my"):
+- for: what her interviews CONFIRM about her original hypothesis — concrete evidence, quotes, patterns that support it.
+- against: what her interviews CONTRADICT or that surprised her — evidence that challenges or reorders the hypothesis.
+Use her actual data (her value proposition/hypothesis, interview log, persona, market notes). NEVER invent interviews, quotes, or findings not in her Brain. If the evidence is thin on a side, say so honestly and briefly rather than padding. Do NOT write a conclusion or a decision — only the two evidence blocks. Respond ONLY with valid JSON: {"for":"...","against":"..."}`,
+        messages: [{ role: 'user', content: `HER HYPOTHESIS / VALUE PROP: ${byType['value_proposition'] || byType['mission_vision'] || '(not written)'}
+PERSONA: ${byType['persona'] || '(not written)'}
+INTERVIEW LOG: ${byType['interview_log'] || '(no interviews logged yet)'}
+MARKET / COMPETITORS: ${byType['competitive_landscape'] || byType['positioning'] || '(none)'}
+
+Draft her For (confirms) and Against (contradicts/surprised) from this.` }],
+      });
+      const raw = msg.content[0].type === 'text' ? msg.content[0].text : '';
+      const match = raw.match(/\{[\s\S]*\}/);
+      if (!match) throw new Error('no JSON');
+      const p = Schema.parse(JSON.parse(match[0]));
+      return res.status(200).json({ for: p.for, against: p.against });
+    } catch {
+      return res.status(502).json({ error: 'ai_unavailable' });
+    }
+  }
+
+  if (req.body.mode === 'psc-conclusion') {
+    const { forText, againstText } = req.body;
+    if (!forText?.trim() && !againstText?.trim()) return res.status(400).json({ error: 'for/against required' });
+    const Schema = z.object({ conclusion: z.coerce.string().catch('') });
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    try {
+      const msg = await client.messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 600,
+        system: `A founder has weighed what her interviews CONFIRM vs CONTRADICT about her idea. From the two blocks she gives you — and ONLY those — draft a starting CONCLUSION in her first person: what she should keep, what to change, and why, grounded strictly in the For/Against provided. This is a draft for her to edit and make her own — keep it honest and specific to her evidence, not generic startup advice. Do not invent evidence beyond the two blocks. Respond ONLY with valid JSON: {"conclusion":"..."}`,
+        messages: [{ role: 'user', content: `FOR (confirms):\n${forText || '(empty)'}\n\nAGAINST (contradicts/surprised):\n${againstText || '(empty)'}\n\nDraft her conclusion.` }],
+      });
+      const raw = msg.content[0].type === 'text' ? msg.content[0].text : '';
+      const match = raw.match(/\{[\s\S]*\}/);
+      if (!match) throw new Error('no JSON');
+      const p = Schema.parse(JSON.parse(match[0]));
+      return res.status(200).json({ conclusion: p.conclusion });
+    } catch {
+      return res.status(502).json({ error: 'ai_unavailable' });
+    }
+  }
+
   // Generate project name mode — cheap Haiku call, no lesson context required
   if (req.body.mode === 'generate-name') {
     const { idea, customer, businessModel, stage, avoid } = req.body;
@@ -325,10 +385,15 @@ Return JSON with exactly this structure:
       const scoreLine = noScore
         ? '"score": null,  // DO NOT SCORE this intake block — extraction + follow-ups only (see rubric)'
         : '"score": <integer 0-100>,';
+      // m4l5 provenance (SPEC_M4L5_THREE_BLOCK §7): flag an unedited AI conclusion.
+      const prov = req.body.provenance as { conclusionDrafted?: boolean; conclusionEditedAfterDraft?: boolean } | undefined;
+      const provBlock = prov?.conclusionDrafted && !prov.conclusionEditedAfterDraft
+        ? '\nPROVENANCE: her CONCLUSION is the AI draft, accepted UNEDITED. Apply the rubric provenance rule — the "explicit delta / her reasoning" criterion cannot score in the top band; gently ask her to say in her own words what SHE is changing and why. Do not penalize her for using the draft, only for not engaging with it.\n'
+        : '';
       const userMessage = `Lesson: ${lessonTitle}
 Exercise: ${prompt}
 Founder's answer: "${answer}"
-${rubricBlock}
+${rubricBlock}${provBlock}
 Return JSON with exactly this structure:
 {
   ${scoreLine}

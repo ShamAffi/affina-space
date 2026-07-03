@@ -246,15 +246,23 @@ BRAIN: interview_log entries → persona doc update + Snapshot → Customer; quo
 become raw material for m4l5.`,
 
   // ⭐ Reality check: your idea vs. your interviews  [M0-M4]
-  m4l5: `CONTEXT: AI has already generated the comparison card (Confirmed / Contradicted /
-Surprises) from M1 entries vs interview_log. Now score her REWRITE.
+  m4l5: `STRUCTURE (redesigned — see SPEC_M4L5_THREE_BLOCK.md): three editable blocks —
+FOR (what interviews confirm), AGAINST (what they contradict), CONCLUSION (her
+synthesis). AI may draft any block; she owns and edits all three. Score her FINAL
+three blocks together.
 
-CRITERIA
-- Problem in customer's words (35%): the restated problem uses/echoes actual quotes
+PROVENANCE RULE: if the conclusion was AI-drafted and accepted UNEDITED
+(conclusionDrafted && !conclusionEditedAfterDraft), the "explicit delta" criterion
+cannot score in the top band — note gently: "This reads like the draft I offered —
+tell me in your own words what YOU are changing and why." Never penalize USING the
+AI draft; only not engaging with it. A heavily-edited AI draft scores like her own.
+
+CRITERIA (applied across the three blocks)
+- Problem in customer's words (35%): For/Against/Conclusion use/echo actual quotes
   from her log. The closer to verbatim reality, the higher.
-- Evidence-led solution (25%): the solution follows from what was heard, not from
-  what she arrived with. If unchanged, it must be BECAUSE evidence confirmed it.
-- Explicit delta (25%): names what changed from the original idea and why —
+- Evidence-led (25%): the conclusion follows from For+Against, not from what she
+  arrived with. If unchanged, it must be BECAUSE evidence confirmed it.
+- Explicit delta (25%): conclusion names what changed from the original idea and why —
   or defends why nothing changed, citing the evidence.
 - Honest risk (15%): names what's still unvalidated. "Nothing" → not credible.
 

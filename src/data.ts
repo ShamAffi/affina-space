@@ -589,16 +589,14 @@ This exercise is short on the page and heavy in what it does downstream: this ex
       },
       {
         id: 'm4l5',
-        delegateMode: 'C', // RULES §2.3: compare card is AI; what-I-change is hers only
+        // Three-block evidence balance (SPEC_M4L5_THREE_BLOCK). Not Delegate/Mode C
+        // anymore: the custom ProblemSolutionBlock owns For/Against/Conclusion + its
+        // own per-block AI assists, so the generic exercise input & Delegate are off.
+        delegatable: false,
         type: 'structured',
         kind: 'exercise',
         title: 'Problem–Solution check against your interviews',
-        body: `The moment of truth: does what you believed in Module 1 survive contact with what real people told you in Module 3? Restate your original hypothesis, then summarize what your interviews actually said. The AI mentor will highlight where they align — and where the evidence is telling you to adjust.`,
-        inputPrompt: 'Restate your original problem hypothesis (from M1). Then summarize what your interviews actually revealed. Where do they confirm you — and where do they contradict?',
-        inputPlaceholder: `My original hypothesis: …
-What interviews confirmed: …
-What interviews contradicted or surprised me: …
-What I'm adjusting: …`,
+        body: `The moment of truth: does what you believed in Module 1 survive contact with what real people told you in Module 3? Lay out what your interviews confirm, what they contradict or surprised you with, then decide — in your own words — what you're keeping and changing. The AI can help draft each part from your Brain, but the call is yours.`,
       },
       {
         id: 'm4l6',
