@@ -67,13 +67,13 @@ export default function LessonBody({ body }: { body: string }) {
         }
         if (b.kind === 'quote') {
           return (
-            <p key={i} className="border-l-2 border-brand-300 pl-4 italic text-ink-soft text-base sm:text-lg leading-relaxed my-5">
+            <p key={i} className="border-l-2 border-brand-300 pl-4 italic text-ink text-base sm:text-lg leading-relaxed my-5">
               {renderInline(b.text, budget)}
             </p>
           );
         }
         return (
-          <p key={i} className="text-ink-soft text-base sm:text-lg leading-relaxed mb-5 whitespace-pre-wrap">
+          <p key={i} className="text-ink text-base sm:text-lg leading-relaxed mb-5 whitespace-pre-wrap">
             {renderInline(b.text, budget)}
           </p>
         );

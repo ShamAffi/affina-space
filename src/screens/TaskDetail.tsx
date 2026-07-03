@@ -210,12 +210,12 @@ export default function TaskDetail({ task, email, onBack }: Props) {
           {briefing ? (
             <>
               <p className="text-xs font-bold text-brand-600 uppercase tracking-widest mb-3">🧭 Mission briefing</p>
-              <p className="text-sm text-ink-soft leading-relaxed whitespace-pre-wrap">{briefing}</p>
+              <p className="text-sm text-ink leading-relaxed whitespace-pre-wrap">{briefing}</p>
             </>
           ) : (
             <>
               <p className="text-xs font-bold text-ink-mute uppercase tracking-widest mb-3">What to do</p>
-              <p className="text-sm text-ink-soft leading-relaxed whitespace-pre-wrap">
+              <p className="text-sm text-ink leading-relaxed whitespace-pre-wrap">
                 {currentTask.instruction}
               </p>
               {briefingLoading && (
