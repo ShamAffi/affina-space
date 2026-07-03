@@ -819,6 +819,9 @@ My motivation & 12-week goal: …`;
                       <div className="bg-brand-50 border border-brand-200 rounded-card p-4">
                         <p className="text-[10px] font-bold text-brand-700 uppercase tracking-widest mb-2">AI mentor's draft</p>
                         <p className="text-sm text-ink whitespace-pre-wrap leading-relaxed">{drafts.aiDraft}</p>
+                        <p className="mt-3 pt-3 border-t border-brand-100 text-[11px] text-brand-700/70 leading-relaxed">
+                          This is a draft to react to — a recommendation, not a decision. Edit it until every word is true for you. You know things I don't.
+                        </p>
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-2">

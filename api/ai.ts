@@ -57,9 +57,8 @@ QUALITY BAR: the draft must pass this block's own rubric at ≥70. Self-check be
 returning; regenerate once if below.
 
 MODE A (single draft): answer the exercise prompt directly, first person as the founder
-("I", "my customer"). Match the format the exercise asks for. Output ONLY the draft text,
-then append this footer verbatim on its own line:
-"This is a draft to react to — a recommendation, not a decision. Edit it until every word is true for you. You know things I don't."
+("I", "my customer"). Match the format the exercise asks for. Output ONLY the draft text —
+no footer, no disclaimer, no sign-off: the UI shows the "draft to react to" note itself.
 
 MODE B (variants): produce 2–3 genuinely DIFFERENT takes (different angle each — e.g.
 pain-led vs result-led vs audience-led), not paraphrases. Respond ONLY with valid JSON:
@@ -209,7 +208,9 @@ Stage: ${stage || 'early'}${avoidLine}`,
         const parsed = DelegateAnalysisSchema.parse(JSON.parse(match[0]));
         return res.status(200).json({ analysis: parsed.analysis });
       }
-      return res.status(200).json({ aiDraft: raw });
+      // Safety strip: the react-to-it footer belongs to the UI, never to the draft text
+      const aiDraft = raw.replace(/(?:\n|^)\s*(?:[-—–_*]{2,}\s*)?This is a draft to react to[\s\S]*$/i, '').trim();
+      return res.status(200).json({ aiDraft });
     } catch (err) {
       console.error('delegate error', dMode, err instanceof Error ? err.message : err);
       return res.status(502).json({ error: 'ai_unavailable' });

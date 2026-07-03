@@ -154,7 +154,7 @@ missing and ask exactly ONE question; draft after she answers.
 QUALITY BAR: the draft must pass this block's own rubric (RUBRICS_M0-M4.md) at ≥70.
 Self-check before returning; regenerate once if below.
 
-FOOTER (always append, verbatim):
+FOOTER (rendered by the UI under the draft, verbatim — the model must NOT append it to the text):
 "This is a draft to react to — a recommendation, not a decision. Edit it until
 every word is true for you. You know things I don't."
 ```
