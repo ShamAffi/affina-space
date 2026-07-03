@@ -161,12 +161,22 @@ export type TaskSource = 'mentor' | 'lesson' | 'advisor' | 'self' | 'system' | '
 export type TaskStatus = 'todo' | 'submitted' | 'reviewed' | 'done';
 
 // Interview Log (§3.3) — reusable across M3/M5/M11 field tasks. Up to 10 entries.
+// Field keys stay who/pain/quotes/priceSignal/verdict (no migration); the transcript
+// spec's mainPain/keyQuotes names map onto pain/quotes.
 export type InterviewLogEntry = {
   who: string;          // name / role / segment
   pain: string;         // main pain + how they solve it today
   quotes: string;       // key quotes / insights
   priceSignal: string;  // what they pay now / reaction to price (active from M5)
   verdict: string;      // confirms / contradicts hypothesis (+ what changes)
+  // "Add Transcript" (SPEC_INTERVIEW_LOG_TRANSCRIPT §3) — present only when the
+  // entry was filled from a pasted transcript. Raw source kept for provenance +
+  // the fabrication-protocol cross-check; NOT a Delegate answer (§6).
+  rawTranscript?: string;
+  aiExtracted?: {
+    fields: string[];         // field keys the AI populated
+    lowConfidence: string[];  // of those, the ones flagged amber ("AI wasn't sure")
+  };
 };
 
 // Structured field-task submissions (§3.2 submissionData jsonb).

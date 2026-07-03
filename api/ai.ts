@@ -121,6 +121,57 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'method not allowed' });
 
+  // Interview transcript extraction (SPEC_INTERVIEW_LOG_TRANSCRIPT §5).
+  // NOT a Delegate mode (§6): this only RESTRUCTURES her own pasted real data into
+  // the 5 interview-log fields — it never invents an interview, quote, or verdict.
+  if (req.body.mode === 'extract-interview') {
+    const { text } = req.body;
+    if (!text?.trim()) return res.status(400).json({ error: 'text required' });
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const conf = z.enum(['found', 'unclear']).catch('unclear');
+    const Field = z.object({ value: z.coerce.string().catch(''), confidence: conf });
+    const ExtractSchema = z.object({
+      who: Field, mainPain: Field, keyQuotes: Field, priceSignal: Field, verdict: Field,
+    });
+    try {
+      const msg = await client.messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1200,
+        system: `You are extracting structured fields from a founder's raw interview notes or transcript. Do not invent anything not present in the text.
+
+Extract, if present:
+- who: name/role/segment of the interviewee
+- mainPain: their main pain + how they currently solve it
+- keyQuotes: their most telling verbatim words (prefer exact phrasing over paraphrase)
+- priceSignal: anything about money — what they pay today, reaction to price
+- verdict: only if SHE explicitly stated a conclusion in the notes (confirms/contradicts her hypothesis) — do not infer a verdict she didn't state; leave it empty for her to write if it's not clearly there.
+
+For each field, mark confidence: "found" (clearly stated) or "unclear" (inferred/thin/absent). Never fabricate to avoid an "unclear" flag — an honest gap is better than an invented answer. An absent field must be {"value":"","confidence":"unclear"}.
+
+Respond ONLY with valid JSON:
+{"who":{"value":"...","confidence":"found|unclear"},"mainPain":{...},"keyQuotes":{...},"priceSignal":{...},"verdict":{...}}`,
+        messages: [{ role: 'user', content: `Raw interview notes / transcript:\n"""\n${String(text).slice(0, 8000)}\n"""` }],
+      });
+      const raw = msg.content[0].type === 'text' ? msg.content[0].text : '';
+      const match = raw.match(/\{[\s\S]*\}/);
+      if (!match) throw new Error('no JSON');
+      const p = ExtractSchema.parse(JSON.parse(match[0]));
+      // Map spec field names → component keys (mainPain→pain, keyQuotes→quotes)
+      return res.status(200).json({
+        fields: {
+          who: p.who.value, pain: p.mainPain.value, quotes: p.keyQuotes.value,
+          priceSignal: p.priceSignal.value, verdict: p.verdict.value,
+        },
+        confidence: {
+          who: p.who.confidence, pain: p.mainPain.confidence, quotes: p.keyQuotes.confidence,
+          priceSignal: p.priceSignal.confidence, verdict: p.verdict.confidence,
+        },
+      });
+    } catch {
+      return res.status(502).json({ error: 'ai_unavailable' });
+    }
+  }
+
   // Generate project name mode — cheap Haiku call, no lesson context required
   if (req.body.mode === 'generate-name') {
     const { idea, customer, businessModel, stage, avoid } = req.body;

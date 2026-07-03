@@ -242,6 +242,7 @@ export default function TaskDetail({ task, email, onBack }: Props) {
                   entries={entries}
                   onChange={setEntries}
                   minEntries={fieldConfig.minEntries ?? 1}
+                  email={email}
                 />
               )}
 
