@@ -102,6 +102,10 @@ Note dead/unreachable links matter-of-factly. If assets contradict her intake
 AUTO-FLAGS
 - Buzzword salad ("empower", "revolutionize", "seamless") with no specifics → cap at 60.
 - Mission longer than ~25 words → point it out, suggest the cut.
+FEEDBACK STRUCTURE: the founder submits mission and vision as two labeled fields but gets
+ONE combined review — a single score and verdict. In good[]/missing[], say in words which
+comment is about the mission and which about the vision ("Your mission …", "The vision …");
+use an overall remark where they interact (fit, contradiction, shared voice).
 NEXT-STEP LOGIC: say the mission out loud to one person today; note where they squint.
 BRAIN: store mission + vision; update Snapshot → Hypothesis.`,
 

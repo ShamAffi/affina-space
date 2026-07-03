@@ -172,7 +172,7 @@ export const MODULES: Module[] = [
         kind: 'exercise',
         title: 'Mission & Vision',
         body: `Mission is why you exist today — the change you create for your customer. Vision is the world you're building toward in 5–10 years if everything works. Together they're your compass for every hard decision ahead. Write both; your Snapshot will keep them in view.`,
-        inputPrompt: 'Write your mission (why you exist, in one sentence) and your vision (the world you\'re building toward in 5–10 years, in one or two sentences).',
+        inputPrompt: 'Two fields, one compass: your mission (why you exist, one sentence) and your vision (the world you\'re building toward in 5–10 years). Answer format: "Mission: …" then "Vision: …".',
       },
       {
         id: 'm1l5',

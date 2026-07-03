@@ -32,6 +32,20 @@ interface Props {
 
 const allLessons: Lesson[] = MODULES.flatMap((m) => m.lessons);
 
+// m1l4 Mission & Vision — two inputs, ONE stored text (one brain entry, one combined review).
+function splitMissionVision(text: string): { mission: string; vision: string } {
+  const vIdx = text.search(/(^|\n)\s*Vision:/i);
+  const missionPart = vIdx >= 0 ? text.slice(0, vIdx) : text;
+  const visionPart = vIdx >= 0 ? text.slice(vIdx) : '';
+  return {
+    mission: missionPart.replace(/^\s*Mission:\s*/i, '').trim(),
+    vision: visionPart.replace(/^\s*Vision:\s*/i, '').trim(),
+  };
+}
+function composeMissionVision(mission: string, vision: string): string {
+  return `Mission: ${mission.trim()}\n\nVision: ${vision.trim()}`;
+}
+
 export default function LMS({ userData, onUpdateUserData, onGoToDashboard, onLogout, initialLessonId, onActiveLessonChange, onGoToTasks }: Props) {
   const [activeLessonId, setActiveLessonId] = useState<string>(() => {
     if (initialLessonId) return initialLessonId;
@@ -938,6 +952,33 @@ My motivation & 12-week goal: …`;
                           Previous score: <span className="font-semibold text-amber-500">{lessonFeedback.score}/100</span> — refine and save to get a new score
                         </div>
                       )}
+                      {activeLessonId === 'm1l4' ? (() => {
+                        // Two labeled fields; stored as one combined text so Brain/review/Delegate stay unchanged.
+                        const mv = splitMissionVision(getInputValue('m1l4'));
+                        const fieldCls = 'w-full bg-surface border border-brand-200 focus:border-brand-400 focus:ring-2 focus:ring-brand-100 rounded-control px-4 py-3 text-sm text-ink placeholder-ink-mute outline-none resize-none transition';
+                        return (
+                          <div className="flex flex-col gap-4">
+                            <div>
+                              <label className="block text-[11px] font-bold text-brand-700 uppercase tracking-wider mb-1">Mission — why you exist, in one sentence</label>
+                              <textarea
+                                className={`${fieldCls} min-h-[70px]`}
+                                placeholder="e.g. We give new moms their energy back with meal plans built for postpartum recovery."
+                                value={mv.mission}
+                                onChange={(e) => setInputDraft((d) => ({ ...d, m1l4: composeMissionVision(e.target.value, mv.vision) }))}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[11px] font-bold text-brand-700 uppercase tracking-wider mb-1">Vision — the changed world in 5–10 years</label>
+                              <textarea
+                                className={`${fieldCls} min-h-[90px]`}
+                                placeholder="e.g. Postpartum nutrition is a normal part of maternity care — every new mom gets a plan, not guilt."
+                                value={mv.vision}
+                                onChange={(e) => setInputDraft((d) => ({ ...d, m1l4: composeMissionVision(mv.mission, e.target.value) }))}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })() : (
                       <textarea
                         className={`w-full bg-surface border border-brand-200 focus:border-brand-400 focus:ring-2 focus:ring-brand-100 rounded-control px-4 py-3 text-sm text-ink placeholder-ink-mute outline-none resize-none transition ${
                           activeLesson.type === 'structured' ? 'min-h-[200px]' : 'min-h-[120px]'
@@ -947,6 +988,7 @@ My motivation & 12-week goal: …`;
                         maxLength={activeLesson.inputMaxLength}
                         onChange={(e) => setInputDraft((d) => ({ ...d, [activeLessonId]: e.target.value }))}
                       />
+                      )}
                       {activeLesson.inputMaxLength && (() => {
                         const len = getInputValue(activeLessonId).length;
                         const max = activeLesson.inputMaxLength;
@@ -959,7 +1001,9 @@ My motivation & 12-week goal: …`;
                       <div className="mt-3">
                         <button
                           onClick={() => handleSaveInput(activeLessonId)}
-                          disabled={!getInputValue(activeLessonId).trim()}
+                          disabled={activeLessonId === 'm1l4'
+                            ? (() => { const mv = splitMissionVision(getInputValue('m1l4')); return !mv.mission || !mv.vision; })()
+                            : !getInputValue(activeLessonId).trim()}
                           className="relative bg-brand hover:bg-brand-700 active:scale-95 disabled:opacity-40 text-white text-sm font-semibold px-6 py-2.5 rounded-pill transition-all duration-150"
                         >
                           {isRefining ? (isCompareMode ? 'Revise & re-score' : 'Save & get new score') : 'Save'}
