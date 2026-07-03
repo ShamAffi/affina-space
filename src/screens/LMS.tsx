@@ -58,6 +58,9 @@ export default function LMS({ userData, onUpdateUserData, onGoToDashboard, onLog
   // §6.5 mentor sessions
   const [openSession, setOpenSession] = useState<MentorSessionId | null>(null);
   const [sessionsState, setSessionsState] = useState<MentorSessionsState>({});
+  // §9 — visible failure state for AI calls (was a silent catch → "nothing happens")
+  const [aiErrorLesson, setAiErrorLesson] = useState<string | null>(null);
+  const [delegateErrorLesson, setDelegateErrorLesson] = useState<string | null>(null);
   // §4 Delegate — Try → Review → Delegate
   const [delegating, setDelegating] = useState<string | null>(null);
   const [delegateOpen, setDelegateOpen] = useState<string | null>(null);
@@ -179,6 +182,7 @@ My motivation & 12-week goal: …`;
   function handleSaveInput(lessonId: string, contentOverride?: string) {
     const val = contentOverride ?? getInputValue(lessonId);
     if (!val.trim()) return;
+    setAiErrorLesson(null);
     if (contentOverride !== undefined) {
       setInputDraft((d) => ({ ...d, [lessonId]: contentOverride }));
     }
@@ -228,6 +232,7 @@ My motivation & 12-week goal: …`;
         })
         .then((data) => {
           setSavingLesson(null);
+          setAiErrorLesson(null);
           if (isCompare) {
             setCompareByLesson((prev) => ({ ...prev, [lessonId]: data as CompareResult }));
           } else {
@@ -237,7 +242,7 @@ My motivation & 12-week goal: …`;
             }));
           }
         })
-        .catch(() => setSavingLesson(null));
+        .catch(() => { setSavingLesson(null); setAiErrorLesson(lessonId); });
     }, 750);
   }
 
@@ -271,6 +276,7 @@ My motivation & 12-week goal: …`;
     const lesson = allLessons.find((l) => l.id === lessonId)!;
     const dMode = lesson.delegateMode ?? 'A';
     const userText = getInputValue(lessonId);
+    setDelegateErrorLesson(null);
     setDelegating(lessonId);
     fetch('/api/ai', {
       method: 'POST',
@@ -300,7 +306,7 @@ My motivation & 12-week goal: …`;
           setDelegateOpen(lessonId);
         }
       })
-      .catch(() => { /* silent — button stays available */ })
+      .catch(() => setDelegateErrorLesson(lessonId))
       .finally(() => setDelegating(null));
   }
 
@@ -309,8 +315,10 @@ My motivation & 12-week goal: …`;
     setSidebarOpen(false);
     setSavingLesson(null);
     setRefiningLesson(null);
+    setAiErrorLesson(null);
     setDelegateOpen(null);
     setDelegating(null);
+    setDelegateErrorLesson(null);
   }
 
   const handleToggleMenu = useCallback(() => setProfileMenuOpen((v) => !v), []);
@@ -745,12 +753,29 @@ My motivation & 12-week goal: …`;
                 </button>
               ) : null;
 
-              // Delegating spinner
+              // Delegating spinner (§9)
               if (delegating === activeLessonId) {
                 return (
                   <div className="bg-surface border border-brand-100 rounded-card mb-8 flex flex-col items-center justify-center gap-4 py-14 animate-fade-in">
                     <div className="w-12 h-12 rounded-pill bg-brand animate-orb-pulse" />
-                    <p className="text-sm font-semibold text-ink-mute tracking-wide">Mentor is drafting from your Brain…</p>
+                    <p className="text-sm font-semibold text-ink-soft tracking-wide">Your mentor is drafting from your Brain…</p>
+                    <p className="text-xs text-ink-mute">This can take up to 15 seconds.</p>
+                  </div>
+                );
+              }
+
+              // §9 — delegate failure with its own retry
+              if (delegateErrorLesson === activeLessonId) {
+                return (
+                  <div className="bg-amber-50 border border-amber-200 rounded-card p-5 mb-8 flex flex-col items-center text-center gap-3 animate-fade-in">
+                    <p className="text-sm font-semibold text-amber-800">The AI mentor couldn't draft this just now.</p>
+                    <p className="text-xs text-amber-600">A network or server hiccup — nothing was lost. Try again.</p>
+                    <button
+                      onClick={() => handleDelegate(activeLessonId)}
+                      className="bg-brand hover:bg-brand-700 active:scale-95 text-white text-sm font-semibold px-6 py-2.5 rounded-pill transition-all duration-150"
+                    >
+                      Try again
+                    </button>
                   </div>
                 );
               }
@@ -845,11 +870,28 @@ My motivation & 12-week goal: …`;
 
               return (
                 <>
-                  {/* 1. Saving / analyzing spinner */}
+                  {/* 1. Saving / analyzing spinner (§9 — clear thinking state on the AI call) */}
                   {isSaving && (
                     <div className="bg-surface border border-brand-100 rounded-card mb-8 flex flex-col items-center justify-center gap-4 py-14 animate-fade-in">
                       <div className="w-12 h-12 rounded-pill bg-brand animate-orb-pulse" />
-                      <p className="text-sm font-semibold text-ink-mute tracking-wide">Mentor is reviewing your answer…</p>
+                      <p className="text-sm font-semibold text-ink-soft tracking-wide">
+                        {isCompareMode ? 'Your mentor is comparing your options…' : 'Your mentor is thinking…'}
+                      </p>
+                      <p className="text-xs text-ink-mute">This can take up to 15 seconds.</p>
+                    </div>
+                  )}
+
+                  {/* §9 — visible error + retry (replaces the old silent catch) */}
+                  {aiErrorLesson === activeLessonId && !isSaving && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-card p-5 mb-8 flex flex-col items-center text-center gap-3 animate-fade-in">
+                      <p className="text-sm font-semibold text-amber-800">Your mentor couldn't respond just now.</p>
+                      <p className="text-xs text-amber-600">A network or server hiccup — your answer is safe. Try again.</p>
+                      <button
+                        onClick={() => handleSaveInput(activeLessonId)}
+                        className="bg-brand hover:bg-brand-700 active:scale-95 text-white text-sm font-semibold px-6 py-2.5 rounded-pill transition-all duration-150"
+                      >
+                        Try again
+                      </button>
                     </div>
                   )}
 
