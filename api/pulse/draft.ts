@@ -3,13 +3,13 @@ import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
-import { eq, desc } from 'drizzle-orm';
-import { users, checkIns, completedLessons, brainEntries } from '../../src/db/schema.js';
+import { eq, desc, and, ne } from 'drizzle-orm';
+import { users, checkIns, completedLessons, brainEntries, tasks } from '../../src/db/schema.js';
 import { MODULES } from '../../src/data.js';
 
 function getDb() {
   const sql = neon(process.env.DATABASE_URL!);
-  return drizzle(sql, { schema: { users, checkIns, completedLessons, brainEntries } });
+  return drizzle(sql, { schema: { users, checkIns, completedLessons, brainEntries, tasks } });
 }
 
 const DraftSchema = z.object({
@@ -88,7 +88,7 @@ PART A — Analyze the check-in:
 - metrics: extract EVERY number mentioned. value: new value. delta: change vs last week (0 if unknown/first).
 - sentiment: energized | steady | struggling
 - mentorNote: 1–2 warm, honest sentences. No toxic positivity.
-- tasks: 1–3 specific next steps. ≤6-word titles. priority 80/60/40.
+- tasks: 1–3 specific next steps. ≤6-word titles. priority 80/60/40. Skip anything that duplicates an OPEN TASK by meaning (listed in the user message); propose fewer rather than repeat one she already has.
 
 PART B — Extract activity, snapshot facts + compose the Momentum card:
 - snapshotFacts: FACTS and DECISIONS from this update that change the startup's one-page Snapshot — new numbers, changed inputs, corrections ("price is now $29", "pivoted to B2B", "first paying customer"). NOT process ("worked hard this week"). section ∈ [Founder, Project & stage, Hypothesis, Market, Customer & persona, Product, Model & North Star, Traction, Risk flags, Next focus]. [] if nothing snapshot-worthy.
@@ -133,6 +133,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   });
   const completed = await db.query.completedLessons.findMany({ where: eq(completedLessons.userId, user.id) });
   const brain = await db.query.brainEntries.findMany({ where: eq(brainEntries.userId, user.id) });
+  // §8 — open tasks fed to the prompt so new check-in tasks don't duplicate them by MEANING
+  const openTasks = await db.query.tasks.findMany({
+    where: and(eq(tasks.userId, user.id), ne(tasks.status, 'done')),
+  });
+  const openTaskList = openTasks.length
+    ? openTasks.map((t) => `- ${t.title}`).join('\n')
+    : '(none open)';
 
   const completedSet = new Set(completed.map((c) => c.lessonId));
   const lessonsDone = completed.length;
@@ -184,6 +191,10 @@ North star metric: ${ns ? `${ns.label} (${ns.key})` : 'not set yet'}
 Recent check-ins (for deltas):
 ${pastContext}
 Last known metrics: ${lastMetrics}
+
+OPEN TASKS she already has (do NOT propose a new task that duplicates any of these
+in MEANING, not just wording — if her update is about one of these, don't re-create it):
+${openTaskList}
 
 This week's update from the founder:
 "${rawText}"
