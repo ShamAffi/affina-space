@@ -4,7 +4,7 @@ import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
 import { eq } from 'drizzle-orm';
 import { users, lessonInputs, completedLessons, brainEntries, tasks, checkIns, achievements } from '../src/db/schema.js';
-import { computeLaunchReadiness, computeGrowth, GROWTH_SEED_XP, onboardingSeed } from './lib/progressUtils.js';
+import { computeLaunchReadiness, computeGrowth, GROWTH_SEED_XP, onboardingSeed } from '../src/server/progressUtils.js';
 import { MODULES } from '../src/data.js';
 import { blockKind } from '../src/types.js';
 

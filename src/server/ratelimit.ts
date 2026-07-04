@@ -1,10 +1,9 @@
 import type { VercelRequest } from '@vercel/node';
 import { neon } from '@neondatabase/serverless';
 
-// Lives in src/ (not api/lib): every .ts under /api is emitted as its own Vercel
-// function and Hobby caps us at 12 — we're already at 12 (11 handlers +
-// api/lib/progressUtils). The api handlers import this. (Same reason src/rubrics.ts
-// is not in api/lib.)
+// Lives in src/ (not api/): every .ts under /api is emitted as its own Vercel
+// function and Hobby caps us at 12. All shared non-handler helpers live in
+// src/server/ for that reason (same as src/rubrics.ts). The api handlers import this.
 //
 // Neon-backed fixed-window rate limiter — the ACTUAL protection for the Anthropic
 // bill (CORS only stops other sites' browsers, never curl/scripts). One row per

@@ -9,7 +9,7 @@ import { drizzle } from 'drizzle-orm/neon-http';
 import { eq, and } from 'drizzle-orm';
 import { users, tasks, brainEntries } from '../../src/db/schema.js';
 import { RUBRICS, GLOBAL_RUBRIC_RULES } from '../../src/rubrics.js';
-import { FIELD_POINTS, LAYER_LABELS } from '../lib/progressUtils.js';
+import { FIELD_POINTS, LAYER_LABELS } from '../../src/server/progressUtils.js';
 
 const TaskReviewSchema = z.object({
   score: z.number().int().min(0).max(100),

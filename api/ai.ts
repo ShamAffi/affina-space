@@ -8,7 +8,7 @@ import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
 import { eq, and } from 'drizzle-orm';
 import { users, brainEntries, tasks, delegations } from '../src/db/schema.js';
-import { computeExercisePoints, LAYER_LABELS } from './lib/progressUtils.js';
+import { computeExercisePoints, LAYER_LABELS } from '../src/server/progressUtils.js';
 import { RUBRICS, GLOBAL_RUBRIC_RULES, NO_SCORE_LESSONS } from '../src/rubrics.js';
 
 const FeedbackSchema = z.object({

@@ -78,10 +78,10 @@ export default function MetricPulse({ email, projectName, onBack }: Props) {
     setStep('loading');
     setError('');
     try {
-      const r = await fetch('/api/pulse/draft', {
+      const r = await fetch('/api/pulse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, rawText }),
+        body: JSON.stringify({ action: 'draft', email, rawText }),
       });
       if (r.status === 429) {
         setError("You're going a bit fast — give it a moment, then try again.");
@@ -103,10 +103,10 @@ export default function MetricPulse({ email, projectName, onBack }: Props) {
     if (!draft) return;
     setStep('committing');
     try {
-      const r = await fetch('/api/pulse/commit', {
+      const r = await fetch('/api/pulse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, rawText, confirmedMetrics: editedMetrics, draft }),
+        body: JSON.stringify({ action: 'commit', email, rawText, confirmedMetrics: editedMetrics, draft }),
       });
       const data = await r.json();
       setNewStreak(data.streak ?? 0);

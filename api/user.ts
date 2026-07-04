@@ -4,7 +4,7 @@ import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
 import { eq } from 'drizzle-orm';
 import { users, lessonInputs, completedLessons, brainEntries, tasks, checkIns, achievements, delegations } from '../src/db/schema.js';
-import { GROWTH_SEED_XP } from './lib/progressUtils.js';
+import { GROWTH_SEED_XP } from '../src/server/progressUtils.js';
 
 function getDb() {
   const sql = neon(process.env.DATABASE_URL!);
