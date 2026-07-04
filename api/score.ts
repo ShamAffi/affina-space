@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import Anthropic from '@anthropic-ai/sdk';
+import { callClaude } from '../src/server/anthropic.js';
+import { MODELS } from '../src/server/models.js';
 import { z } from 'zod';
 import { applyCors } from '../src/server/http.js';
 import { checkRateLimit } from '../src/server/ratelimit.js';
@@ -65,8 +66,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { idea, customer, businessModel, stage, goal } = req.body;
   if (!idea?.trim()) return res.status(200).json(FALLBACK);
 
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
   const userMessage = `Founder's onboarding answers:
 - Business idea: "${idea}"
 - Target customer: "${customer || 'not specified'}"
@@ -89,12 +88,12 @@ Return JSON with exactly this structure:
 }`;
 
   try {
-    const message = await client.messages.create({
-      model: 'claude-sonnet-4-6',
+    const message = await callClaude({
+      model: MODELS.standard,
       max_tokens: 900,
       system: SYSTEM_PROMPT,
       messages: [{ role: 'user', content: userMessage }],
-    });
+    }, { endpoint: 'score', mode: 'score' });
 
     const raw = message.content[0].type === 'text' ? message.content[0].text : '';
     const match = raw.match(/\{[\s\S]*\}/);

@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import Anthropic from '@anthropic-ai/sdk';
+import { callClaude } from '../../src/server/anthropic.js';
+import { MODELS } from '../../src/server/models.js';
 import { z } from 'zod';
 import { applyCors } from '../../src/server/http.js';
 import { checkRateLimit } from '../../src/server/ratelimit.js';
@@ -240,14 +241,13 @@ Return JSON:
   "snapshotFacts": [{"section": "Traction", "fact": "First 5 sign-ups from Instagram"}]
 }`;
 
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   try {
-    const message = await client.messages.create({
-      model: 'claude-sonnet-4-6',
+    const message = await callClaude({
+      model: MODELS.standard,
       max_tokens: 2500,
       system: SYSTEM,
       messages: [{ role: 'user', content: userMessage }],
-    });
+    }, { endpoint: 'pulse-draft', mode: 'check-in', email });
     const raw = message.content[0].type === 'text' ? message.content[0].text : '';
     const match = raw.match(/\{[\s\S]*\}/);
     if (!match) throw new Error('no JSON');

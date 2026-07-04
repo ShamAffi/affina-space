@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import Anthropic from '@anthropic-ai/sdk';
+import { callClaude } from '../src/server/anthropic.js';
+import { MODELS } from '../src/server/models.js';
 import { z } from 'zod';
 import { applyCors } from '../src/server/http.js';
 import { checkRateLimit } from '../src/server/ratelimit.js';
@@ -138,14 +139,13 @@ ${brainDump || '(no entries yet — build the snapshot from the profile alone)'}
 
 Produce the ${prev ? 'updated' : 'first'} Startup Snapshot. Source: ${source}.`;
 
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   try {
-    const msg = await client.messages.create({
-      model: 'claude-sonnet-4-6',
+    const msg = await callClaude({
+      model: MODELS.standard,
       max_tokens: 1800,
       system: SNAPSHOT_SYSTEM,
       messages: [{ role: 'user', content: userMessage }],
-    });
+    }, { endpoint: 'brain', mode: 'snapshot', email: user.email });
     const raw = msg.content[0].type === 'text' ? msg.content[0].text : '';
     const match = raw.match(/\{[\s\S]*\}/);
     if (!match) throw new Error('no JSON');
@@ -274,10 +274,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           })).min(2).max(3),
         }),
       });
-      const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
       try {
-        const msg = await client.messages.create({
-          model: 'claude-sonnet-4-6',
+        const msg = await callClaude({
+          model: MODELS.standard,
           max_tokens: 1100,
           system: `You are Affina, writing "The Founder's Case" — a milestone reveal for a founder who just finished Module 4, right before she decides to continue. Tone: inspiring but HONEST, PLAIN language — never an investment lecture. All from HER real data, never generic or invented.
 
@@ -313,7 +312,7 @@ QUANTIFIED VALUE: ${byType['value_advantage'] || byType['quantified_value'] || '
 MICRO-COMMITMENT / DEMAND: ${byType['micro_commitment'] || '(none)'}
 
 Write her Founder's Case — calibrate the numbers and the third stat to her ambition above.` }],
-        });
+        }, { endpoint: 'brain', mode: 'founders-case', email: user.email });
         const raw = msg.content[0].type === 'text' ? msg.content[0].text : '';
         const match = raw.match(/\{[\s\S]*\}/);
         if (!match) throw new Error('no JSON');
@@ -359,14 +358,13 @@ PRIOR RESEARCH INPUTS: ${byType['research_inputs'] || '(none)'}${answersBlock}
 
 Produce the test-mode report — or the clarifying questions if critical inputs are missing.`;
 
-      const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
       try {
-        const msg = await client.messages.create({
-          model: 'claude-sonnet-4-6',
+        const msg = await callClaude({
+          model: MODELS.standard,
           max_tokens: 2800,
           system: RESEARCH_SYSTEM,
           messages: [{ role: 'user', content: userMessage }],
-        });
+        }, { endpoint: 'brain', mode: 'market-research', email: user.email });
         const raw = msg.content[0].type === 'text' ? msg.content[0].text : '';
         const match = raw.match(/\{[\s\S]*\}/);
         if (!match) throw new Error('no JSON');

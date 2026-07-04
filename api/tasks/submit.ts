@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import Anthropic from '@anthropic-ai/sdk';
+import { callClaude } from '../../src/server/anthropic.js';
+import { MODELS } from '../../src/server/models.js';
 import { z } from 'zod';
 import { applyCors } from '../../src/server/http.js';
 import { checkRateLimit } from '../../src/server/ratelimit.js';
@@ -75,7 +76,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const isFieldMission = task.source === 'program';
   let review: z.infer<typeof TaskReviewSchema>;
   try {
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const debriefPart = isFieldMission
       ? `,
   "debrief": {
@@ -99,12 +99,12 @@ Return JSON:
   "nextStep": "<one concrete follow-up action>"${debriefPart}
 }`;
 
-    const message = await client.messages.create({
-      model: 'claude-sonnet-4-6',
+    const message = await callClaude({
+      model: MODELS.standard,
       max_tokens: 800,
       system: REVIEW_SYSTEM_PROMPT,
       messages: [{ role: 'user', content: userMessage }],
-    });
+    }, { endpoint: 'tasks-submit', mode: 'review', email });
     const raw = message.content[0].type === 'text' ? message.content[0].text : '';
     const match = raw.match(/\{[\s\S]*\}/);
     if (!match) throw new Error('no JSON');

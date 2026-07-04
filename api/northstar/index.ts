@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import Anthropic from '@anthropic-ai/sdk';
+import { callClaude } from '../../src/server/anthropic.js';
+import { MODELS } from '../../src/server/models.js';
 import { z } from 'zod';
 import { applyCors } from '../../src/server/http.js';
 import { checkRateLimit } from '../../src/server/ratelimit.js';
@@ -78,8 +79,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const user = await db.query.users.findFirst({ where: eq(users.email, email) });
   if (!user) return res.status(404).json({ error: 'user not found' });
 
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
   // ── SUGGEST ──────────────────────────────────────────────────────────────────
   if (action === 'suggest') {
     const brain = await db.query.brainEntries.findMany({ where: eq(brainEntries.userId, user.id) });
@@ -134,12 +133,12 @@ Return JSON:
 }`;
 
     try {
-      const msg = await client.messages.create({
-        model: 'claude-sonnet-4-6',
+      const msg = await callClaude({
+        model: MODELS.standard,
         max_tokens: 800,
         system: SUGGEST_SYSTEM,
         messages: [{ role: 'user', content: userMessage }],
-      });
+      }, { endpoint: 'northstar', mode: 'suggest', email });
       const raw = msg.content[0].type === 'text' ? msg.content[0].text : '';
       const match = raw.match(/\{[\s\S]*\}/);
       if (!match) throw new Error('no JSON');
@@ -180,12 +179,12 @@ Evaluate this metric. Return JSON:
 }`;
 
   try {
-    const msg = await client.messages.create({
-      model: 'claude-sonnet-4-6',
+    const msg = await callClaude({
+      model: MODELS.standard,
       max_tokens: 400,
       system: COMMIT_SYSTEM,
       messages: [{ role: 'user', content: commitMessage }],
-    });
+    }, { endpoint: 'northstar', mode: 'commit', email });
     const raw = msg.content[0].type === 'text' ? msg.content[0].text : '';
     const match = raw.match(/\{[\s\S]*\}/);
     if (!match) throw new Error('no JSON');

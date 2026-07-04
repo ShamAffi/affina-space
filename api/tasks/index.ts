@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import Anthropic from '@anthropic-ai/sdk';
+import { callClaude } from '../../src/server/anthropic.js';
+import { MODELS } from '../../src/server/models.js';
 import { applyCors } from '../../src/server/http.js';
 import { checkRateLimit } from '../../src/server/ratelimit.js';
 import { neon } from '@neondatabase/serverless';
@@ -116,17 +117,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .map((e) => `[${e.entryType}] ${(e.content ?? '').slice(0, 700)}`)
         .join('\n\n');
 
-      const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
       try {
-        const msg = await client.messages.create({
-          model: 'claude-sonnet-4-6',
+        const msg = await callClaude({
+          model: MODELS.standard,
           max_tokens: 500,
           system: BRIEFING_SYSTEM,
           messages: [{
             role: 'user',
             content: `Startup Snapshot:\n${snap ? snap.sections.map((s) => `## ${s.title}\n${s.content}`).join('\n') : '(none yet)'}\n\nRelevant Brain entries:\n${relevant || '(none yet)'}\n\nTHE MISSION — "${task.title}":\n${task.instruction}\n\nWrite her Mission Briefing.`,
           }],
-        });
+        }, { endpoint: 'tasks', mode: 'briefing', email: user.email });
         const briefing = msg.content[0].type === 'text' ? msg.content[0].text.trim() : '';
         if (!briefing) throw new Error('empty');
         await db.update(tasks).set({ briefing, updatedAt: new Date() }).where(eq(tasks.id, task.id));

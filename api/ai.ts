@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import Anthropic from '@anthropic-ai/sdk';
+import { callClaude } from '../src/server/anthropic.js';
+import { MODELS } from '../src/server/models.js';
 import { z } from 'zod';
 import { applyCors } from '../src/server/http.js';
 import { checkRateLimit } from '../src/server/ratelimit.js';
@@ -132,15 +133,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.body.mode === 'extract-interview') {
     const { text } = req.body;
     if (!text?.trim()) return res.status(400).json({ error: 'text required' });
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const conf = z.enum(['found', 'unclear']).catch('unclear');
     const Field = z.object({ value: z.coerce.string().catch(''), confidence: conf });
     const ExtractSchema = z.object({
       who: Field, mainPain: Field, keyQuotes: Field, priceSignal: Field, verdict: Field,
     });
     try {
-      const msg = await client.messages.create({
-        model: 'claude-sonnet-4-6',
+      const msg = await callClaude({
+        model: MODELS.standard,
         max_tokens: 1200,
         system: `You are extracting structured fields from a founder's raw interview notes or transcript. Do not invent anything not present in the text.
 
@@ -156,7 +156,7 @@ For each field, mark confidence: "found" (clearly stated) or "unclear" (inferred
 Respond ONLY with valid JSON:
 {"who":{"value":"...","confidence":"found|unclear"},"mainPain":{...},"keyQuotes":{...},"priceSignal":{...},"verdict":{...}}`,
         messages: [{ role: 'user', content: `Raw interview notes / transcript:\n"""\n${String(text).slice(0, 8000)}\n"""` }],
-      });
+      }, { endpoint: 'ai', mode: 'extract-interview', email: req.body.email });
       const raw = msg.content[0].type === 'text' ? msg.content[0].text : '';
       const match = raw.match(/\{[\s\S]*\}/);
       if (!match) throw new Error('no JSON');
@@ -189,10 +189,9 @@ Respond ONLY with valid JSON:
     const byType: Record<string, string> = {};
     for (const e of entries) if (e.content) byType[e.entryType] = e.content;
     const Schema = z.object({ for: z.coerce.string().catch(''), against: z.coerce.string().catch('') });
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     try {
-      const msg = await client.messages.create({
-        model: 'claude-sonnet-4-6',
+      const msg = await callClaude({
+        model: MODELS.standard,
         max_tokens: 900,
         system: `You are helping a founder check her Module 1 idea against her real Module 3 customer interviews. From her Brain ONLY, draft two evidence blocks in her first person ("I"/"my"):
 - for: what her interviews CONFIRM about her original hypothesis — concrete evidence, quotes, patterns that support it.
@@ -204,7 +203,7 @@ INTERVIEW LOG: ${byType['interview_log'] || '(no interviews logged yet)'}
 MARKET / COMPETITORS: ${byType['competitive_landscape'] || byType['positioning'] || '(none)'}
 
 Draft her For (confirms) and Against (contradicts/surprised) from this.` }],
-      });
+      }, { endpoint: 'ai', mode: 'psc-for-against', email });
       const raw = msg.content[0].type === 'text' ? msg.content[0].text : '';
       const match = raw.match(/\{[\s\S]*\}/);
       if (!match) throw new Error('no JSON');
@@ -219,14 +218,13 @@ Draft her For (confirms) and Against (contradicts/surprised) from this.` }],
     const { forText, againstText } = req.body;
     if (!forText?.trim() && !againstText?.trim()) return res.status(400).json({ error: 'for/against required' });
     const Schema = z.object({ conclusion: z.coerce.string().catch('') });
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     try {
-      const msg = await client.messages.create({
-        model: 'claude-sonnet-4-6',
+      const msg = await callClaude({
+        model: MODELS.standard,
         max_tokens: 600,
         system: `A founder has weighed what her interviews CONFIRM vs CONTRADICT about her idea. From the two blocks she gives you — and ONLY those — draft a starting CONCLUSION in her first person: what she should keep, what to change, and why, grounded strictly in the For/Against provided. This is a draft for her to edit and make her own — keep it honest and specific to her evidence, not generic startup advice. Do not invent evidence beyond the two blocks. Respond ONLY with valid JSON: {"conclusion":"..."}`,
         messages: [{ role: 'user', content: `FOR (confirms):\n${forText || '(empty)'}\n\nAGAINST (contradicts/surprised):\n${againstText || '(empty)'}\n\nDraft her conclusion.` }],
-      });
+      }, { endpoint: 'ai', mode: 'psc-conclusion' });
       const raw = msg.content[0].type === 'text' ? msg.content[0].text : '';
       const match = raw.match(/\{[\s\S]*\}/);
       if (!match) throw new Error('no JSON');
@@ -241,14 +239,13 @@ Draft her For (confirms) and Against (contradicts/surprised) from this.` }],
   if (req.body.mode === 'generate-name') {
     const { idea, customer, businessModel, stage, avoid } = req.body;
     if (!idea?.trim()) return res.status(200).json({ name: '' });
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const avoidList: string[] = Array.isArray(avoid) ? avoid.filter(Boolean) : [];
     const avoidLine = avoidList.length
       ? `\nAlready suggested — return something clearly DIFFERENT in sound and root: ${avoidList.join(', ')}.`
       : '';
-    const message = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 24,
+    const message = await callClaude({
+      model: MODELS.standard,
+      max_tokens: 32,
       system: `You name consumer startups. Output ONE brand name that fits THIS specific business.
 Rules:
 - The name must connect to what the startup actually does, its value, or its customer — never generic.
@@ -263,7 +260,7 @@ Target customer: ${customer || 'not specified'}
 Business model: ${businessModel || 'not specified'}
 Stage: ${stage || 'early'}${avoidLine}`,
       }],
-    });
+    }, { endpoint: 'ai', mode: 'name-gen' });
     const raw = message.content[0].type === 'text' ? message.content[0].text.trim() : '';
     const name = raw.replace(/["""''`*.\n]/g, '').trim().split(/\s+/).slice(0, 2).join(' ');
     return res.status(200).json({ name });
@@ -294,17 +291,16 @@ Stage: ${stage || 'early'}${avoidLine}`,
       : dMode === 'C' ? `MODE C — produce the JSON analysis case file for this decision. Do NOT write the decision itself.`
       : `MODE A — draft the founder's answer.`;
 
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     try {
-      const msg = await client.messages.create({
-        model: 'claude-sonnet-4-6',
+      const msg = await callClaude({
+        model: MODELS.standard,
         max_tokens: dMode === 'A' ? 900 : 1400,
         system: DELEGATE_SYSTEM,
         messages: [{
           role: 'user',
           content: `STARTUP SNAPSHOT:\n${snapText}\n\nOTHER BRAIN ENTRIES:\n${brainDump || '(none yet)'}\n\nEXERCISE — "${lessonTitle}":\n${prompt || 'Write the answer for this exercise.'}\n\n${modeTask}`,
         }],
-      });
+      }, { endpoint: 'ai', mode: `delegate-${dMode}`, email });
       const raw = msg.content[0].type === 'text' ? msg.content[0].text.trim() : '';
       if (!raw) throw new Error('empty');
 
@@ -341,7 +337,6 @@ Stage: ${stage || 'early'}${avoidLine}`,
     return res.status(400).json({ error: 'email, lessonId, and answer are required' });
   }
 
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   const isCompare = aiMode === 'compare';
 
   let result: AiFeedback | CompareResult;
@@ -371,12 +366,14 @@ Return JSON with exactly this structure:
   "runnerUp": "<Runner-up label + one-sentence reason>",
   "nextStep": "<one concrete action for the next 7 days>"
 }`;
-      const message = await client.messages.create({
-        model: 'claude-sonnet-4-6',
+      const message = await callClaude({
+        model: MODELS.standard,
         max_tokens: 1024,
-        system: COMPARE_SYSTEM_PROMPT + contextBlock,
-        messages: [{ role: 'user', content: userMessage }],
-      });
+        // §4 caching: stable rubric/system in a cached block; her answer + per-user
+        // context go in the user turn (never above the cache breakpoint).
+        system: [{ type: 'text', text: COMPARE_SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
+        messages: [{ role: 'user', content: userMessage + contextBlock }],
+      }, { endpoint: 'ai', mode: 'compare', email });
       const raw = message.content[0].type === 'text' ? message.content[0].text : '';
       const match = raw.match(/\{[\s\S]*\}/);
       if (!match) throw new Error('no JSON in response');
@@ -408,12 +405,14 @@ Return JSON with exactly this structure:
   "nextStep": "<one concrete next step>",
   "realWorldTask": null | { "title": "<≤6 word imperative, e.g. 'Interview 5 target customers'>", "instruction": "<full detailed instruction with context, how-to, and expected output>" }
 }`;
-      const message = await client.messages.create({
-        model: 'claude-sonnet-4-6',
+      const message = await callClaude({
+        model: MODELS.standard,
         max_tokens: 1024,
-        system: FEEDBACK_SYSTEM_PROMPT + contextBlock,
-        messages: [{ role: 'user', content: userMessage }],
-      });
+        // §4 caching: stable feedback rubric (FEEDBACK_SYSTEM_PROMPT + GLOBAL_RUBRIC_RULES)
+        // in a cached block; her answer + per-user context go in the user turn.
+        system: [{ type: 'text', text: FEEDBACK_SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
+        messages: [{ role: 'user', content: userMessage + contextBlock }],
+      }, { endpoint: 'ai', mode: 'feedback', email });
       const raw = message.content[0].type === 'text' ? message.content[0].text : '';
       const match = raw.match(/\{[\s\S]*\}/);
       if (!match) throw new Error('no JSON in response');
