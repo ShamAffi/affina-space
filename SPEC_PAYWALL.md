@@ -25,20 +25,44 @@ micro_commitment). Three sections:
 2. **The Proof** — bullets of what she did/validated across the 4 modules,
    from her real Brain data (N interviews, validated problem, first demand
    signals) — not generic.
-3. **The Potential** — venture "napkin math", optimistic upside:
-   - Reachable customers in beachhead (from M2 TAM)
-   - × a PLAUSIBLE/ILLUSTRATIVE price (she has no pricing yet — that's M5) →
-     annual revenue potential
-   - × a simple revenue multiple → rough valuation range
-   - **Mandatory framing:** clearly labeled napkin/optimistic-case, NOT a
-     promise. Hook line: "Module 5 is where these guesses become your real
-     numbers." (ties directly into the paywall motivation)
+3. **The Potential** — inspiring, plain-language upside. NOT an investment
+   lecture. 2–3 clean stats, each: small grey label + ONE bold hero number +
+   a short plain support line. Derived from M2 TAM + illustrative price.
+   - Reachable customers (year one)
+   - Revenue potential (at an illustrative price)
+   - Upside stat — **calibrated to her ambition** (see below)
+   - Closing line (KEEP verbatim, it tested well): *"These are napkin numbers
+     — the optimistic case if you hit it, not a promise. Module 5 is where
+     these guesses become your real numbers."*
+
+**★ AMBITION CALIBRATION (critical — the numbers AND the frame adapt to her).**
+Read her ambition from intake: onboarding `goal`, m0l3/quiz `goal_12w`,
+`capacity`. Do NOT impose a generic venture model.
+- **Income / lifestyle / first-customers ambition** (or low capacity): frame
+  the third stat as MONTHLY INCOME ("What it means for you · £1.5k–£3k/month ·
+  a real business that pays you, on your terms"). Modest, achievable numbers.
+  **Do NOT show a valuation** — it's irrelevant and scary for her.
+- **Scale / investment ambition** (goal=Investment, or goal_12w mentions
+  raising/growth): frame the third stat as VALUATION ("What it could be worth ·
+  £50k–£180k · early businesses like yours are valued on revenue, and it climbs
+  fast once people stay"). Bigger numbers, ARR language allowed.
+- **Unclear/exploring:** conservative income frame + one light line of upside.
+Year-one target is anchored to her stated goal where she gave one, not a fixed
+benchmark — a "first 10 customers" founder must not be shown 500 subscribers.
+
+**★ PRESENTATION RULES (fixes the bad first draft — apply to all 3 sections):**
+- **Bold ONLY the hero numbers/phrases** (e.g. "250–500", "£18k–£36k/year",
+  the M5 hook). Everything else regular weight. No bold paragraphs.
+- **No methodology / jargon in visible text.** Ban: "illustrative only —
+  pricing not yet set", "N× revenue multiple", "SAM assumption", "cold-chain
+  costs", "conservative anchor against benchmarks". Say it human: "at a price
+  around £6/month", not the box-math derivation.
+- **No formula line** (the "300 × £72 = £21,600 ARR × 3–5× = £65k–£108k" line
+  is removed entirely — pointless to her).
+- The napkin/"not a promise" honesty lives ONLY in the single closing line
+  above — not sprinkled as caveats inside every stat.
 
 **CTA:** **"Sounds great — continue →"** → opens the paywall overlay (§1).
-
-Content generation rules: never present the price/valuation as a forecast;
-always the "if you hit it" upside with the napkin disclaimer. This is
-inspiring-but-honest, consistent with the results-not-hype positioning.
 
 ## 1. Trigger & gating
 

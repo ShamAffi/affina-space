@@ -1994,7 +1994,8 @@ function ProblemSolutionBlock({ email, initialContent, onSave }: {
 type FoundersCase = {
   vision: string;
   proof: string[];
-  potential: { reachableCustomers: string; illustrativePrice: string; annualRevenue: string; valuationRange: string; math: string };
+  // 2–3 clean stats (SPEC_PAYWALL §0): small grey label · one bold hero number · plain support line.
+  potential: { stats: { label: string; hero: string; support: string }[] };
 };
 function FoundersCaseBlock({ email, onContinue }: { email: string; onContinue: () => void }) {
   type Status = 'loading' | 'ready' | 'error';
@@ -2034,7 +2035,7 @@ function FoundersCaseBlock({ email, onContinue }: { email: string; onContinue: (
     );
   }
 
-  const p = data.potential;
+  const stats = data.potential?.stats ?? [];
   return (
     <div className="mb-8 animate-slide-up flex flex-col gap-5">
       {/* The Vision */}
@@ -2058,29 +2059,19 @@ function FoundersCaseBlock({ email, onContinue }: { email: string; onContinue: (
         </ul>
       </div>
 
-      {/* The Potential — napkin */}
+      {/* The Potential — bold ONLY the hero; label + support plain. No formula, no jargon. */}
       <div className="bg-brand-50 border border-brand-100 rounded-card p-5">
-        <p className="text-[10px] font-bold text-brand-700 uppercase tracking-widest mb-3">The Potential — a napkin, not a forecast</p>
-        <div className="grid grid-cols-2 gap-3 mb-3">
-          <div className="bg-surface border border-brand-100 rounded-control p-3">
-            <p className="text-[10px] font-bold text-ink-mute uppercase tracking-wider">Reachable customers</p>
-            <p className="text-lg font-bold text-ink leading-tight mt-0.5">{p.reachableCustomers}</p>
-          </div>
-          <div className="bg-surface border border-brand-100 rounded-control p-3">
-            <p className="text-[10px] font-bold text-ink-mute uppercase tracking-wider">Illustrative price</p>
-            <p className="text-lg font-bold text-ink leading-tight mt-0.5">{p.illustrativePrice}</p>
-          </div>
-          <div className="bg-surface border border-brand-100 rounded-control p-3">
-            <p className="text-[10px] font-bold text-ink-mute uppercase tracking-wider">Annual revenue</p>
-            <p className="text-lg font-bold text-brand-800 leading-tight mt-0.5">{p.annualRevenue}</p>
-          </div>
-          <div className="bg-surface border border-brand-100 rounded-control p-3">
-            <p className="text-[10px] font-bold text-ink-mute uppercase tracking-wider">Rough valuation</p>
-            <p className="text-lg font-bold text-brand-800 leading-tight mt-0.5">{p.valuationRange}</p>
-          </div>
+        <p className="text-[10px] font-bold text-brand-700 uppercase tracking-widest mb-4">The Potential</p>
+        <div className="flex flex-col gap-4">
+          {stats.map((s, i) => (
+            <div key={i} className={i < stats.length - 1 ? 'pb-4 border-b border-brand-100' : ''}>
+              <p className="text-[11px] text-ink-mute mb-0.5">{s.label}</p>
+              <p className="text-2xl font-bold text-brand-800 leading-tight">{s.hero}</p>
+              {s.support && <p className="text-sm text-ink-soft leading-relaxed mt-0.5">{s.support}</p>}
+            </div>
+          ))}
         </div>
-        <p className="text-xs text-ink-soft leading-relaxed">✏️ {p.math}</p>
-        <p className="text-[11px] text-ink-mute mt-3 leading-relaxed">
+        <p className="text-[11px] text-ink-mute mt-5 leading-relaxed">
           These are napkin numbers — the optimistic case if you hit it, not a promise.
           <span className="font-semibold text-brand-700"> Module 5 is where these guesses become your real numbers.</span>
         </p>

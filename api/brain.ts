@@ -238,39 +238,65 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const entries = await db.query.brainEntries.findMany({ where: eq(brainEntries.userId, user.id) });
       const cached = entries.find((e) => e.entryType === 'founders_case');
       if (cached && req.body.refresh !== true) {
-        try { return res.status(200).json({ case: JSON.parse(cached.content) }); } catch { /* regen */ }
+        // Only serve cache in the NEW stats shape — old-format entries fall through to regen.
+        try {
+          const c = JSON.parse(cached.content);
+          if (Array.isArray(c?.potential?.stats)) return res.status(200).json({ case: c });
+        } catch { /* regen */ }
       }
       const byType: Record<string, string> = {};
       for (const e of entries) if (e.content) byType[e.entryType] = e.content;
       const snap = user.snapshot as { sections: { title: string; content: string }[] } | null;
+
+      // Ambition signals (SPEC_PAYWALL §0 calibration): onboarding goal + m0l4 quiz goal_12w + capacity.
+      let goal12w = '', capacity = '';
+      try {
+        const intake = JSON.parse(byType['founder_intake'] || '{}');
+        goal12w = intake.goal12w ?? ''; capacity = intake.capacity ?? '';
+      } catch { /* no quiz yet */ }
+
+      // Potential = 2–3 clean stats, each {label (small grey), hero (bold number), support (plain line)}.
+      // No box-math, no jargon, no formula line — the AI already delivers presentation-ready copy.
       const CaseSchema = z.object({
         vision: z.coerce.string(),
         proof: z.array(z.coerce.string()).min(1).max(6),
         potential: z.object({
-          reachableCustomers: z.coerce.string(),
-          illustrativePrice: z.coerce.string(),
-          annualRevenue: z.coerce.string(),
-          valuationRange: z.coerce.string(),
-          math: z.coerce.string(),         // the napkin line, calculation shown
+          stats: z.array(z.object({
+            label: z.coerce.string(),
+            hero: z.coerce.string(),
+            support: z.coerce.string().catch(''),
+          })).min(2).max(3),
         }),
       });
       const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
       try {
         const msg = await client.messages.create({
           model: 'claude-sonnet-4-6',
-          max_tokens: 1200,
-          system: `You are Affina, writing "The Founder's Case" — a milestone reveal for a founder who just finished Module 4, right before she decides to continue. Tone: inspiring but HONEST (results-not-hype). Three parts, all from HER real data — never generic, never invented:
-- vision: her project one-liner + why it matters in the world (2-3 sentences, from her value proposition + validated problem).
-- proof: 3-6 bullet strings of what she actually did/validated across 4 modules (real numbers from her Brain: interviews run, problem validated, first demand signals). Each bullet concrete and hers.
-- potential: a VENTURE NAPKIN, optimistic upside — NOT a forecast:
-  · reachableCustomers: from her M2 market/TAM (a number or honest range; if absent, a reasonable estimate labeled as such)
-  · illustrativePrice: a plausible ILLUSTRATIVE monthly/annual price (she has no pricing yet — that's M5), clearly illustrative
-  · annualRevenue: reachableCustomers × price (show the multiplication in 'math')
-  · valuationRange: annualRevenue × a simple revenue multiple (e.g. 3–5×) as a rough range
-  · math: one line showing the napkin calculation transparently
-  NEVER present price/revenue/valuation as a promise or prediction — it is the "if you hit it" upside.
-Respond ONLY with valid JSON: {"vision":"...","proof":["..."],"potential":{"reachableCustomers":"...","illustrativePrice":"...","annualRevenue":"...","valuationRange":"...","math":"..."}}`,
+          max_tokens: 1100,
+          system: `You are Affina, writing "The Founder's Case" — a milestone reveal for a founder who just finished Module 4, right before she decides to continue. Tone: inspiring but HONEST, PLAIN language — never an investment lecture. All from HER real data, never generic or invented.
+
+Return three parts:
+- vision: her project one-liner + why it matters in the world (2-3 sentences, plain).
+- proof: 3-6 short bullet strings of what she actually did/validated across 4 modules (real numbers from her Brain: interviews run, problem validated, first demand). Concrete and hers.
+- potential.stats: EXACTLY 3 stats, each { "label": small caption, "hero": ONE punchy number/range, "support": one short plain sentence }. Optimistic upside, napkin-level.
+  Stat 1 — Reachable customers, year one. hero e.g. "250–500". support: one plain line. Anchor to HER stated goal if she gave one (a "first 10 customers" founder must NOT see 500) — otherwise a modest year-one reach from her M2 market.
+  Stat 2 — Revenue potential at an illustrative price. hero e.g. "£18k–£36k/year". support says the price humanly, e.g. "at a price around £6/month" — NOT box-math.
+  Stat 3 — CALIBRATED TO HER AMBITION (below).
+
+AMBITION CALIBRATION (critical):
+- INCOME / lifestyle / first-customers ambition, OR low weekly capacity → Stat 3 is MONTHLY INCOME. label "What it means for you", hero e.g. "£1.5k–£3k/month", support e.g. "a real business that pays you, on your terms". Keep ALL numbers modest and achievable. NEVER show a valuation.
+- SCALE / INVESTMENT ambition (goal = Investment, or goal_12w mentions raising / big growth) → Stat 3 is VALUATION. label "What it could be worth", hero e.g. "£50k–£180k", support e.g. "early businesses like yours are valued on revenue, and it climbs fast once people stay". Bigger numbers, ARR language allowed.
+- UNCLEAR → income frame + one light line of upside in the support. No valuation.
+
+HARD PRESENTATION RULES:
+- hero = ONLY the number/range/short phrase (the app renders it bold). label and support are plain, lowercase-ish captions/sentences.
+- BAN this jargon from all visible text: "illustrative only", "pricing not yet set", "N× revenue multiple", "SAM", "cold-chain", "conservative anchor", "benchmark", "ARR" in support lines for income founders. Say things like a human.
+- NO formula/derivation line anywhere.
+- Do NOT add napkin/"not a promise" caveats inside stats — the app appends the single closing line itself.
+
+Respond ONLY with valid JSON: {"vision":"...","proof":["..."],"potential":{"stats":[{"label":"...","hero":"...","support":"..."}]}}`,
           messages: [{ role: 'user', content: `PROJECT: ${user.projectName || 'unnamed'} — ${user.idea || 'not set'}
+HER AMBITION → onboarding goal: ${user.goal || 'not set'} · 12-week goal (quiz): ${goal12w || 'not stated'} · weekly capacity: ${capacity || 'not stated'}
 STARTUP SNAPSHOT:\n${snap ? snap.sections.map((x) => `## ${x.title}\n${x.content}`).join('\n') : '(none)'}
 VALUE PROP: ${byType['value_proposition'] || '(none)'}
 PERSONA: ${byType['persona'] || '(none)'}
@@ -279,7 +305,7 @@ PROBLEM-SOLUTION CHECK: ${byType['problem_solution_check'] || '(none)'}
 QUANTIFIED VALUE: ${byType['value_advantage'] || byType['quantified_value'] || '(none)'}
 MICRO-COMMITMENT / DEMAND: ${byType['micro_commitment'] || '(none)'}
 
-Write her Founder's Case.` }],
+Write her Founder's Case — calibrate the numbers and the third stat to her ambition above.` }],
         });
         const raw = msg.content[0].type === 'text' ? msg.content[0].text : '';
         const match = raw.match(/\{[\s\S]*\}/);
