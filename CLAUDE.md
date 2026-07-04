@@ -28,12 +28,13 @@ Brand in one line: **editorial, confident, minimal — royal-violet primary (`#7
 - **Verification:** browser preview tooling does not work in this environment — verify with `tsc -b` + `vite build` + live curl checks against prod APIs; UI interactions get eyeballed by Shamil.
 - Commits in English with `Co-Authored-By: Claude <model> <noreply@anthropic.com>`; commit per logical task; deploy after each user-visible change.
 
-## Current state (2026-07-03)
-Live: full Program v2 (13 modules, 87 lessons, all lecture bodies real — citations restored), Snapshot with checkpoint/check-in updates, Delegate A/B/C, per-block rubrics with NO-SCORE intake, Briefing/Debrief, Launch Readiness §7 with `lastReadinessGain`, mentor sessions S1–S3 (S3 completion = launch→growth transition), Market Research test mode, M0 intake redesign, dynamic Momentum ("Traction") card, weekly Pulse check-ins, routing (`/start`, `/dashboard`, `/learning/:course/:lesson`, `/tasks`, `/traction`), freshStart re-onboarding wipe. DB was wiped for launch (users start at id 1).
+## Current state (2026-07-04)
+Program v2 fully live, ALL lecture texts filled (M0–M12, LECTURES_V2 markup via LessonBody renderer). Paywall LIVE (SPEC_PAYWALL): m4l10 "Founder's Case" reveal (ambition-calibrated to m0l4 quiz goal3y) → dismissible /unlock (users.subscribed; "Unlock" is a stub flipping the flag, Stripe drops in later) gating M5–M12 → full-page /start-session S1 booking. Also: M0 intake (6-Q quiz incl goal3y), m4l5 three-block For/Against/Conclusion, Traction card deterministic Business tiers (+ red staleness card), Interview Log Add-Transcript, Tasks Real World/Practice + newest-first, course-level pills, Snapshot, Delegate A/B/C, 44 rubrics, mentor S1–S3, Market Research test-mode. DB wiped for launch.
+
 
 ## Backlog (agreed, not started)
-- Fill the 12 `TODO: rewrite` lecture texts from CONTENT_M5-M12.md (title-matched).
-- Auth (magic link) — `/login`, `/auth/verify` are placeholders; then lock down email-in-query APIs + rate-limit AI endpoints.
-- Landing page at `/` (placeholder hero now).
-- Out of v2 scope per SPEC §9: paywall enforce, payments, Resend/email triggers (23-trigger table), booking calendar, Market Research full mode (needs search API decision: Exa vs Tavily), legal mini-course, viral cards, S3 certificate.
-- Smaller: AI role-play (m3l6 practice customer, m8l4 skeptic, m12l4 investor Q&A), per-entry Interview Log AI review, "D + text" outreach draft buttons in field briefings, m0l4 link content fetching.
+- Stripe: paywall "Unlock" is a stub (sets subscribed=true); drop checkout between click and flag, gating unchanged. Plus [PRICE] + billing-period decision (SPEC_PAYWALL §6: "6 weeks" vs 12-week — unresolved).
+- Auth (magic link) — /login, /auth/verify placeholders; then lock down email-in-query APIs + rate-limit AI endpoints.
+- Landing at /.
+- Out of v2 scope (SPEC §9): Resend 23-trigger emails, booking calendar, Market Research full mode (needs Exa-vs-Tavily), legal mini-course, viral cards, S3 certificate.
+- Smaller: AI role-plays (m3l6/m8l4/m12l4), per-entry Interview Log review, "D + text" outreach buttons, m11l4 three-block treatment (awaiting decision).
