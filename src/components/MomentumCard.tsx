@@ -174,17 +174,6 @@ export default function MomentumCard({
         {tier === 'B' && learningLine && (
           <p className="text-xs text-ink-mute">📚 Learning: {learningLine}</p>
         )}
-
-        {/* 🔥 Streak block */}
-        {streak > 0 && (
-          <div className="bg-amber-50 border border-amber-100 rounded-control px-4 py-3 flex items-center gap-2 flex-shrink-0">
-            <span className="text-lg">🔥</span>
-            <div>
-              <p className="text-sm font-bold text-amber-700 leading-none">{streak} week{streak !== 1 ? 's' : ''}</p>
-              <p className="text-xs text-amber-600 mt-0.5">of showing up</p>
-            </div>
-          </div>
-        )}
       </div>
 
       <button
