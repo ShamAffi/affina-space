@@ -5,7 +5,8 @@ import { drizzle } from 'drizzle-orm/neon-http';
 import { eq } from 'drizzle-orm';
 import { users, lessonInputs, completedLessons, brainEntries, tasks, checkIns, achievements, delegations } from '../src/db/schema.js';
 import { GROWTH_SEED_XP } from '../src/server/progressUtils.js';
-import { sendEmail, welcomeEmail, subscriptionEmail } from '../src/server/email.js';
+import { sendEmail, welcomeEmail, subscriptionEmail, mentorBookedEmail } from '../src/server/email.js';
+import { logEmail } from '../src/server/emailLog.js';
 
 function getDb() {
   const sql = neon(process.env.DATABASE_URL!);
@@ -107,8 +108,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const [created] = await db.insert(users)
         .values({ email, name, projectName, idea, customer, businessModel, stage, goal, score })
         .returning({ id: users.id });
-      // §8 — welcome email on first user creation (fire-and-forget; sendEmail never throws)
-      await sendEmail(welcomeEmail(email));
+      // §2.2 — welcome email on first user creation (fire-and-forget; sendEmail never throws)
+      await sendEmail(welcomeEmail(email, name));
+      await logEmail(created.id, 'welcome');
       return res.status(201).json({ id: created.id });
     }
   }
@@ -123,10 +125,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (projectName !== undefined) patchFields.projectName = projectName;
     if (subscribed !== undefined) patchFields.subscribed = subscribed;
     // Merge mentorSessions (partial patch per session) — never clobber other sessions.
+    const newlyBooked: string[] = [];
     if (mentorSessions !== undefined) {
       const prev = (existingUser?.mentorSessions ?? {}) as Record<string, unknown>;
       const merged: Record<string, unknown> = { ...prev };
       for (const [k, v] of Object.entries(mentorSessions as Record<string, unknown>)) {
+        const before = prev[k] as { booked?: boolean } | undefined;
+        const after = v as { booked?: boolean };
+        if (after?.booked === true && before?.booked !== true) newlyBooked.push(k);
         merged[k] = { ...(prev[k] as object ?? {}), ...(v as object) };
       }
       patchFields.mentorSessions = merged;
@@ -143,9 +149,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     await db.update(users).set(patchFields).where(eq(users.email, email));
-    // §8 — subscription-confirmed email when `subscribed` flips false→true (the /unlock path)
+    // §2.3 — subscription-confirmed email when `subscribed` flips false→true (the /unlock path)
     if (subscribed === true && existingUser?.subscribed !== true) {
       await sendEmail(subscriptionEmail(email));
+      if (existingUser) await logEmail(existingUser.id, 'subscription');
+    }
+    // §2.4 — mentor-session-booked email when a session's `booked` flips true (once per session)
+    for (const sid of newlyBooked) {
+      await sendEmail(mentorBookedEmail(email, sid));
+      if (existingUser) await logEmail(existingUser.id, 'mentor_booked', sid);
     }
     return res.status(200).json({ ok: true });
   }

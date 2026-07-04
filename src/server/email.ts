@@ -1,9 +1,10 @@
 import { Resend } from 'resend';
 
-// Email layer (SPEC_RESEND_AUTH §3). Lives in src/server/ (not api/) — Vercel Hobby
-// 12-function cap counts every .ts under /api. One integration serves transactional
-// email AND magic-link auth. sendEmail NEVER throws into the request path: a failed
-// send is caught + logged, so a broken Resend can't fail user creation / login.
+// Email layer (SPEC_EMAILS §0 / SPEC_RESEND_AUTH §3). Lives in src/server/ (not api/)
+// — Vercel Hobby 12-function cap counts every .ts under /api. sendEmail NEVER throws
+// into the request path: a failed send is caught + logged (fire-and-forget), so a
+// broken Resend can't fail signup / login / a check-in. All copy is the final English
+// from SPEC_EMAILS — that doc is the source of truth for content.
 
 type Mail = { to: string; subject: string; html: string };
 
@@ -23,12 +24,18 @@ export async function sendEmail({ to, subject, html }: Mail): Promise<void> {
   }
 }
 
-// ── Templates: inline-styled HTML (email clients strip <style>). DESIGN.md brand
-// hardcoded as hex. Small functions returning strings — no template engine. ────────
+// ── Shared brand wrapper — inline-styled HTML (email clients strip <style>).
+// DESIGN.md brand hardcoded as hex. lifecycleNote adds a soft footer line on the
+// cron/marketing emails (a real unsubscribe endpoint is Phase B / Broadcasts). ──────
 
 const appUrl = () => process.env.APP_URL || 'https://affina-space.vercel.app';
 
-function wrap(bodyHtml: string): string {
+const P = 'font-size:15px;line-height:1.6;color:#3f3f46;margin:0 0 16px 0;';
+
+function wrap(bodyHtml: string, lifecycleNote?: string): string {
+  const foot = lifecycleNote
+    ? `<p style="font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:12px;line-height:1.5;color:#9a9aa2;margin:16px 0 0 0;">${lifecycleNote}</p>`
+    : '';
   return `<!doctype html><html><body style="margin:0;padding:0;background:#F4F4F5;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F4F4F5;padding:32px 12px;">
     <tr><td align="center">
@@ -36,11 +43,12 @@ function wrap(bodyHtml: string): string {
         <tr><td style="padding:28px 32px 6px 32px;">
           <span style="font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:700;color:#7150EA;letter-spacing:-0.5px;">Affina<span style="color:#1F1F23;">Space</span></span>
         </td></tr>
-        <tr><td style="padding:6px 32px 32px 32px;font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;color:#1F1F23;">
+        <tr><td style="padding:6px 32px 30px 32px;font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;color:#1F1F23;">
           ${bodyHtml}
         </td></tr>
       </table>
       <p style="font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:12px;color:#9a9aa2;margin:18px 0 0 0;">Affina — the AI incubator for early-stage founders.</p>
+      ${foot}
     </td></tr>
   </table></body></html>`;
 }
@@ -49,44 +57,142 @@ function button(href: string, label: string): string {
   return `<a href="${href}" style="display:inline-block;background:#7150EA;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:13px 28px;border-radius:999px;">${label}</a>`;
 }
 
-const P = 'font-size:15px;line-height:1.55;color:#3f3f46;margin:0 0 16px 0;';
-const H = 'font-size:20px;font-weight:700;margin:10px 0 10px 0;color:#1F1F23;';
+function bullets(items: string[]): string {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 16px 0;">${items
+    .map((t) => `<tr><td style="padding:2px 0;${P.replace('margin:0 0 16px 0;', 'margin:0;')}">• ${t}</td></tr>`)
+    .join('')}</table>`;
+}
 
+const sign = `<p style="${P}margin-top:20px;color:#71717a;">— Affina</p>`;
+const LIFECYCLE_NOTE = "You're getting this because you're building your startup with Affina.";
+const SESSION_LABEL: Record<string, string> = { S1: 'Start', S2: 'Mid', S3: 'Final' };
+export function sessionLabel(id: string): string { return SESSION_LABEL[id] ?? 'Start'; }
+
+// ── 1. Magic link (§2.1) ──────────────────────────────────────────────────────
 export function magicLinkEmail(to: string, link: string): Mail {
   return {
     to,
     subject: 'Your Affina sign-in link',
     html: wrap(`
-      <h1 style="${H}">Sign in to Affina</h1>
-      <p style="${P}">Click below to sign in. This link works once and expires in 15 minutes.</p>
-      <p style="margin:0 0 18px 0;">${button(link, 'Sign in →')}</p>
-      <p style="font-size:13px;line-height:1.5;color:#71717a;margin:0;">If you didn't request this, you can safely ignore this email — no one can sign in without the link above.</p>
+      <p style="${P}">Hey 👋</p>
+      <p style="${P}">Tap the button and you're in. No password needed.</p>
+      <p style="margin:0 0 18px 0;">${button(link, 'Sign in to Affina')}</p>
+      <p style="font-size:13px;line-height:1.5;color:#71717a;margin:0;">This link works once and expires in 15 minutes. If this wasn't you, just ignore this email — nothing will happen.</p>
+      ${sign}
     `),
   };
 }
 
-export function welcomeEmail(to: string): Mail {
+// ── 2. Welcome (§2.2) ─────────────────────────────────────────────────────────
+export function welcomeEmail(to: string, name?: string): Mail {
+  const hi = name?.trim() ? `Hey ${name.trim()} 👋` : 'Hey 👋';
   return {
     to,
-    subject: 'Welcome to Affina 💜',
+    subject: "Welcome to Affina — let's build this",
     html: wrap(`
-      <h1 style="${H}">Welcome to Affina</h1>
-      <p style="${P}">Affina is your AI incubator — it walks you from idea to your first paying customer, one module at a time, with a mentor in your corner the whole way.</p>
-      <p style="${P}">Start with Module 0. It takes about 10 minutes and sets everything up.</p>
-      <p style="margin:0;">${button(appUrl(), 'Start Module 0 →')}</p>
+      <p style="${P}">${hi}</p>
+      <p style="${P}">You're in. Affina takes you from an idea to your first paying customer — one small, real step at a time. Not a course to watch: a program to <em>do</em>.</p>
+      <p style="${P}">You won't do it alone — you've got AI guidance, live mentors, and a community of women building right alongside you.</p>
+      <p style="${P}">Start with Module 0. It's short, and it sets everything up.</p>
+      <p style="margin:0;">${button(appUrl(), 'Start Module 0')}</p>
+      ${sign}
     `),
   };
 }
 
+// ── 3. Subscription confirmed (§2.3) ──────────────────────────────────────────
 export function subscriptionEmail(to: string): Mail {
   return {
     to,
-    subject: "You're in — Affina unlocked 🎉",
+    subject: "You're in — the full program is open",
     html: wrap(`
-      <h1 style="${H}">You're in 🎉</h1>
-      <p style="${P}">Your subscription is active — Modules 5–12 are unlocked: the full path to launch and your first customers.</p>
-      <p style="${P}">Next up: book your Strategy Session (S1) with a mentor to map your next 90 days.</p>
-      <p style="margin:0;">${button(`${appUrl()}/start-session`, 'Book your session →')}</p>
+      <p style="${P}">That's the hard part started — now you build the business.</p>
+      <p style="${P}">You've just unlocked:</p>
+      ${bullets([
+        'All 12 modules — idea → first paying customer',
+        '3 live 1:1 mentor sessions with real founders',
+        'Specialized deep-dive programs',
+        'Live events &amp; a community of women founders',
+      ])}
+      <p style="${P}">First thing: book your <strong>Start</strong> session with a mentor — the fastest way to make sure you're pointed at the right thing before Module 5.</p>
+      <p style="margin:0;">${button(`${appUrl()}/start-session`, 'Book my Start session')}</p>
+      ${sign}
     `),
+  };
+}
+
+// ── 4. Mentor session booked (§2.4) ───────────────────────────────────────────
+export function mentorBookedEmail(to: string, sessionId: string, dateTime?: string): Mail {
+  const label = sessionLabel(sessionId);
+  const when = dateTime?.trim()
+    ? `You're set for your <strong>${label}</strong> session on ${dateTime.trim()}.`
+    : `You're set for your <strong>${label}</strong> session. We'll be in touch to confirm your time.`;
+  return {
+    to,
+    subject: `Your ${label} session is booked ✅`,
+    html: wrap(`
+      <p style="${P}">${when}</p>
+      <p style="${P}">It's a 1:1 with a founder who's done this. Come with your Snapshot open and whatever's on your mind — this hour is yours.</p>
+      <p style="${P}">See you there.</p>
+      ${sign}
+    `),
+  };
+}
+
+// ── 5. Weekly tasks — Thursday (§2.5) ─────────────────────────────────────────
+export function weeklyTasksEmail(to: string, taskTitles: string[]): Mail {
+  return {
+    to,
+    subject: 'Your tasks for this week',
+    html: wrap(`
+      <p style="${P}">Hey! Here's what's waiting for you in Affina — small steps toward your first customer:</p>
+      ${bullets(taskTitles)}
+      <p style="${P}">Even one task done is momentum. Start with the easiest one.</p>
+      <p style="margin:0;">${button(`${appUrl()}/tasks`, 'Open my tasks')}</p>
+    `, LIFECYCLE_NOTE),
+  };
+}
+
+// ── 6. Business-week reflection — Saturday (§2.6) ─────────────────────────────
+export function reflectionEmail(to: string): Mail {
+  return {
+    to,
+    subject: 'How did your week go? (2 min — and it\'s for you)',
+    html: wrap(`
+      <p style="${P}">Hey 👋</p>
+      <p style="${P}">Saturday's a good moment to look back. Not to report to us — for yourself: what actually moved this week, and what got stuck.</p>
+      <p style="${P}">This is the quiet habit of founders who go the distance — they <strong>notice their own progress</strong>. Heads-down in the day-to-day, it feels like you're standing still. But mark the week and you see it: <em>"oh — I talked to three customers and rewrote my offer."</em> That gives your energy back and shows you where to steer next.</p>
+      <p style="${P}">Takes a couple of minutes:</p>
+      <p style="margin:0 0 18px 0;">${button(`${appUrl()}/traction`, 'Share how your week went')}</p>
+      ${sign}
+      <p style="font-size:13px;line-height:1.5;color:#71717a;margin:14px 0 0 0;">P.S. A rough week is fine too. Stuck? Just say so — that's exactly why your mentor and the program are right here.</p>
+    `, LIFECYCLE_NOTE),
+  };
+}
+
+// ── 7. Book your mentor (§2.7) ────────────────────────────────────────────────
+export function bookMentorEmail(to: string, sessionId: string): Mail {
+  const label = sessionLabel(sessionId);
+  return {
+    to,
+    subject: 'Your mentor session is waiting',
+    html: wrap(`
+      <p style="${P}">You've reached the point where one real conversation saves you weeks. Your <strong>${label}</strong> session is a 1:1 with a founder who's already walked this path — you'll talk through where you're headed and check your course.</p>
+      <p style="margin:0;">${button(`${appUrl()}/dashboard`, 'Book my session')}</p>
+    `, LIFECYCLE_NOTE),
+  };
+}
+
+// ── 8. Re-engagement — 14 days no login (§2.8) ────────────────────────────────
+export function reengagementEmail(to: string, moduleLabel: string, snapshotLine: string): Mail {
+  return {
+    to,
+    subject: 'Your idea is still here',
+    html: wrap(`
+      <p style="${P}">Hey 👋 We haven't seen you in a couple of weeks — everything okay?</p>
+      <p style="${P}">You left off at <strong>${moduleLabel}</strong>, and your project — <em>"${snapshotLine}"</em> — hasn't gone anywhere. Picking back up is easy: just continue from where you stopped.</p>
+      <p style="margin:0 0 18px 0;">${button(`${appUrl()}/dashboard`, 'Jump back in')}</p>
+      <p style="font-size:13px;line-height:1.5;color:#71717a;margin:0;">Life gets busy — no pressure. But your first customer won't find itself 🙂</p>
+    `, LIFECYCLE_NOTE),
   };
 }

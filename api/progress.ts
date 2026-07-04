@@ -103,6 +103,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
+    // §4 — activity signal for lifecycle emails. Throttle to ≤1 write/hour/user.
+    const lastActive = user.lastActiveAt ? new Date(user.lastActiveAt).getTime() : 0;
+    if (Date.now() - lastActive > 3_600_000) {
+      await db.update(users).set({ lastActiveAt: new Date() }).where(eq(users.id, user.id));
+    }
+
     const [completed, inputs] = await Promise.all([
       db.query.completedLessons.findMany({ where: eq(completedLessons.userId, user.id) }),
       db.query.lessonInputs.findMany({ where: eq(lessonInputs.userId, user.id) }),

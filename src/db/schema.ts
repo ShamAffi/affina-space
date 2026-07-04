@@ -19,6 +19,7 @@ export const users = pgTable('users', {
   northStar: jsonb('north_star'),  // { key, label, unit } | null
   pulseStreak: integer('pulse_streak').default(0),
   lastCheckInAt: timestamp('last_check_in_at'),
+  lastActiveAt: timestamp('last_active_at'),   // §4 lifecycle-email activity signal (14-day suppression / re-engagement)
   momentumCard: jsonb('momentum_card'),  // AI-composed MomentumCard | null
   lastReadinessGain: jsonb('last_readiness_gain'),  // { delta, sourceLabel } | null
   // Startup Snapshot (§3.4)
@@ -152,4 +153,15 @@ export const authTokens = pgTable('auth_tokens', {
   expiresAt: timestamp('expires_at').notNull(),
   usedAt: timestamp('used_at'),
   createdAt: timestamp('created_at').defaultNow(),
+});
+
+// Email log (SPEC_EMAILS §4) — idempotency (dedupe lifecycle sends) + analytics.
+// weekOf is the dedup window key: week string for weeklies, 'once' or a session id
+// for once-only. Unique-ish on (user_id, type, week_of) — see the migration index.
+export const emailLog = pgTable('email_log', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').references(() => users.id, { onDelete: 'cascade' }),
+  type: text('type').notNull(),
+  weekOf: text('week_of').notNull().default('once'),
+  sentAt: timestamp('sent_at').defaultNow(),
 });
