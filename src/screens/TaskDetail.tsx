@@ -143,6 +143,10 @@ export default function TaskDetail({ task, email, onBack }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, taskId: currentTask.id, submissionText: text, submissionData }),
       });
+      if (r.status === 429) {
+        setError("You're going a bit fast — give it a moment, then try again.");
+        return;
+      }
       const data = await r.json();
       if (data.task) {
         setCurrentTask(data.task);

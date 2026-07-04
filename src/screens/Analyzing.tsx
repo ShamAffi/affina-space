@@ -55,7 +55,7 @@ export default function Analyzing({ userData, onDone }: Props) {
         goal: userData.goal,
       }),
     })
-      .then((r) => r.json() as Promise<OnboardingScore>)
+      .then((r) => (r.ok ? (r.json() as Promise<OnboardingScore>) : FALLBACK))
       .catch(() => FALLBACK);
 
     Promise.all([minDelay, scoreCall]).then(([, result]) => {

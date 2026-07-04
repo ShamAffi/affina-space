@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, timestamp, unique, boolean, jsonb } from 'drizzle-orm/pg-core';
+import { pgTable, serial, text, integer, bigint, timestamp, unique, boolean, jsonb } from 'drizzle-orm/pg-core';
 
 export const users = pgTable('users', {
   id: serial('id').primaryKey(),
@@ -131,4 +131,13 @@ export const lessonsContent = pgTable('lessons_content', {
   type: text('type').notNull(),
   body: text('body').notNull(),
   inputPrompt: text('input_prompt'),
+});
+
+// Rate-limit counters (src/server/ratelimit.ts) — pre-auth stopgap protecting the
+// Anthropic bill. Raw SQL owns this table; defined here only to document the schema.
+export const rateLimits = pgTable('rate_limits', {
+  bucketKey: text('bucket_key').primaryKey(),
+  windowSeconds: integer('window_seconds').notNull(),
+  count: integer('count').notNull().default(0),
+  windowStart: bigint('window_start', { mode: 'number' }).notNull(),
 });

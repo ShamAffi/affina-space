@@ -83,6 +83,11 @@ export default function MetricPulse({ email, projectName, onBack }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, rawText }),
       });
+      if (r.status === 429) {
+        setError("You're going a bit fast — give it a moment, then try again.");
+        setStep('share');
+        return;
+      }
       if (!r.ok) throw new Error('draft failed');
       const data: CheckInDraft = await r.json();
       setDraft(data);

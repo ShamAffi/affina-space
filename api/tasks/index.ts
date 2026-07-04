@@ -1,5 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Anthropic from '@anthropic-ai/sdk';
+import { applyCors } from '../../src/server/http.js';
+import { checkRateLimit } from '../../src/server/ratelimit.js';
 import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
 import { eq, and } from 'drizzle-orm';
@@ -56,10 +58,13 @@ async function syncProgramTasks(db: ReturnType<typeof getDb>, userId: number) {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (applyCors(req, res, 'GET,POST,OPTIONS')) return;
+
+  const rl = await checkRateLimit(req);
+  if (!rl.ok) {
+    if (rl.retryAfter) res.setHeader('Retry-After', String(rl.retryAfter));
+    return res.status(429).json({ error: 'rate_limited', retryAfter: rl.retryAfter });
+  }
 
   const db = getDb();
 

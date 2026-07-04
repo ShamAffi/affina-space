@@ -13,6 +13,7 @@ import CompareCard from '../components/CompareCard';
 import LessonBody from '../components/LessonBody';
 import { splitMissionVision, composeMissionVision } from '../missionVision';
 import { composePSC, splitPSC, pscRecapBlocks, PSC_LABELS, type PscBlocks } from '../problemSolution';
+import { checkRes, isRateLimit, RATE_LIMIT_MESSAGE } from '../rateLimit';
 
 // Block-kind chips (§5 LMS sidebar): label + tint per kind. Theory renders no chip.
 const KIND_CHIP: Partial<Record<BlockKind, { label: string; cls: string }>> = {
@@ -63,6 +64,8 @@ export default function LMS({ userData, onUpdateUserData, onGoToDashboard, onLog
   // §9 — visible failure state for AI calls (was a silent catch → "nothing happens")
   const [aiErrorLesson, setAiErrorLesson] = useState<string | null>(null);
   const [delegateErrorLesson, setDelegateErrorLesson] = useState<string | null>(null);
+  // §4 API hardening — a 429 (rate limit) is shown as a calm "slow down", distinct from a 500
+  const [rateLimitedLesson, setRateLimitedLesson] = useState<string | null>(null);
   // §4 Delegate — Try → Review → Delegate
   const [delegating, setDelegating] = useState<string | null>(null);
   const [delegateOpen, setDelegateOpen] = useState<string | null>(null);
@@ -237,13 +240,12 @@ My motivation & 12-week goal: …`;
           },
         }),
       })
-        .then((r) => {
-          if (!r.ok) throw new Error('api error');
-          return r.json();
-        })
+        .then(checkRes)
+        .then((r) => r.json())
         .then((data) => {
           setSavingLesson(null);
           setAiErrorLesson(null);
+          setRateLimitedLesson(null);
           if (isCompare) {
             setCompareByLesson((prev) => ({ ...prev, [lessonId]: data as CompareResult }));
           } else {
@@ -253,7 +255,11 @@ My motivation & 12-week goal: …`;
             }));
           }
         })
-        .catch(() => { setSavingLesson(null); setAiErrorLesson(lessonId); });
+        .catch((e) => {
+          setSavingLesson(null);
+          if (isRateLimit(e)) setRateLimitedLesson(lessonId);
+          else setAiErrorLesson(lessonId);
+        });
     }, 750);
   }
 
@@ -266,7 +272,7 @@ My motivation & 12-week goal: …`;
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'market-research', email: userData.email, ...(answers ? { answers } : {}) }),
     })
-      .then((r) => { if (!r.ok) throw new Error('api'); return r.json(); })
+      .then(checkRes).then((r) => r.json())
       .then((d: { report?: MarketResearchReport; questions?: { id: string; q: string }[] }) => {
         if (d.report) {
           setResearchReport(d.report);
@@ -277,7 +283,7 @@ My motivation & 12-week goal: …`;
           setResearchQuestions(d.questions);
         }
       })
-      .catch(() => setResearchError('Something went wrong — try again.'))
+      .catch((e) => setResearchError(isRateLimit(e) ? RATE_LIMIT_MESSAGE : 'Something went wrong — try again.'))
       .finally(() => setResearchLoading(false));
   }
 
@@ -288,6 +294,7 @@ My motivation & 12-week goal: …`;
     const dMode = lesson.delegateMode ?? 'A';
     const userText = getInputValue(lessonId);
     setDelegateErrorLesson(null);
+    setRateLimitedLesson(null);
     setDelegating(lessonId);
     fetch('/api/ai', {
       method: 'POST',
@@ -301,7 +308,7 @@ My motivation & 12-week goal: …`;
         prompt: lesson.inputPrompt ?? '',
       }),
     })
-      .then((r) => { if (!r.ok) throw new Error('api'); return r.json(); })
+      .then(checkRes).then((r) => r.json())
       .then((data: { aiDraft?: string; variants?: { label: string; text: string }[]; analysis?: { for: string[]; against: string[]; recommendation: string }; question?: string }) => {
         if (data.question) {
           // §2.1 no-fabrication: the AI needs one answer from her before drafting
@@ -317,7 +324,10 @@ My motivation & 12-week goal: …`;
           setDelegateOpen(lessonId);
         }
       })
-      .catch(() => setDelegateErrorLesson(lessonId))
+      .catch((e) => {
+        if (isRateLimit(e)) setRateLimitedLesson(lessonId);
+        setDelegateErrorLesson(lessonId);
+      })
       .finally(() => setDelegating(null));
   }
 
@@ -327,6 +337,7 @@ My motivation & 12-week goal: …`;
     setSavingLesson(null);
     setRefiningLesson(null);
     setAiErrorLesson(null);
+    setRateLimitedLesson(null);
     setDelegateOpen(null);
     setDelegating(null);
     setDelegateErrorLesson(null);
@@ -815,8 +826,8 @@ My motivation & 12-week goal: …`;
               if (delegateErrorLesson === activeLessonId) {
                 return (
                   <div className="bg-amber-50 border border-amber-200 rounded-card p-5 mb-8 flex flex-col items-center text-center gap-3 animate-fade-in">
-                    <p className="text-sm font-semibold text-amber-800">The AI mentor couldn't draft this just now.</p>
-                    <p className="text-xs text-amber-600">A network or server hiccup — nothing was lost. Try again.</p>
+                    <p className="text-sm font-semibold text-amber-800">{rateLimitedLesson === activeLessonId ? "You're going a bit fast" : "The AI mentor couldn't draft this just now."}</p>
+                    <p className="text-xs text-amber-600">{rateLimitedLesson === activeLessonId ? 'Give it a moment to catch up — nothing was lost. Try again in a few seconds.' : 'A network or server hiccup — nothing was lost. Try again.'}</p>
                     <button
                       onClick={() => handleDelegate(activeLessonId)}
                       className="bg-brand hover:bg-brand-700 active:scale-95 text-white text-sm font-semibold px-6 py-2.5 rounded-pill transition-all duration-150"
@@ -933,6 +944,20 @@ My motivation & 12-week goal: …`;
                     <div className="bg-amber-50 border border-amber-200 rounded-card p-5 mb-8 flex flex-col items-center text-center gap-3 animate-fade-in">
                       <p className="text-sm font-semibold text-amber-800">Your mentor couldn't respond just now.</p>
                       <p className="text-xs text-amber-600">A network or server hiccup — your answer is safe. Try again.</p>
+                      <button
+                        onClick={() => handleSaveInput(activeLessonId)}
+                        className="bg-brand hover:bg-brand-700 active:scale-95 text-white text-sm font-semibold px-6 py-2.5 rounded-pill transition-all duration-150"
+                      >
+                        Try again
+                      </button>
+                    </div>
+                  )}
+
+                  {/* §4 API hardening — a 429 is a calm "slow down", not the crash/error state above */}
+                  {rateLimitedLesson === activeLessonId && !isSaving && delegateErrorLesson !== activeLessonId && (
+                    <div className="bg-brand-50 border border-brand-100 rounded-card p-5 mb-8 flex flex-col items-center text-center gap-3 animate-fade-in">
+                      <p className="text-sm font-semibold text-ink">You're going a bit fast</p>
+                      <p className="text-xs text-ink-soft">Give it a moment to catch up — your answer is safe. Try again in a few seconds.</p>
                       <button
                         onClick={() => handleSaveInput(activeLessonId)}
                         className="bg-brand hover:bg-brand-700 active:scale-95 text-white text-sm font-semibold px-6 py-2.5 rounded-pill transition-all duration-150"
