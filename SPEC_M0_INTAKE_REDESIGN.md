@@ -72,6 +72,11 @@ Free text. Placeholder: *"Not the elevator pitch — the real reason. What happe
 Free text. Placeholder: *"e.g. I have a paying customer. I know this idea is right. I've launched, even if small."*
 → `goal12w: string`
 
+**Q6 — "What's your 3-year business goal?"** (added)
+Free text, with a subtitle giving example shapes: *"A rough number and shape is enough — a steady income of $X/month, raising $Y M in investment, or selling the business for $Z M. Any numbers and plans — it tells us the scale of your ambition, and we use it when we show you your potential."*
+Placeholder: *"e.g. steady $8k/month that supports my family · raise $2M and grow fast · build it to sell for $20M · not sure yet, but big"*
+→ `goal3y: string` — the PRIMARY ambition signal for the Founder's Case (m4l10) potential calibration.
+
 **Design rationale for this exact set:** Q1+Q2 read the startup's real state (what exists, where it's stuck — the second one directly targets our "stuck at some stage" ICP signal). Q3–Q5 read the founder (real capacity → paces the whole program per delegation/ritm principles already in SPEC §10; Q4 is the raw emotional edge, feeding into the formal "Why You" exercise later in M1; Q5 is an early, sharper version of her 12-week goal — cross-checked later against the real North Star in M5). No question re-asks anything Step 3 already covers.
 
 **On completing Q5:** brief transition ("Generating your Snapshot…") → Step 5.
@@ -91,7 +96,7 @@ No edit mode on the Snapshot itself — approval is acknowledgment, not editing 
 
 ## §4 — Data model changes
 
-- `submissionData`/`lessonInputs` for m0l4 (the quiz) stores one JSON object with the 5 named fields above (`doneSoFar`, `stuckPoint`, `capacity`, `whyMe`, `goal12w` — all plain strings except `capacity`, which is the enum) — one brain entry, `entryType: 'founder_intake'` (already exists in BRAIN_ENTRY_TYPES).
+- `submissionData`/`lessonInputs` for m0l4 (the quiz) stores one JSON object with the named fields above (`doneSoFar`, `stuckPoint`, `capacity`, `whyMe`, `goal12w`, `goal3y` — all plain strings except `capacity`, which is the enum) — one brain entry, `entryType: 'founder_intake'` (already exists in BRAIN_ENTRY_TYPES).
 - m0l3 edits write directly to `users.idea/customer/businessModel/stage/goal` (same columns onboarding already populates) — no separate brain entry needed for Section A; Section B (links) keeps existing `imported_assets` entry type.
 - No schema migration needed — same columns/entry types as before, just redistributed across screens.
 

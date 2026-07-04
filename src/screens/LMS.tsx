@@ -1675,6 +1675,7 @@ type IntakeAnswers = {
   capacity: string;
   whyMe: string;
   goal12w: string;
+  goal3y: string;      // 3-year business goal — primary ambition signal for the Founder's Case
 };
 
 const Q3_OPTIONS: { label: string; value: string }[] = [
@@ -1689,7 +1690,7 @@ function IntakeQuizBlock({ initialJson, onComplete }: {
   onComplete: (json: string) => void;
 }) {
   const initial: IntakeAnswers = (() => {
-    const empty: IntakeAnswers = { doneSoFar: '', stuckPoint: '', capacity: '', whyMe: '', goal12w: '' };
+    const empty: IntakeAnswers = { doneSoFar: '', stuckPoint: '', capacity: '', whyMe: '', goal12w: '', goal3y: '' };
     try {
       const parsed = { ...empty, ...JSON.parse(initialJson) };
       // pre-approval drafts stored doneSoFar as a chip array — flatten
@@ -1702,13 +1703,13 @@ function IntakeQuizBlock({ initialJson, onComplete }: {
   const [nudged, setNudged] = useState<Record<number, boolean>>({});
   const [finishing, setFinishing] = useState(false);
 
-  const TOTAL = 5;
+  const TOTAL = 6;
   const textCls = 'w-full text-base bg-surface border-2 border-hairline rounded-card px-4 py-3.5 outline-none focus:border-brand-400 focus:ring-4 focus:ring-brand-100 placeholder-ink-mute resize-none transition';
 
   // Soft validation (§2 approved): only Q3 (chip-select) gates; all free-text
-  // questions (Q1, Q2, Q4, Q5) get ONE gentle nudge if empty, never a hard block.
+  // questions (Q1, Q2, Q4, Q5, Q6) get ONE gentle nudge if empty, never a hard block.
   const TEXT_VALUE: Record<number, () => string> = {
-    0: () => a.doneSoFar, 1: () => a.stuckPoint, 3: () => a.whyMe, 4: () => a.goal12w,
+    0: () => a.doneSoFar, 1: () => a.stuckPoint, 3: () => a.whyMe, 4: () => a.goal12w, 5: () => a.goal3y,
   };
   function tryNext() {
     if (step === 2 && !a.capacity) return;
@@ -1832,6 +1833,27 @@ function IntakeQuizBlock({ initialJson, onComplete }: {
               onChange={(e) => setA((p) => ({ ...p, goal12w: e.target.value }))}
               rows={4}
               placeholder="e.g. I have a paying customer. I know this idea is right. I've launched, even if small."
+              className={textCls}
+            />
+          </div>
+        )}
+
+        {step === 5 && (
+          <div>
+            <h2 className="text-xl sm:text-2xl font-bold text-ink mb-2">What's your 3-year business goal?</h2>
+            <p className="text-sm text-ink-soft mb-5 leading-relaxed">
+              A rough number and shape is enough — a steady income of <span className="font-medium text-ink">$X/month</span>,
+              raising <span className="font-medium text-ink">$Y M</span> in investment, or selling the business for{' '}
+              <span className="font-medium text-ink">$Z M</span>. Any numbers and plans — it tells us the scale of your ambition,
+              and we use it when we show you your potential.
+            </p>
+            <textarea
+              autoFocus
+              value={a.goal3y}
+              onKeyDown={onTextKey}
+              onChange={(e) => setA((p) => ({ ...p, goal3y: e.target.value }))}
+              rows={4}
+              placeholder="e.g. steady $8k/month that supports my family · raise $2M and grow fast · build it to sell for $20M · not sure yet, but big"
               className={textCls}
             />
           </div>

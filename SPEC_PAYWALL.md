@@ -36,8 +36,9 @@ micro_commitment). Three sections:
      these guesses become your real numbers."*
 
 **★ AMBITION CALIBRATION (critical — the numbers AND the frame adapt to her).**
-Read her ambition from intake: onboarding `goal`, m0l3/quiz `goal_12w`,
-`capacity`. Do NOT impose a generic venture model.
+Read her ambition from intake: the quiz `goal3y` (3-year goal — PRIMARY: its
+number + shape drive the frame and the size of the numbers), then `goal_12w`,
+onboarding `goal`, `capacity`. Do NOT impose a generic venture model.
 - **Income / lifestyle / first-customers ambition** (or low capacity): frame
   the third stat as MONTHLY INCOME ("What it means for you · £1.5k–£3k/month ·
   a real business that pays you, on your terms"). Modest, achievable numbers.

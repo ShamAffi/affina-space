@@ -248,11 +248,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       for (const e of entries) if (e.content) byType[e.entryType] = e.content;
       const snap = user.snapshot as { sections: { title: string; content: string }[] } | null;
 
-      // Ambition signals (SPEC_PAYWALL §0 calibration): onboarding goal + m0l4 quiz goal_12w + capacity.
-      let goal12w = '', capacity = '';
+      // Ambition signals (SPEC_PAYWALL §0 calibration). PRIMARY = her stated 3-year goal
+      // (m0l4 quiz goal3y) — the number + shape she wants; then goal_12w, onboarding goal, capacity.
+      let goal3y = '', goal12w = '', capacity = '';
       try {
         const intake = JSON.parse(byType['founder_intake'] || '{}');
-        goal12w = intake.goal12w ?? ''; capacity = intake.capacity ?? '';
+        goal3y = intake.goal3y ?? ''; goal12w = intake.goal12w ?? ''; capacity = intake.capacity ?? '';
       } catch { /* no quiz yet */ }
 
       // Potential = 2–3 clean stats, each {label (small grey), hero (bold number), support (plain line)}.
@@ -283,10 +284,11 @@ Return three parts:
   Stat 2 — Revenue potential at an illustrative price. hero e.g. "£18k–£36k/year". support says the price humanly, e.g. "at a price around £6/month" — NOT box-math.
   Stat 3 — CALIBRATED TO HER AMBITION (below).
 
-AMBITION CALIBRATION (critical):
-- INCOME / lifestyle / first-customers ambition, OR low weekly capacity → Stat 3 is MONTHLY INCOME. label "What it means for you", hero e.g. "£1.5k–£3k/month", support e.g. "a real business that pays you, on your terms". Keep ALL numbers modest and achievable. NEVER show a valuation.
-- SCALE / INVESTMENT ambition (goal = Investment, or goal_12w mentions raising / big growth) → Stat 3 is VALUATION. label "What it could be worth", hero e.g. "£50k–£180k", support e.g. "early businesses like yours are valued on revenue, and it climbs fast once people stay". Bigger numbers, ARR language allowed.
-- UNCLEAR → income frame + one light line of upside in the support. No valuation.
+AMBITION CALIBRATION (critical — her 3-YEAR GOAL is the PRIMARY signal; read its number AND shape, then anchor Stat 3 and the size of all numbers to it):
+- INCOME / lifestyle ambition (3-year goal is a monthly/annual income figure, "a business that pays me", first customers, OR low weekly capacity) → Stat 3 is MONTHLY INCOME. label "What it means for you", hero anchored to HER stated income target (e.g. she said "$8k/month" → build toward that, not a generic number), support e.g. "a real business that pays you, on your terms". Keep ALL numbers modest and grounded. NEVER show a valuation.
+- SCALE / INVESTMENT / EXIT ambition (3-year goal mentions raising $Y, a valuation, selling for $Z, or big growth; or onboarding goal = Investment) → Stat 3 is VALUATION, anchored toward HER stated figure where she gave one (she said "sell for $20M" → the range points that way, honestly as an early-stage step toward it). label "What it could be worth", support e.g. "early businesses like yours are valued on revenue, and it climbs fast once people stay". Bigger numbers, revenue language ok.
+- UNCLEAR / not stated → income frame + one light line of upside. No valuation.
+Never contradict her stated 3-year number: if she wants a lifestyle income, don't dangle a huge valuation; if she wants a $20M exit, don't cap her at a modest side-income.
 
 HARD PRESENTATION RULES:
 - hero = ONLY the number/range/short phrase (the app renders it bold). label and support are plain, lowercase-ish captions/sentences.
@@ -296,7 +298,7 @@ HARD PRESENTATION RULES:
 
 Respond ONLY with valid JSON: {"vision":"...","proof":["..."],"potential":{"stats":[{"label":"...","hero":"...","support":"..."}]}}`,
           messages: [{ role: 'user', content: `PROJECT: ${user.projectName || 'unnamed'} — ${user.idea || 'not set'}
-HER AMBITION → onboarding goal: ${user.goal || 'not set'} · 12-week goal (quiz): ${goal12w || 'not stated'} · weekly capacity: ${capacity || 'not stated'}
+HER AMBITION → 3-YEAR GOAL (primary, use this): ${goal3y || 'not stated'} · onboarding goal: ${user.goal || 'not set'} · 12-week goal: ${goal12w || 'not stated'} · weekly capacity: ${capacity || 'not stated'}
 STARTUP SNAPSHOT:\n${snap ? snap.sections.map((x) => `## ${x.title}\n${x.content}`).join('\n') : '(none)'}
 VALUE PROP: ${byType['value_proposition'] || '(none)'}
 PERSONA: ${byType['persona'] || '(none)'}
