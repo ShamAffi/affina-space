@@ -34,7 +34,8 @@ Program v2 fully live, ALL lecture texts filled (M0–M12, LECTURES_V2 markup vi
 
 ## Backlog (agreed, not started)
 - Stripe: paywall "Unlock" is a stub (sets subscribed=true); drop checkout between click and flag, gating unchanged. Plus [PRICE] + billing-period decision (SPEC_PAYWALL §6: "6 weeks" vs 12-week — unresolved).
-- Auth (magic link) — /login, /auth/verify placeholders; then lock down email-in-query APIs + rate-limit AI endpoints.
+- Auth (magic link) — /login, /auth/verify placeholders; then lock down email-in-query APIs (per-user data — email is still the identity until auth lands).
+- API hardening SHIPPED (SPEC_API_HARDENING.md): CORS allowlist (`ALLOWED_ORIGINS`, `applyCors` in src/server/http.ts) on all 11 handlers + Neon rate limiter (src/server/ratelimit.ts, `rate_limits` table, IP 20/min+300/day, email 200/day) on the 7 Claude endpoints → 429 + Retry-After, fails open. Helpers in src/ (not api/lib — 12-fn cap). ⚠️ Manual: set Anthropic monthly spend cap (Console → Billing) + `ALLOWED_ORIGINS` in Vercel env.
 - Landing at /.
 - Out of v2 scope (SPEC §9): Resend 23-trigger emails, booking calendar, Market Research full mode (needs Exa-vs-Tavily), legal mini-course, viral cards, S3 certificate.
 - Smaller: AI role-plays (m3l6/m8l4/m12l4), per-entry Interview Log review, "D + text" outreach buttons, m11l4 three-block treatment (awaiting decision).
