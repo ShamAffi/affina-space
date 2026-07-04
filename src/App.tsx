@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams, useLocation } from 'react-router-dom';
 import type { UserData, Task } from './types';
 import { loadUserData, updateUserData, defaultUserData, saveUserData } from './store';
@@ -70,6 +70,12 @@ function AppRoutes() {
     } catch { /* fail silently — localStorage is the fallback */ }
   }
 
+  // SPEC_RESEND_AUTH §7 — after a verified magic link: new user → onboarding, existing → dashboard.
+  function onVerified(email: string, isNew: boolean) {
+    if (isNew) { update({ email }); navigate('/start'); }
+    else { signIn(email); }
+  }
+
   const toLanding = <Navigate to="/" replace />;
 
   return (
@@ -83,8 +89,8 @@ function AppRoutes() {
         path="/start"
         element={<Onboarding userData={userData} update={update} signIn={signIn} onComplete={() => navigate(`/learning/${COURSE_SLUG}/m0l1`)} />}
       />
-      <Route path="/login" element={<LoginPlaceholder onSignIn={signIn} />} />
-      <Route path="/auth/verify" element={<VerifyPlaceholder />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/auth/verify" element={<Verify onVerified={onVerified} />} />
 
       {/* App */}
       <Route
@@ -188,57 +194,114 @@ function TasksRoute({ email }: { email: string }) {
   );
 }
 
-// ─── Placeholders for /login and /auth/verify (magic-link auth ships later) ────
-function LoginPlaceholder({ onSignIn }: { onSignIn: (email: string) => void }) {
+// ─── Magic-link auth (SPEC_RESEND_AUTH §7) — real /login + /auth/verify ────────
+function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
+  const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   const valid = email.trim().includes('@') && email.trim().includes('.');
+
+  async function requestLink() {
+    if (!valid || status === 'sending') return;
+    setStatus('sending');
+    try {
+      const r = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'request-link', email: email.trim() }),
+      });
+      setStatus(r.ok ? 'sent' : 'error');
+    } catch {
+      setStatus('error');
+    }
+  }
+
+  if (status === 'sent') {
+    return (
+      <div className="min-h-screen bg-canvas flex flex-col items-center justify-center px-5 text-center">
+        <div className="w-full max-w-sm">
+          <span className="text-brand-700 font-bold text-xl tracking-tight">Affina<span className="text-ink">Space</span></span>
+          <div className="mt-8 text-4xl">📬</div>
+          <h1 className="mt-4 text-2xl font-extrabold text-ink mb-2">Check your inbox</h1>
+          <p className="text-sm text-ink-soft">We sent a magic link to <span className="font-semibold text-ink">{email.trim()}</span>. Click it to sign in — it expires in 15 minutes.</p>
+          <button onClick={() => setStatus('idle')} className="mt-6 text-sm text-ink-mute hover:text-ink-soft transition">Use a different email</button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-canvas flex flex-col items-center justify-center px-5">
       <div className="w-full max-w-sm text-center">
-        <span className="text-brand-700 font-bold text-xl tracking-tight">
-          Affina<span className="text-ink">Space</span>
-        </span>
-        <h1 className="mt-6 text-2xl font-extrabold text-ink mb-2">Welcome back</h1>
-        <p className="text-sm text-ink-soft mb-6">Enter your email to load your account.</p>
+        <span className="text-brand-700 font-bold text-xl tracking-tight">Affina<span className="text-ink">Space</span></span>
+        <h1 className="mt-6 text-2xl font-extrabold text-ink mb-2">Sign in</h1>
+        <p className="text-sm text-ink-soft mb-6">Enter your email — we'll send you a magic link. No password.</p>
         <input
           type="email"
           autoFocus
           placeholder="you@email.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter' && valid) onSignIn(email.trim()); }}
+          onKeyDown={(e) => { if (e.key === 'Enter') requestLink(); }}
           className="w-full rounded-card border-2 border-hairline focus:border-brand-400 focus:ring-4 focus:ring-brand-100 outline-none px-5 py-4 text-base text-ink placeholder-ink-mute transition mb-3"
         />
         <button
-          onClick={() => { if (valid) onSignIn(email.trim()); }}
-          disabled={!valid}
+          onClick={requestLink}
+          disabled={!valid || status === 'sending'}
           className="w-full bg-brand hover:bg-brand-700 active:scale-95 disabled:opacity-40 text-white text-base font-semibold py-4 rounded-pill transition mb-3"
         >
-          Continue →
+          {status === 'sending' ? 'Sending…' : 'Send magic link →'}
         </button>
-        <button onClick={() => navigate('/')} className="text-sm text-ink-mute hover:text-ink-soft transition">
-          New here? Start free
-        </button>
+        {status === 'error' && <p className="text-xs text-red-500 mb-3">Something went wrong — please try again.</p>}
+        <button onClick={() => navigate('/')} className="text-sm text-ink-mute hover:text-ink-soft transition">New here? Start free</button>
       </div>
     </div>
   );
 }
 
-function VerifyPlaceholder() {
+function Verify({ onVerified }: { onVerified: (email: string, isNew: boolean) => void }) {
   const navigate = useNavigate();
+  const [status, setStatus] = useState<'checking' | 'error'>('checking');
+  const ran = useRef(false);
+
+  useEffect(() => {
+    if (ran.current) return;
+    ran.current = true;
+    const token = new URLSearchParams(window.location.search).get('token');
+    if (!token) { setStatus('error'); return; }
+    fetch('/api/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'verify-link', token }),
+    })
+      .then(async (r) => {
+        if (!r.ok) throw new Error('invalid');
+        const d = await r.json();
+        onVerified(d.email, !!d.isNew);
+      })
+      .catch(() => setStatus('error'));
+  }, [onVerified]);
+
+  if (status === 'error') {
+    return (
+      <div className="min-h-screen bg-canvas flex flex-col items-center justify-center px-5 text-center">
+        <div className="w-full max-w-sm">
+          <span className="text-brand-700 font-bold text-xl tracking-tight">Affina<span className="text-ink">Space</span></span>
+          <h1 className="mt-8 text-2xl font-extrabold text-ink mb-2">This link didn't work</h1>
+          <p className="text-sm text-ink-soft mb-6">It may have expired or already been used. Request a fresh one — it only takes a moment.</p>
+          <button onClick={() => navigate('/login')} className="bg-brand hover:bg-brand-700 active:scale-95 text-white text-sm font-semibold px-8 py-3 rounded-pill transition">
+            Request a new link →
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-canvas flex flex-col items-center justify-center px-5 text-center">
-      <span className="text-brand-700 font-bold text-xl tracking-tight">
-        Affina<span className="text-ink">Space</span>
-      </span>
-      <p className="mt-6 text-ink-soft text-sm">Email verification is coming soon.</p>
-      <button
-        onClick={() => navigate('/')}
-        className="mt-6 bg-brand hover:bg-brand-700 text-white text-sm font-semibold px-8 py-3 rounded-pill transition"
-      >
-        Continue →
-      </button>
+      <span className="text-brand-700 font-bold text-xl tracking-tight">Affina<span className="text-ink">Space</span></span>
+      <div className="mt-8 w-10 h-10 rounded-pill bg-brand animate-orb-pulse" />
+      <p className="mt-4 text-ink-soft text-sm">Signing you in…</p>
     </div>
   );
 }

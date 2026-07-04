@@ -141,3 +141,15 @@ export const rateLimits = pgTable('rate_limits', {
   windowStart: timestamp('window_start', { withTimezone: true }).notNull(),
   count: integer('count').notNull().default(0),
 });
+
+// Magic-link auth tokens (api/auth.ts, SPEC_RESEND_AUTH §5). We store only
+// sha256(token); the raw token lives only in the emailed link. Single-use
+// (used_at), 15-min TTL (expires_at). Index token_hash for lookup.
+export const authTokens = pgTable('auth_tokens', {
+  id: serial('id').primaryKey(),
+  email: text('email').notNull(),
+  tokenHash: text('token_hash').notNull(),
+  expiresAt: timestamp('expires_at').notNull(),
+  usedAt: timestamp('used_at'),
+  createdAt: timestamp('created_at').defaultNow(),
+});

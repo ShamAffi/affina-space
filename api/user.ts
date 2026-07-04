@@ -5,6 +5,7 @@ import { drizzle } from 'drizzle-orm/neon-http';
 import { eq } from 'drizzle-orm';
 import { users, lessonInputs, completedLessons, brainEntries, tasks, checkIns, achievements, delegations } from '../src/db/schema.js';
 import { GROWTH_SEED_XP } from '../src/server/progressUtils.js';
+import { sendEmail, welcomeEmail, subscriptionEmail } from '../src/server/email.js';
 
 function getDb() {
   const sql = neon(process.env.DATABASE_URL!);
@@ -106,6 +107,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const [created] = await db.insert(users)
         .values({ email, name, projectName, idea, customer, businessModel, stage, goal, score })
         .returning({ id: users.id });
+      // §8 — welcome email on first user creation (fire-and-forget; sendEmail never throws)
+      await sendEmail(welcomeEmail(email));
       return res.status(201).json({ id: created.id });
     }
   }
@@ -140,6 +143,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     await db.update(users).set(patchFields).where(eq(users.email, email));
+    // §8 — subscription-confirmed email when `subscribed` flips false→true (the /unlock path)
+    if (subscribed === true && existingUser?.subscribed !== true) {
+      await sendEmail(subscriptionEmail(email));
+    }
     return res.status(200).json({ ok: true });
   }
 
