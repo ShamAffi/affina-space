@@ -214,18 +214,18 @@ export function finish1Email(to: string, link: string): Mail {
   };
 }
 
-// #10 — Day 3 · the odds. NOTE: stat/framing per Shamil's amendment instruction
-// ("up to 3.5× more likely to scale, twice as likely to survive") — NOT the "5× to
-// start (SCORE)" wording in SPEC_EMAILS §D. Flagged the discrepancy; using the chat
-// instruction. No specific source cited per that instruction.
+// #10 — Day 3 · the odds. Source-verified (SPEC_EMAILS §D): SCORE (an SBA resource
+// partner) — 5× more likely to START a business + higher revenues & growth. Framed as
+// "the right support" (Affina = AI + mentors + community). Do NOT reframe to "with a
+// mentor" or "start and succeed". Source: score.org mentorship-improves-odds-of-success.
 export function finish2Email(to: string, link: string): Mail {
   return {
     to,
-    subject: "With a mentor, you're far more likely to make it",
+    subject: "With the right support, you're 5× more likely to start",
     html: wrap(`
       <p style="${P}">Hey 👋</p>
-      <p style="${P}">Here's a number worth knowing: founders who work with a mentor are up to <strong>3.5× more likely to scale</strong> — and <strong>twice as likely to still be in business</strong> years later (mentorship research).</p>
-      <p style="${P}">Most ideas never get far — not because they're bad, but because going it alone is overwhelming. With real guidance you stop guessing and just take the next step.</p>
+      <p style="${P}">Do you know: <strong>entrepreneurs with the right support are 5× more likely to start a business</strong> — and report higher revenues and increased business growth (SCORE, an SBA partner).</p>
+      <p style="${P}">Most ideas never launch — not because they're bad, but because going it alone is overwhelming. With real guidance you stop guessing and just take the next step.</p>
       <p style="${P}">That's exactly Affina — AI incubation and real mentors guiding you the whole way, with honest feedback at each step. Your project's waiting:</p>
       <p style="margin:0;">${button(link, 'Confirm my email &amp; start')}</p>
       ${sign}
@@ -245,6 +245,23 @@ export function finish3Email(to: string, link: string): Mail {
       <p style="${P}">Your idea deserves that. One tap and it's yours:</p>
       <p style="margin:0 0 16px 0;">${button(link, 'Confirm my email &amp; begin')}</p>
       <p style="font-size:13px;line-height:1.5;color:#71717a;margin:0;">(after this we'll stop reminding — no spam, promise)</p>
+    `, LIFECYCLE_NOTE),
+  };
+}
+
+// #12 — Day 0, T+1h · report ready (SPEC_ONBOARDING_FUNNEL §4 / SPEC_EMAILS §D2).
+// Elapsed-time trigger (now - emailCapturedAt ≥ 1h), before the +1/+3/+7 nudges. The
+// CTA is a fresh magic link → verify + land on the interactive /report page.
+export function reportReadyEmail(to: string, link: string): Mail {
+  return {
+    to,
+    subject: 'Your Affina report is ready 📋',
+    html: wrap(`
+      <p style="${P}">Hey 👋</p>
+      <p style="${P}">You started mapping out your idea on Affina — here's your report, saved and ready for you.</p>
+      <p style="${P}">Open it to see where your idea stands and take the next step. It's all set up — one tap and you're in:</p>
+      <p style="margin:0;">${button(link, 'Open my report &amp; continue')}</p>
+      ${sign}
     `, LIFECYCLE_NOTE),
   };
 }

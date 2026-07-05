@@ -33,6 +33,7 @@ export type UserData = {
   email: string;
   score: number;
   subscribed: boolean;   // paywall entitlement (SPEC_PAYWALL) — M5–M12 gated on this
+  onboardingReport?: OnboardingScore | null;   // funnel: persisted report (RevealTeaser / /report)
   lessonInputs: Record<string, string>;
   completedLessons: string[];
 };

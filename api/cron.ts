@@ -7,17 +7,19 @@ import { MODULES } from '../src/data.js';
 import { sendOnce, alreadyLogged, logEmail } from '../src/server/emailLog.js';
 import {
   weeklyTasksEmail, reflectionEmail, bookMentorEmail, reengagementEmail,
-  finish1Email, finish2Email, finish3Email, sendEmail,
+  finish1Email, finish2Email, finish3Email, reportReadyEmail, sendEmail,
 } from '../src/server/email.js';
 import { createMagicLink } from '../src/server/magicLink.js';
 
-// Lifecycle-email sweep (SPEC_EMAILS §3 + AMENDMENT §C). Sends each email at the user's
-// LOCAL 11:00 (from users.timezone). Driven HOURLY by GitHub Actions (Vercel Hobby caps
-// cron at daily). Branches on registration state:
-//   PENDING  (verifiedAt null) → finish-registration chain (#9/#10/#11) by age since
-//             createdAt: +1d/+3d/+7d, each once, then stop. Verifying stops it. No #5–#8.
+// Lifecycle-email sweep (SPEC_EMAILS §3 + AMENDMENT §C + SPEC_ONBOARDING_FUNNEL §4).
+// Driven HOURLY by GitHub Actions (Vercel Hobby caps cron at daily). Branches on state:
+//   PENDING (verifiedAt null):
+//     • Day-0 report-ready (#12) — ELAPSED-TIME trigger: once, when now-emailCapturedAt
+//       ≥ 1h. NOT gated to 11:00 (runs any hourly tick). CTA → verify + /report.
+//     • Finish chain (#9/#10/#11) — by age since emailCapturedAt (+1d/+3d/+7d), each once,
+//       at the user's LOCAL 11:00, then stop. Verifying stops the whole sequence.
 //   REGISTERED (verifiedAt set) → the existing #5–#8 lifecycle (weekly/reflection/
-//             book-mentor / re-engagement) — never runs for pending users.
+//     book-mentor / re-engagement) at LOCAL 11:00 — never runs for pending users.
 // Protected by CRON_SECRET. Dedup via email_log. Test hooks: ?day/?hour/?dry=1/?only.
 
 function getDb() {
@@ -25,9 +27,11 @@ function getDb() {
 }
 
 const DAY_MS = 86_400_000;
+const HOUR_MS = 3_600_000;
 const ACTIVE_WINDOW_MS = 14 * DAY_MS;
 const FINISH_TTL_MS = 14 * DAY_MS; // finish-email magic links live long enough to sit in an inbox
 const SEND_HOUR = 11; // 11:00 local
+const RECOVERY_NEXT = '/report'; // recovery emails verify + land on the interactive report page
 const THURSDAY = 4;
 const SATURDAY = 6;
 
@@ -104,36 +108,53 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const hour = forcedHour ?? local.hour;
     const dow = forcedDay ?? local.dow;
 
-    // Only act at the user's local 11:00. Cheap skip BEFORE per-user DB work.
-    if (hour !== SEND_HOUR) continue;
-
     const sent: string[] = [];
     const skipped: string[] = [];
     const mark = (label: string, ok: boolean) => (ok ? sent : skipped).push(label);
 
     if (!u.verifiedAt) {
-      // ── PENDING → finish-registration chain (age since createdAt; no #5–#8) ─────
-      const ageDays = (now.getTime() - new Date(u.createdAt as Date).getTime()) / DAY_MS;
-      const stage =
-        ageDays >= 7 ? { type: 'finish_7', build: finish3Email }
-        : ageDays >= 3 ? { type: 'finish_3', build: finish2Email }
-        : ageDays >= 1 ? { type: 'finish_1', build: finish1Email }
-        : null;
-      if (stage) {
-        if (dry) mark(stage.type, true);
-        else if (await alreadyLogged(u.id, stage.type, 'once')) mark(stage.type, false);
+      // ── PENDING → day-0 report (elapsed) + finish chain (11:00). No #5–#8. ──────
+      // Funnel: the clock starts at emailCapturedAt (fallback createdAt for legacy rows).
+      const clock = (u.emailCapturedAt ?? u.createdAt) as Date | null;
+      const sinceMs = clock ? now.getTime() - new Date(clock).getTime() : 0;
+
+      // Day-0 report-ready (#12): once, ≥1h after capture, at ANY hour (elapsed trigger).
+      if (u.emailCapturedAt && sinceMs >= HOUR_MS) {
+        if (dry) mark('report_ready', true);
+        else if (await alreadyLogged(u.id, 'report_ready', 'once')) mark('report_ready', false);
         else {
-          const link = await createMagicLink(u.email, FINISH_TTL_MS); // fresh link = verify + login
-          await sendEmail(stage.build(u.email, link));
-          await logEmail(u.id, stage.type, 'once');
-          mark(stage.type, true);
+          const link = await createMagicLink(u.email, FINISH_TTL_MS, RECOVERY_NEXT);
+          await sendEmail(reportReadyEmail(u.email, link));
+          await logEmail(u.id, 'report_ready', 'once');
+          mark('report_ready', true);
         }
       }
-      summary.push({ email: u.email, tz, state: 'pending', sent, skipped });
+
+      // Finish nudges (#9/#10/#11): LOCAL 11:00 only, by age since capture, each once.
+      if (hour === SEND_HOUR) {
+        const ageDays = sinceMs / DAY_MS;
+        const stage =
+          ageDays >= 7 ? { type: 'finish_7', build: finish3Email }
+          : ageDays >= 3 ? { type: 'finish_3', build: finish2Email }
+          : ageDays >= 1 ? { type: 'finish_1', build: finish1Email }
+          : null;
+        if (stage) {
+          if (dry) mark(stage.type, true);
+          else if (await alreadyLogged(u.id, stage.type, 'once')) mark(stage.type, false);
+          else {
+            const link = await createMagicLink(u.email, FINISH_TTL_MS, RECOVERY_NEXT); // verify + /report
+            await sendEmail(stage.build(u.email, link));
+            await logEmail(u.id, stage.type, 'once');
+            mark(stage.type, true);
+          }
+        }
+      }
+      if (sent.length || skipped.length) summary.push({ email: u.email, tz, state: 'pending', sent, skipped });
       continue;
     }
 
-    // ── REGISTERED → existing #5–#8 lifecycle ──────────────────────────────────
+    // ── REGISTERED → existing #5–#8 lifecycle (LOCAL 11:00 only) ────────────────
+    if (hour !== SEND_HOUR) continue;
     const active = !!u.lastActiveAt && now.getTime() - new Date(u.lastActiveAt).getTime() < ACTIVE_WINDOW_MS;
     const completed = await db.query.completedLessons.findMany({ where: eq(completedLessons.userId, u.id) });
     const completedIds = new Set(completed.map((c) => c.lessonId));

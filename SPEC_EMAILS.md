@@ -377,6 +377,24 @@ else (REGISTERED):
   >
   > *(after this we'll stop reminding — no spam, promise)*
 
+### D2. Report-ready email (#12 — day 0, T+1h) — added by SPEC_ONBOARDING_FUNNEL
+- **Trigger:** pending user, `now - emailCapturedAt ≥ 1h`, not yet verified,
+  not yet sent (elapsed-time trigger, not the 11:00 slot). Once.
+- **CTA:** fresh magic link → verify + land on the interactive `/report` page
+  (her report + "continue into the program").
+- **Copy:**
+  - **Subject:** Your Affina report is ready 📋
+  - **Body:**
+    > Hey 👋
+    > You started mapping out your idea on Affina — here's your report, saved and ready for you.
+    >
+    > Open it to see where your idea stands and take the next step. It's all set up — one tap and you're in:
+    >
+    > **[ Open my report & continue ]**
+    >
+    > — Affina
+- Precedes the +1/+3/+7 finish nudges (#9–#11). Dedup `email_log` type `report_ready`.
+
 ### E. Amendment acceptance
 - [ ] `users.verifiedAt` added; set on verify-link transition; `schema.ts` updated.
 - [ ] Welcome fires ONLY on first verification; removed from `api/user.ts`.

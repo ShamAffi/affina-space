@@ -12,6 +12,9 @@ import TaskDetail from './screens/TaskDetail';
 import MetricPulse from './screens/MetricPulse';
 import Paywall from './screens/Paywall';
 import StartSession from './screens/StartSession';
+import ReportPage from './screens/ReportPage';
+
+const M0_FIRST = 'm0l1';
 
 // Single course for now; the URL keeps a course segment so parallel courses slot in later.
 const COURSE_SLUG = 'launch';
@@ -48,9 +51,12 @@ function AppRoutes() {
     navigate('/');
   }
 
-  async function signIn(email: string) {
+  async function signIn(rawEmail: string, dest: string = '/dashboard') {
+    // Normalize to lowercase — rows are stored lowercased (capture + auth), and every
+    // email-keyed endpoint (progress/brain/tasks) must resolve to the same row.
+    const email = rawEmail.trim().toLowerCase();
     const withEmail = update({ email });
-    navigate('/dashboard');
+    navigate(dest);
     try {
       const res = await fetch(`/api/user?email=${encodeURIComponent(email)}`);
       if (res.ok) {
@@ -68,14 +74,18 @@ function AppRoutes() {
           timezone: db.timezone || withEmail.timezone,
           score: db.score || withEmail.score,
           subscribed: db.subscribed ?? false,
+          onboardingReport: db.onboardingReport ?? withEmail.onboardingReport ?? null,
         });
       }
     } catch { /* fail silently — localStorage is the fallback */ }
   }
 
-  // SPEC_RESEND_AUTH §7 — after a verified magic link: new user → onboarding, existing → dashboard.
-  function onVerified(email: string, isNew: boolean) {
-    if (isNew) { update({ email }); navigate('/start'); }
+  // After a verified magic link: recovery emails carry ?next=/report (land on the report +
+  // continue); otherwise new user → onboarding, existing → dashboard (SPEC_RESEND_AUTH §7 +
+  // SPEC_ONBOARDING_FUNNEL §4).
+  function onVerified(email: string, isNew: boolean, next?: string | null) {
+    if (next) { signIn(email, next); }
+    else if (isNew) { update({ email }); navigate('/start'); }
     else { signIn(email); }
   }
 
@@ -90,10 +100,15 @@ function AppRoutes() {
       />
       <Route
         path="/start"
-        element={<Onboarding userData={userData} update={update} signIn={signIn} onComplete={() => navigate(`/learning/${COURSE_SLUG}/m0l1`)} />}
+        element={<Onboarding userData={userData} update={update} signIn={signIn} />}
       />
       <Route path="/login" element={<Login />} />
       <Route path="/auth/verify" element={<Verify onVerified={onVerified} />} />
+      {/* Interactive report (SPEC_ONBOARDING_FUNNEL §3) — recovery-email magic links land here */}
+      <Route
+        path="/report"
+        element={authed ? <ReportPage userData={userData} onContinue={() => navigate(`/learning/${COURSE_SLUG}/${M0_FIRST}`)} /> : toLanding}
+      />
 
       {/* App */}
       <Route
@@ -262,7 +277,7 @@ function Login() {
   );
 }
 
-function Verify({ onVerified }: { onVerified: (email: string, isNew: boolean) => void }) {
+function Verify({ onVerified }: { onVerified: (email: string, isNew: boolean, next?: string | null) => void }) {
   const navigate = useNavigate();
   const [status, setStatus] = useState<'checking' | 'error'>('checking');
   const ran = useRef(false);
@@ -270,7 +285,11 @@ function Verify({ onVerified }: { onVerified: (email: string, isNew: boolean) =>
   useEffect(() => {
     if (ran.current) return;
     ran.current = true;
-    const token = new URLSearchParams(window.location.search).get('token');
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    // Only honor safe in-app paths (single leading slash) — never an external redirect.
+    const rawNext = params.get('next');
+    const next = rawNext && /^\/[A-Za-z0-9/_-]*$/.test(rawNext) ? rawNext : null;
     if (!token) { setStatus('error'); return; }
     fetch('/api/auth', {
       method: 'POST',
@@ -280,7 +299,7 @@ function Verify({ onVerified }: { onVerified: (email: string, isNew: boolean) =>
       .then(async (r) => {
         if (!r.ok) throw new Error('invalid');
         const d = await r.json();
-        onVerified(d.email, !!d.isNew);
+        onVerified(d.email, !!d.isNew, next);
       })
       .catch(() => setStatus('error'));
   }, [onVerified]);

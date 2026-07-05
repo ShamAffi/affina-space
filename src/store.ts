@@ -16,6 +16,7 @@ export const defaultUserData: UserData = {
   email: '',
   score: 0,
   subscribed: false,
+  onboardingReport: null,
   lessonInputs: {},
   completedLessons: [],
 };
@@ -45,6 +46,24 @@ export function updateUserData(updates: Partial<UserData>): UserData {
 
 // --- API (syncs with Neon DB when email is known) ---
 
+function userPayload(data: UserData): Record<string, unknown> {
+  return {
+    email: data.email,
+    name: data.name,
+    projectName: data.projectName,
+    idea: data.idea,
+    customer: data.customer,
+    businessModel: data.businessModel,
+    stage: data.stage,
+    goal: data.goal,
+    country: data.country,
+    city: data.city,
+    timezone: data.timezone,
+    score: data.score,
+    onboardingReport: data.onboardingReport ?? undefined,   // persist the report (funnel §3)
+  };
+}
+
 export async function syncUserToDB(data: UserData, opts?: { freshStart?: boolean }): Promise<void> {
   if (!data.email) return;
   try {
@@ -52,24 +71,41 @@ export async function syncUserToDB(data: UserData, opts?: { freshStart?: boolean
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        email: data.email,
-        name: data.name,
-        projectName: data.projectName,
-        idea: data.idea,
-        customer: data.customer,
-        businessModel: data.businessModel,
-        stage: data.stage,
-        goal: data.goal,
-        country: data.country,
-        city: data.city,
-        timezone: data.timezone,
-        score: data.score,
+        ...userPayload(data),
         // Register flow only: re-onboarding an existing email wipes its previous life server-side
         ...(opts?.freshStart ? { freshStart: true } : {}),
       }),
     });
   } catch {
     // fail silently — localStorage is the fallback
+  }
+}
+
+// Email capture (SPEC_ONBOARDING_FUNNEL §2/§2a) — creates the PENDING user + emailCapturedAt
+// (starts the finish-sequence clock) and persists the intake. Returns the server's ownership
+// verdict: `blocked` when the email belongs to a VERIFIED account (caller offers sign-in).
+// `previousEmail` triggers the change-email relocate path. Network failure → proceed
+// optimistically (ok:true) so the funnel isn't hard-blocked by a transient blip.
+export async function captureEmail(
+  data: UserData,
+  previousEmail?: string,
+): Promise<{ ok: boolean; blocked?: boolean; reason?: string }> {
+  if (!data.email) return { ok: false };
+  try {
+    const res = await fetch('/api/user', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...userPayload(data),
+        emailCapture: true,
+        ...(previousEmail ? { previousEmail } : {}),
+      }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (json?.blocked) return { ok: false, blocked: true, reason: json.reason };
+    return { ok: true };
+  } catch {
+    return { ok: true };
   }
 }
 

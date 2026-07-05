@@ -8,6 +8,7 @@ interface Props {
   goal: string;
   result: OnboardingScore;
   onRegister: () => void;
+  ctaLabel?: string;   // funnel: "Start the program for free" in onboarding; "Continue…" on /report
 }
 
 function ScoreRing({ score }: { score: number }) {
@@ -49,7 +50,7 @@ function ScoreRing({ score }: { score: number }) {
   );
 }
 
-export default function RevealTeaser({ projectName, goal, result, onRegister }: Props) {
+export default function RevealTeaser({ projectName, goal, result, onRegister, ctaLabel = 'Start the program for free →' }: Props) {
   const [visible, setVisible] = useState(false);
   const topPercent = 100 - result.percentileAheadOf;
 
@@ -175,7 +176,7 @@ export default function RevealTeaser({ projectName, goal, result, onRegister }: 
           onClick={onRegister}
           className="w-full bg-brand hover:bg-brand-700 active:scale-95 text-white text-base font-semibold py-4 rounded-pill transition-all duration-150"
         >
-          Create free account to unlock →
+          {ctaLabel}
         </button>
         <p className="text-xs text-ink-mute mt-3">No credit card · Cancel anytime</p>
       </main>

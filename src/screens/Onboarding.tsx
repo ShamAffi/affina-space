@@ -1,23 +1,26 @@
 import { useState } from 'react';
 import type { UserData, OnboardingScore } from '../types';
-import { syncUserToDB } from '../store';
+import { syncUserToDB, captureEmail } from '../store';
 import { QUESTIONS } from '../data';
 import OnboardingQuestion from './OnboardingQuestion';
+import OnboardingLocation from './OnboardingLocation';
+import EmailCapture from './EmailCapture';
 import Analyzing from './Analyzing';
 import RevealTeaser from './RevealTeaser';
-import Register from './Register';
+import OnboardingName from './OnboardingName';
 import ProjectName from './ProjectName';
-import OnboardingLocation from './OnboardingLocation';
-import ProgramIntro from './ProgramIntro';
-import Unlock from './Unlock';
+import ConfirmEmail from './ConfirmEmail';
 
+// New funnel order (SPEC_ONBOARDING_FUNNEL): intake+location → EMAIL CAPTURE (before the
+// report, creates the pending user) → analyzing → REPORT → name → project name → CONFIRM
+// EMAIL (magic link). Verifying the link (api/auth verify-link) is what enters the program.
 type Step =
   | 'q_idea' | 'q_customer' | 'q_business_model' | 'q_stage' | 'q_goal' | 'q_location'
-  | 'analyzing' | 'reveal_teaser' | 'register' | 'project_name' | 'program_intro' | 'unlock';
+  | 'email_capture' | 'analyzing' | 'reveal_teaser' | 'name' | 'project_name' | 'confirm_email';
 
 const STEPS: Step[] = [
   'q_idea', 'q_customer', 'q_business_model', 'q_stage', 'q_goal', 'q_location',
-  'analyzing', 'reveal_teaser', 'register', 'project_name', 'program_intro', 'unlock',
+  'email_capture', 'analyzing', 'reveal_teaser', 'name', 'project_name', 'confirm_email',
 ];
 
 const Q_CONFIG = [
@@ -32,10 +35,9 @@ interface Props {
   userData: UserData;
   update: (updates: Partial<UserData>) => UserData;
   signIn: (email: string) => void;
-  onComplete: () => void;
 }
 
-export default function Onboarding({ userData, update, signIn, onComplete }: Props) {
+export default function Onboarding({ userData, update, signIn }: Props) {
   const [step, setStep] = useState<Step>('q_idea');
   const [result, setResult] = useState<OnboardingScore | null>(null);
 
@@ -69,11 +71,33 @@ export default function Onboarding({ userData, update, signIn, onComplete }: Pro
         />
       );
 
+    // Step 2 — email BEFORE the report: create the pending user + emailCapturedAt (starts
+    // the finish-sequence clock). Blocks only on a verified account (§2a) → offer sign-in.
+    case 'email_capture':
+      return (
+        <EmailCapture
+          initialEmail={userData.email}
+          onSubmit={async (email) => {
+            const u = update({ email });
+            const r = await captureEmail(u);
+            if (!r.blocked) advance();
+            return r;
+          }}
+          onSignIn={signIn}
+        />
+      );
+
     case 'analyzing':
       return (
         <Analyzing
           userData={userData}
-          onDone={(r) => { setResult(r); update({ score: r.score }); advance(); }}
+          onDone={(r) => {
+            // Persist the report on the pending user (§3) so the day-0 email + /report render it.
+            const u = update({ score: r.score, onboardingReport: r });
+            syncUserToDB(u);
+            setResult(r);
+            advance();
+          }}
         />
       );
 
@@ -95,17 +119,11 @@ export default function Onboarding({ userData, update, signIn, onComplete }: Pro
         />
       );
 
-    case 'register':
+    case 'name':
       return (
-        <Register
-          score={userData.score}
-          onRegistered={(name, email) => {
-            const u = update({ name, email });
-            // freshStart: if this email somehow already exists, its previous life is wiped server-side
-            syncUserToDB(u, { freshStart: true });
-            setStep('project_name');
-          }}
-          onSignIn={signIn}
+        <OnboardingName
+          initialValue={userData.name}
+          onNext={(name) => { const u = update({ name }); syncUserToDB(u); advance(); }}
         />
       );
 
@@ -117,19 +135,37 @@ export default function Onboarding({ userData, update, signIn, onComplete }: Pro
           businessModel={userData.businessModel}
           stage={userData.stage}
           initialValue={userData.projectName}
-          onNext={(projectName) => {
-            const u = update({ projectName });
-            syncUserToDB(u);
-            setStep('program_intro');
-          }}
+          onNext={(projectName) => { const u = update({ projectName }); syncUserToDB(u); advance(); }}
         />
       );
 
-    case 'program_intro':
-      return <ProgramIntro onStart={() => setStep('unlock')} />;
-
-    case 'unlock':
-      return <Unlock onDone={onComplete} />;
+    // Step 6 — confirm email → magic link. Change-email relocates the pending row (§2a).
+    // Clicking the link (verify-link) sets verifiedAt and lands in the program.
+    case 'confirm_email':
+      return (
+        <ConfirmEmail
+          email={userData.email}
+          onChangeEmail={async (newEmail) => {
+            const prev = userData.email;
+            const u = update({ email: newEmail });
+            const r = await captureEmail(u, prev);
+            if (r.blocked) update({ email: prev }); // revert local email if the new one is taken
+            return r;
+          }}
+          onSendLink={async (email) => {
+            try {
+              const res = await fetch('/api/auth', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'request-link', email }),
+              });
+              return res.ok;
+            } catch {
+              return false;
+            }
+          }}
+        />
+      );
 
     default:
       return null;

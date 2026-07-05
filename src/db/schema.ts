@@ -34,6 +34,9 @@ export const users = pgTable('users', {
   // Paywall entitlement (SPEC_PAYWALL) — M5–M12 gated on this. Stripe sets it later.
   subscribed: boolean('subscribed').default(false),
   verifiedAt: timestamp('verified_at', { withTimezone: true }),   // AMENDMENT: null = pending (email not yet verified via magic link)
+  // Onboarding funnel (SPEC_ONBOARDING_FUNNEL): email captured before the report.
+  emailCapturedAt: timestamp('email_captured_at', { withTimezone: true }),  // set at email capture; drives the finish-sequence clock (day 0/1/3/7)
+  onboardingReport: jsonb('onboarding_report'),                             // persisted OnboardingScore — day-0 email + interactive /report page
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
