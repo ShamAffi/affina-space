@@ -27,6 +27,9 @@ export type UserData = {
   businessModel: string;
   stage: string;
   goal: string;
+  country: string;
+  city: string;
+  timezone: string;   // IANA tz (browser-captured) — drives 11:00-local lifecycle sends
   email: string;
   score: number;
   subscribed: boolean;   // paywall entitlement (SPEC_PAYWALL) — M5–M12 gated on this

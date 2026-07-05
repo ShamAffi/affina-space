@@ -56,6 +56,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       businessModel: user.businessModel ?? '',
       stage: user.stage ?? '',
       goal: user.goal ?? '',
+      country: user.country ?? '',
+      city: user.city ?? '',
+      timezone: user.timezone ?? '',
       email: user.email,
       score: user.score ?? 0,
       subscribed: user.subscribed ?? false,
@@ -70,7 +73,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // project: wipe child rows + reset derived state before applying the new profile.
   // Plain sync calls (LMS mount etc.) never send the flag and never touch children.
   if (req.method === 'POST') {
-    const { email, name, projectName, idea, customer, businessModel, stage, goal, score, freshStart } = req.body;
+    const { email, name, projectName, idea, customer, businessModel, stage, goal, score, country, city, timezone, freshStart } = req.body;
     if (!email) return res.status(400).json({ error: 'email required' });
 
     const existing = await db.query.users.findFirst({ where: eq(users.email, email) });
@@ -81,6 +84,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         await db.update(users)
           .set({
             name, projectName, idea, customer, businessModel, stage, goal, score,
+            country, city, timezone,
             // reset everything derived from the previous life of this email
             phase: 'launch',
             launchValidatedAt: null,
@@ -101,12 +105,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       await db.update(users)
-        .set({ name, projectName, idea, customer, businessModel, stage, goal, score, updatedAt: new Date() })
+        .set({ name, projectName, idea, customer, businessModel, stage, goal, score, country, city, timezone, updatedAt: new Date() })
         .where(eq(users.email, email));
       return res.status(200).json({ id: existing.id });
     } else {
       const [created] = await db.insert(users)
-        .values({ email, name, projectName, idea, customer, businessModel, stage, goal, score })
+        .values({ email, name, projectName, idea, customer, businessModel, stage, goal, score, country, city, timezone })
         .returning({ id: users.id });
       // §2.2 — welcome email on first user creation (fire-and-forget; sendEmail never throws)
       await sendEmail(welcomeEmail(email, name));

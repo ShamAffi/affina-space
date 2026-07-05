@@ -63,6 +63,9 @@ function AppRoutes() {
           businessModel: db.businessModel || withEmail.businessModel,
           stage: db.stage || withEmail.stage,
           goal: db.goal || withEmail.goal,
+          country: db.country || withEmail.country,
+          city: db.city || withEmail.city,
+          timezone: db.timezone || withEmail.timezone,
           score: db.score || withEmail.score,
           subscribed: db.subscribed ?? false,
         });

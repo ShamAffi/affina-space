@@ -7,15 +7,16 @@ import Analyzing from './Analyzing';
 import RevealTeaser from './RevealTeaser';
 import Register from './Register';
 import ProjectName from './ProjectName';
+import OnboardingLocation from './OnboardingLocation';
 import ProgramIntro from './ProgramIntro';
 import Unlock from './Unlock';
 
 type Step =
-  | 'q_idea' | 'q_customer' | 'q_business_model' | 'q_stage' | 'q_goal'
+  | 'q_idea' | 'q_customer' | 'q_business_model' | 'q_stage' | 'q_goal' | 'q_location'
   | 'analyzing' | 'reveal_teaser' | 'register' | 'project_name' | 'program_intro' | 'unlock';
 
 const STEPS: Step[] = [
-  'q_idea', 'q_customer', 'q_business_model', 'q_stage', 'q_goal',
+  'q_idea', 'q_customer', 'q_business_model', 'q_stage', 'q_goal', 'q_location',
   'analyzing', 'reveal_teaser', 'register', 'project_name', 'program_intro', 'unlock',
 ];
 
@@ -59,6 +60,15 @@ export default function Onboarding({ userData, update, signIn, onComplete }: Pro
   }
 
   switch (step) {
+    case 'q_location':
+      return (
+        <OnboardingLocation
+          initialCountry={userData.country}
+          initialCity={userData.city}
+          onNext={(country, city, timezone) => { update({ country, city, timezone }); advance(); }}
+        />
+      );
+
     case 'analyzing':
       return (
         <Analyzing

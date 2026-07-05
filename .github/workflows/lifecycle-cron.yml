@@ -1,0 +1,21 @@
+name: Lifecycle emails (hourly)
+
+# Vercel Hobby caps cron at once/day, so the lifecycle sweep is driven HOURLY from here.
+# api/cron.ts only acts on users whose LOCAL hour is 11:00 right now (from users.timezone),
+# so across a day every user is nudged at their own 11:00. Idempotent (email_log dedupe),
+# so an occasional GitHub delay/retry never double-sends.
+# Requires repo Actions secret CRON_SECRET (same value as the Vercel env var).
+on:
+  schedule:
+    - cron: '0 * * * *'   # top of every hour, UTC (GitHub may delay a few minutes)
+  workflow_dispatch: {}    # manual trigger for testing
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger lifecycle sweep
+        run: |
+          curl -fsS -X POST \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            https://affina-space.vercel.app/api/cron

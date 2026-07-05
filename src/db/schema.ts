@@ -10,6 +10,10 @@ export const users = pgTable('users', {
   businessModel: text('business_model').default(''),
   stage: text('stage').default(''),
   goal: text('goal').default(''),
+  // Location (onboarding) — personalization + timezone for 11:00-local lifecycle sends
+  country: text('country').default(''),
+  city: text('city').default(''),
+  timezone: text('timezone').default(''),   // IANA tz captured from the browser at onboarding
   score: integer('score').default(0),
   // Phase model
   phase: text('phase').default('launch'),
