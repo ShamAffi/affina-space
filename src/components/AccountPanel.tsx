@@ -20,7 +20,7 @@ export default function AccountPanel({ userData, onClose, onSave }: Props) {
     fetch('/api/user', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: userData.email, name, projectName }),
+      body: JSON.stringify({ name, projectName }),
     }).catch(() => {});
   }
 

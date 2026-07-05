@@ -44,8 +44,8 @@ export default function DocumentsPanel({ email, onClose, onLessonInputSaved, con
   const [modalEntry, setModalEntry] = useState<BrainEntry | null>(null);
 
   useEffect(() => {
-    if (!email) { setLoading(false); return; }
-    fetch(`/api/brain?email=${encodeURIComponent(email)}&with=snapshot`)
+    if (!email) { setLoading(false); return; }   // gates to logged-in users; identity is the cookie
+    fetch('/api/brain?with=snapshot')
       .then((r) => r.json())
       .then((data) => {
         // Snapshot is pinned separately (§3.4) — keep it out of the regular doc list
@@ -156,7 +156,6 @@ export default function DocumentsPanel({ email, onClose, onLessonInputSaved, con
       {modalEntry && (
         <EditModal
           entry={modalEntry}
-          email={email}
           onClose={() => setModalEntry(null)}
           onSaved={handleSaved}
           context={context}
@@ -261,10 +260,9 @@ function DocCard({ entry, onOpen }: { entry: BrainEntry; onOpen: () => void }) {
 
 // ─── Edit modal ───────────────────────────────────────────────────────────────
 function EditModal({
-  entry, email, onClose, onSaved, context,
+  entry, onClose, onSaved, context,
 }: {
   entry: BrainEntry;
-  email: string;
   onClose: () => void;
   onSaved: (updated: BrainEntry) => void;
   context?: DocContext;
@@ -286,7 +284,7 @@ function EditModal({
       await fetch('/api/brain', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'save-input', email, lessonId: entry.lessonId, content: draft }),
+        body: JSON.stringify({ action: 'save-input', lessonId: entry.lessonId, content: draft }),
       });
 
       // 2. Re-run the AI mentor for exercise docs and refresh the score + feedback.
@@ -296,7 +294,6 @@ function EditModal({
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              email,
               lessonId: entry.lessonId,
               lessonTitle: entry.lessonTitle,
               prompt: entry.prompt,

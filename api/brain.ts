@@ -3,6 +3,7 @@ import { callClaude } from '../src/server/anthropic.js';
 import { MODELS } from '../src/server/models.js';
 import { z } from 'zod';
 import { applyCors } from '../src/server/http.js';
+import { requireAuth } from '../src/server/requireAuth.js';
 import { checkRateLimit } from '../src/server/ratelimit.js';
 import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
@@ -193,7 +194,11 @@ Produce the ${prev ? 'updated' : 'first'} Startup Snapshot. Source: ${source}.`;
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (applyCors(req, res, 'GET,POST,OPTIONS')) return;
 
-  const rl = await checkRateLimit(req);
+  // Auth Phase B (§2) — identity from the session cookie; client email ignored.
+  const email = requireAuth(req, res);
+  if (!email) return;
+
+  const rl = await checkRateLimit(req, { email }); // §6 — limiter keys on the session email
   if (!rl.ok) {
     if (rl.retryAfter) res.setHeader('Retry-After', String(rl.retryAfter));
     return res.status(429).json({ error: 'rate_limited', retryAfter: rl.retryAfter });
@@ -201,10 +206,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const db = getDb();
 
-  // GET /api/brain?email= — brain entries (array). With ?with=snapshot → { entries, snapshot }.
+  // GET /api/brain — brain entries (array). With ?with=snapshot → { entries, snapshot }.
   if (req.method === 'GET') {
-    const email = req.query.email as string;
-    if (!email) return res.status(400).json({ error: 'email required' });
     const withSnapshot = req.query.with === 'snapshot';
 
     const user = await db.query.users.findFirst({ where: eq(users.email, email) });
@@ -220,15 +223,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json(entries);
   }
 
-  // POST /api/brain — save-input | toggle-complete | generate-snapshot
+  // POST /api/brain — save-input | toggle-complete | generate-snapshot (session user).
   if (req.method === 'POST') {
-    const { action, email, lessonId, content, userDraft, aiDraft } = req.body;
+    const { action, lessonId, content, userDraft, aiDraft } = req.body;
 
-    let user = await db.query.users.findFirst({ where: eq(users.email, email) });
-    if (!user) {
-      const [created] = await db.insert(users).values({ email }).returning();
-      user = created;
-    }
+    const user = await db.query.users.findFirst({ where: eq(users.email, email) });
+    if (!user) return res.status(404).json({ error: 'user not found' });
 
     // ⚙️ M0.5 / explicit regeneration — the wow moment (§6.1)
     if (action === 'generate-snapshot') {

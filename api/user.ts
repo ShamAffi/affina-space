@@ -1,5 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { applyCors } from '../src/server/http.js';
+import { requireAuth } from '../src/server/requireAuth.js';
+import { checkRateLimit } from '../src/server/ratelimit.js';
 import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
 import { eq } from 'drizzle-orm';
@@ -7,6 +9,12 @@ import { users, lessonInputs, completedLessons, brainEntries, tasks, checkIns, a
 import { GROWTH_SEED_XP } from '../src/server/progressUtils.js';
 import { sendEmail, subscriptionEmail, mentorBookedEmail } from '../src/server/email.js';
 import { logEmail } from '../src/server/emailLog.js';
+
+// Auth Phase B (SPEC_AUTH_PHASE_B): GET + PATCH derive identity from the session cookie
+// (requireAuth) — the client email param is ignored. POST is the PRE-AUTH onboarding
+// surface (§7): no session, IP rate-limited, and it may ONLY create/update a PENDING row
+// (verifiedAt IS NULL) — it refuses to touch a verified account. Post-verify profile
+// edits go through PATCH.
 
 function getDb() {
   const sql = neon(process.env.DATABASE_URL!);
@@ -33,10 +41,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const db = getDb();
 
-  // GET /api/user?email=... — load user data
+  // GET /api/user — load the SESSION user's data (identity from the cookie, not a param).
   if (req.method === 'GET') {
-    const email = ((req.query.email as string) ?? '').trim().toLowerCase();
-    if (!email) return res.status(400).json({ error: 'email required' });
+    const email = requireAuth(req, res);
+    if (!email) return;
 
     const user = await db.query.users.findFirst({ where: eq(users.email, email) });
     if (!user) return res.status(404).json({ error: 'not found' });
@@ -71,22 +79,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   }
 
-  // POST /api/user — upsert user with onboarding data.
-  //   emailCapture=true (SPEC_ONBOARDING_FUNNEL §2a) = the email-capture / change-email
-  //     step: block ONLY on a verified account (ownership); pending rows reuse (overwrite),
-  //     never block. Sets emailCapturedAt (starts the finish-sequence clock).
-  //   freshStart=true = this email starts a new project: wipe child rows + reset derived.
-  //   Plain sync calls (LMS mount etc.) never send a flag and never touch children.
+  // POST /api/user — PRE-AUTH onboarding surface (SPEC_AUTH_PHASE_B §7). No session:
+  // it may ONLY create/update a PENDING row (verifiedAt IS NULL) and refuses to touch a
+  // verified account (a pre-auth caller must never overwrite / read a real user's data).
+  // IP rate-limited. Post-verify profile edits go through PATCH (session-guarded).
+  //   emailCapture=true (SPEC_ONBOARDING_FUNNEL §2a): email-capture / change-email — blocks
+  //     on a verified account, reuses/relocates a pending row, sets emailCapturedAt.
+  //   plain sync: name/project/report onto the pending row during onboarding.
   if (req.method === 'POST') {
+    const rl = await checkRateLimit(req); // pre-auth → IP-based only (no session email)
+    if (!rl.ok) {
+      if (rl.retryAfter) res.setHeader('Retry-After', String(rl.retryAfter));
+      return res.status(429).json({ error: 'rate_limited', retryAfter: rl.retryAfter });
+    }
+
     const body = req.body ?? {};
     const email = String(body.email ?? '').trim().toLowerCase();
     if (!email) return res.status(400).json({ error: 'email required' });
-    const { name, projectName, idea, customer, businessModel, stage, goal, score, country, city, timezone, freshStart, onboardingReport, emailCapture, previousEmail } = body;
+    const { name, projectName, idea, customer, businessModel, stage, goal, score, country, city, timezone, onboardingReport, emailCapture, previousEmail } = body;
 
     // Profile fields written on every path. drizzle .set()/.values() skips `undefined`,
     // so an omitted field (e.g. name at capture time) never clobbers an existing value.
     const profile = { name, projectName, idea, customer, businessModel, stage, goal, score, country, city, timezone };
-    // freshStart + email-capture reuse both wipe the previous life of a reused row.
+    // email-capture reuse wipes the previous life of a reused pending row.
     const derivedReset = {
       phase: 'launch', launchValidatedAt: null, growthXp: 0, northStar: null,
       pulseStreak: 0, lastCheckInAt: null, momentumCard: null, lastReadinessGain: null,
@@ -128,39 +143,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(201).json({ id: created.id, created: true });
     }
 
+    // Plain onboarding sync — refuse a VERIFIED row (§7: pre-auth touches pending only).
     const existing = await db.query.users.findFirst({ where: eq(users.email, email) });
-
+    if (existing?.verifiedAt) {
+      return res.status(200).json({ blocked: true, reason: 'already_registered' });
+    }
     if (existing) {
-      if (freshStart === true) {
-        await wipeUserChildren(db, existing.id);
-        await db.update(users)
-          .set({ ...profile, ...derivedReset, onboardingReport, updatedAt: new Date() })
-          .where(eq(users.email, email));
-        return res.status(200).json({ id: existing.id, freshStart: true });
-      }
-
       await db.update(users)
         .set({ ...profile, onboardingReport, updatedAt: new Date() })
-        .where(eq(users.email, email));
+        .where(eq(users.id, existing.id));
       return res.status(200).json({ id: existing.id });
-    } else {
-      const [created] = await db.insert(users)
-        .values({ email, ...profile, onboardingReport })
-        .returning({ id: users.id });
-      // AMENDMENT: Welcome no longer fires here — entering email/saving profile isn't
-      // "registration". Welcome fires on magic-link verification (api/auth.ts verify-link).
-      return res.status(201).json({ id: created.id });
     }
+    const [created] = await db.insert(users)
+      .values({ email, ...profile, onboardingReport })
+      .returning({ id: users.id });
+    // Welcome fires on magic-link verification (api/auth.ts verify-link), not here.
+    return res.status(201).json({ id: created.id });
   }
 
-  // PATCH /api/user — update account fields (name, projectName, mentorSessions, subscribed)
+  // PATCH /api/user — post-auth profile/account edits. Identity from the SESSION cookie;
+  // the client email param is ignored (§2). Handles the full profile so post-verify edits
+  // (m0l3 "Your Project Today", AccountPanel) go through the session, never the pre-auth POST.
   if (req.method === 'PATCH') {
-    const { email, name, projectName, mentorSessions, subscribed } = req.body;
-    if (!email) return res.status(400).json({ error: 'email required' });
+    const email = requireAuth(req, res);
+    if (!email) return;
+    const { name, projectName, idea, customer, businessModel, stage, goal, country, city, timezone, mentorSessions, subscribed } = req.body ?? {};
     const existingUser = await db.query.users.findFirst({ where: eq(users.email, email) });
     const patchFields: Record<string, unknown> = { updatedAt: new Date() };
-    if (name !== undefined) patchFields.name = name;
-    if (projectName !== undefined) patchFields.projectName = projectName;
+    for (const [k, v] of Object.entries({ name, projectName, idea, customer, businessModel, stage, goal, country, city, timezone })) {
+      if (v !== undefined) patchFields[k] = v;
+    }
     if (subscribed !== undefined) patchFields.subscribed = subscribed;
     // Merge mentorSessions (partial patch per session) — never clobber other sessions.
     const newlyBooked: string[] = [];

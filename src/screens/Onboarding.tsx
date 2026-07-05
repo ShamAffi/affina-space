@@ -34,10 +34,10 @@ const Q_CONFIG = [
 interface Props {
   userData: UserData;
   update: (updates: Partial<UserData>) => UserData;
-  signIn: (email: string) => void;
+  onSignIn: () => void;   // "already have an account" → /login (magic-link is the only auth)
 }
 
-export default function Onboarding({ userData, update, signIn }: Props) {
+export default function Onboarding({ userData, update, onSignIn }: Props) {
   const [step, setStep] = useState<Step>('q_idea');
   const [result, setResult] = useState<OnboardingScore | null>(null);
 
@@ -83,7 +83,7 @@ export default function Onboarding({ userData, update, signIn }: Props) {
             if (!r.blocked) advance();
             return r;
           }}
-          onSignIn={signIn}
+          onSignIn={onSignIn}
         />
       );
 

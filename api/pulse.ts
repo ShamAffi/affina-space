@@ -3,6 +3,7 @@ import { callClaude } from '../src/server/anthropic.js';
 import { MODELS } from '../src/server/models.js';
 import { z } from 'zod';
 import { applyCors } from '../src/server/http.js';
+import { requireAuth } from '../src/server/requireAuth.js';
 import { checkRateLimit } from '../src/server/ratelimit.js';
 import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
@@ -139,10 +140,10 @@ PART B — Extract activity, snapshot facts + compose the Momentum card:
   - mood: building | progressing | traction | recovering | quiet. 2–4 blocks, most important first.
 Respond ONLY with valid JSON matching the structure exactly.`;
 
-// POST {action:'draft'} — AI check-in draft (was api/pulse/draft.ts).
-async function handleDraft(db: Db, req: VercelRequest, res: VercelResponse) {
-  const { email, rawText } = req.body ?? {};
-  if (!email || !rawText?.trim()) return res.status(400).json({ error: 'email and rawText required' });
+// POST {action:'draft'} — AI check-in draft (was api/pulse/draft.ts). email = session.
+async function handleDraft(db: Db, email: string, req: VercelRequest, res: VercelResponse) {
+  const { rawText } = req.body ?? {};
+  if (!rawText?.trim()) return res.status(400).json({ error: 'rawText required' });
 
   const user = await db.query.users.findFirst({ where: eq(users.email, email) });
   if (!user) return res.status(404).json({ error: 'user not found' });
@@ -279,10 +280,10 @@ Return JSON:
   }
 }
 
-// POST {action:'commit'} — save the check-in (was api/pulse/commit.ts).
-async function handleCommit(db: Db, req: VercelRequest, res: VercelResponse) {
-  const { email, rawText, confirmedMetrics, draft } = req.body ?? {};
-  if (!email || !draft) return res.status(400).json({ error: 'email and draft required' });
+// POST {action:'commit'} — save the check-in (was api/pulse/commit.ts). email = session.
+async function handleCommit(db: Db, email: string, req: VercelRequest, res: VercelResponse) {
+  const { rawText, confirmedMetrics, draft } = req.body ?? {};
+  if (!draft) return res.status(400).json({ error: 'draft required' });
 
   const user = await db.query.users.findFirst({ where: eq(users.email, email) });
   if (!user) return res.status(404).json({ error: 'user not found' });
@@ -436,7 +437,11 @@ async function handleCommit(db: Db, req: VercelRequest, res: VercelResponse) {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (applyCors(req, res, 'GET,POST,OPTIONS')) return;
 
-  const rl = await checkRateLimit(req);
+  // Auth Phase B (§2) — identity from the session cookie; client email ignored.
+  const email = requireAuth(req, res);
+  if (!email) return;
+
+  const rl = await checkRateLimit(req, { email }); // §6 — limiter keys on the session email
   if (!rl.ok) {
     if (rl.retryAfter) res.setHeader('Retry-After', String(rl.retryAfter));
     return res.status(429).json({ error: 'rate_limited', retryAfter: rl.retryAfter });
@@ -444,10 +449,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const db = getDb();
 
-  // GET /api/pulse?email=… — list check-ins (was api/pulse/index.ts)
+  // GET /api/pulse — the session user's check-ins.
   if (req.method === 'GET') {
-    const email = req.query.email as string;
-    if (!email) return res.status(400).json({ error: 'email required' });
     const user = await db.query.users.findFirst({ where: eq(users.email, email) });
     if (!user) return res.status(200).json({ checkIns: [], northStar: null, streak: 0 });
     const rows = await db.query.checkIns.findMany({
@@ -460,7 +463,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'method not allowed' });
 
   const action = (req.body ?? {}).action;
-  if (action === 'draft') return handleDraft(db, req, res);
-  if (action === 'commit') return handleCommit(db, req, res);
+  if (action === 'draft') return handleDraft(db, email, req, res);
+  if (action === 'commit') return handleCommit(db, email, req, res);
   return res.status(400).json({ error: 'unknown action (expected draft|commit)' });
 }

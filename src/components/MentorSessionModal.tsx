@@ -50,8 +50,8 @@ export default function MentorSessionModal({ session, email, completed, onClose,
 
   // Personal agenda points pulled from the Snapshot (Next focus / Risk flags)
   useEffect(() => {
-    if (!email) return;
-    fetch(`/api/brain?email=${encodeURIComponent(email)}&with=snapshot`)
+    if (!email) return;   // gates to logged-in users; identity is the session cookie
+    fetch('/api/brain?with=snapshot')
       .then((r) => r.json())
       .then((d) => {
         const snap = d.snapshot as StartupSnapshot | null;
@@ -72,7 +72,7 @@ export default function MentorSessionModal({ session, email, completed, onClose,
       const res = await fetch('/api/user', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, mentorSessions: { [session]: { completed: next } } }),
+        body: JSON.stringify({ mentorSessions: { [session]: { completed: next } } }),
       });
       if (res.ok) onCompletedChange(next);
     } finally {

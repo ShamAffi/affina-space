@@ -4,7 +4,7 @@ import type { UserData, Lesson, AiFeedback, CompareResult, BrainEntry, NorthStar
 import { blockKind } from '../types';
 import MentorSessionModal from '../components/MentorSessionModal';
 import MarketResearchView from '../components/MarketResearchView';
-import { saveLessonInputToDB, toggleLessonCompleteToDB, syncUserToDB, loadProgressFromDB } from '../store';
+import { saveLessonInputToDB, toggleLessonCompleteToDB, patchUserToDB, loadProgressFromDB } from '../store';
 import ProfileButton from '../components/ProfileButton';
 import AccountPanel from '../components/AccountPanel';
 import DocumentsPanel from '../components/DocumentsPanel';
@@ -96,16 +96,14 @@ export default function LMS({ userData, onUpdateUserData, onGoToDashboard, onLog
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeLessonId]);
 
-  // On mount: sync user to DB, load progress, and restore AI feedback from brain entries
+  // On mount: sync profile to DB (post-auth PATCH), load progress + brain (session cookie).
   useEffect(() => {
-    syncUserToDB(userData);
+    patchUserToDB(userData);
     if (!userData.email) { setProgressLoading(false); return; }
-
-    const enc = encodeURIComponent(userData.email);
 
     Promise.all([
       loadProgressFromDB(userData.email),
-      fetch(`/api/brain?email=${enc}`).then((r) => r.json()).catch(() => []),
+      fetch('/api/brain').then((r) => r.json()).catch(() => []),
     ]).then(([dbProgress, brainData]) => {
       if (dbProgress) {
         const ms = (dbProgress as { mentorSessions?: MentorSessionsState }).mentorSessions;
@@ -225,7 +223,6 @@ My motivation & 12-week goal: …`;
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: userData.email,
           lessonId,
           lessonTitle: lesson.title,
           prompt: lesson.inputPrompt ?? '',
@@ -270,7 +267,7 @@ My motivation & 12-week goal: …`;
     fetch('/api/brain', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'market-research', email: userData.email, ...(answers ? { answers } : {}) }),
+      body: JSON.stringify({ action: 'market-research', ...(answers ? { answers } : {}) }),
     })
       .then(checkRes).then((r) => r.json())
       .then((d: { report?: MarketResearchReport; questions?: { id: string; q: string }[] }) => {
@@ -302,7 +299,6 @@ My motivation & 12-week goal: …`;
       body: JSON.stringify({
         mode: 'delegate',
         delegateMode: dMode,
-        email: userData.email,
         lessonId,
         lessonTitle: lesson.title,
         prompt: lesson.inputPrompt ?? '',
@@ -670,7 +666,7 @@ My motivation & 12-week goal: …`;
                 userData={userData}
                 onSave={(fields, links) => {
                   onUpdateUserData(fields);
-                  syncUserToDB({ ...userData, ...fields });
+                  patchUserToDB(fields);   // post-auth profile edit via the session cookie
                   if (links.trim()) {
                     onUpdateUserData({ lessonInputs: { ...userData.lessonInputs, m0l3: links } });
                     saveLessonInputToDB(userData.email, 'm0l3', links);
@@ -763,7 +759,6 @@ My motivation & 12-week goal: …`;
                 return (
                   <NorthStarExercise
                     key={activeLessonId}
-                    email={userData.email}
                     lessonId={activeLessonId}
                     alreadySubmitted={!!userData.lessonInputs[activeLessonId]}
                     onComplete={onContinue}
@@ -1073,7 +1068,6 @@ My motivation & 12-week goal: …`;
                   {showInput && activeLessonId === 'm4l5' && (
                     <ProblemSolutionBlock
                       key={activeLessonId + String(isRefining)}
-                      email={userData.email}
                       initialContent={getInputValue('m4l5')}
                       onSave={(text, provenance) => handleSaveInput('m4l5', text, { provenance })}
                     />
@@ -1260,14 +1254,13 @@ My motivation & 12-week goal: …`;
 const UNIT_LABELS: Record<string, string> = { people: 'people', '$': '$', '%': '%', count: 'count' };
 
 interface NorthStarExerciseProps {
-  email: string;
   lessonId: string;
   alreadySubmitted: boolean;
   onComplete: () => void;
   onSaveInput: (lessonId: string, content: string) => void;
 }
 
-function NorthStarExercise({ email, lessonId, alreadySubmitted, onComplete, onSaveInput }: NorthStarExerciseProps) {
+function NorthStarExercise({ lessonId, alreadySubmitted, onComplete, onSaveInput }: NorthStarExerciseProps) {
   type Status = 'suggesting' | 'idle' | 'committing' | 'done' | 'redo';
   const [status, setStatus] = useState<Status>(alreadySubmitted ? 'done' : 'suggesting');
   const [suggestion, setSuggestion] = useState<NorthStarSuggestion | null>(null);
@@ -1284,7 +1277,7 @@ function NorthStarExercise({ email, lessonId, alreadySubmitted, onComplete, onSa
     fetch('/api/northstar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'suggest', email }),
+      body: JSON.stringify({ action: 'suggest' }),
     })
       .then((r) => r.json())
       .then((data: NorthStarSuggestion) => {
@@ -1305,7 +1298,7 @@ function NorthStarExercise({ email, lessonId, alreadySubmitted, onComplete, onSa
       const r = await fetch('/api/northstar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'commit', email, key, label, unit, rationale }),
+        body: JSON.stringify({ action: 'commit', key, label, unit, rationale }),
       });
       if (!r.ok) throw new Error('commit failed');
       const data = await r.json();
@@ -1497,8 +1490,8 @@ function SnapshotBlock({ email, onComplete, autoStart = false }: { email: string
   const [snapshot, setSnapshot] = useState<StartupSnapshot | null>(null);
 
   useEffect(() => {
-    if (!email) { setStatus('idle'); return; }
-    fetch(`/api/brain?email=${encodeURIComponent(email)}&with=snapshot`)
+    if (!email) { setStatus('idle'); return; }   // gates to logged-in users; identity is the cookie
+    fetch('/api/brain?with=snapshot')
       .then((r) => r.json())
       .then((d) => {
         if (d.snapshot) { setSnapshot(d.snapshot); setStatus('ready'); }
@@ -1518,7 +1511,7 @@ function SnapshotBlock({ email, onComplete, autoStart = false }: { email: string
     fetch('/api/brain', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'generate-snapshot', email }),
+      body: JSON.stringify({ action: 'generate-snapshot' }),
     })
       .then((r) => { if (!r.ok) throw new Error('api'); return r.json(); })
       .then((d) => { setSnapshot(d.snapshot); setStatus('ready'); })
@@ -1904,8 +1897,7 @@ function IntakeQuizBlock({ initialJson, onComplete }: {
 // ─── m4l5 Problem–Solution check — three editable evidence blocks (SPEC_M4L5_THREE_BLOCK) ──
 // Not Delegate/Mode C: AI may draft any block from her Brain, she owns & edits all three,
 // one Save commits. Each AI button refills ONLY its own block(s); edits are never clobbered.
-function ProblemSolutionBlock({ email, initialContent, onSave }: {
-  email: string;
+function ProblemSolutionBlock({ initialContent, onSave }: {
   initialContent: string;
   onSave: (text: string, provenance: { forAgainstDrafted: boolean; conclusionDrafted: boolean; conclusionEditedAfterDraft: boolean }) => void;
 }) {
@@ -1927,7 +1919,7 @@ function ProblemSolutionBlock({ email, initialContent, onSave }: {
     setDraftingFA(true); setFaError(false);
     fetch('/api/ai', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode: 'psc-for-against', email }),
+      body: JSON.stringify({ mode: 'psc-for-against' }),
     })
       .then((r) => { if (!r.ok) throw new Error('api'); return r.json(); })
       .then((d: { for: string; against: string }) => {
@@ -2050,11 +2042,11 @@ function FoundersCaseBlock({ email, onContinue }: { email: string; onContinue: (
   const [data, setData] = useState<FoundersCase | null>(null);
 
   useEffect(() => {
-    if (!email) { setStatus('error'); return; }
+    if (!email) { setStatus('error'); return; }   // gates to logged-in users; identity is the cookie
     fetch('/api/brain', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'founders-case', email }),
+      body: JSON.stringify({ action: 'founders-case' }),
     })
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((d) => { setData(d.case); setStatus('ready'); })

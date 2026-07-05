@@ -81,7 +81,7 @@ export default function TaskDetail({ task, email, onBack }: Props) {
     fetch('/api/tasks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'briefing', email, taskId: currentTask.id }),
+      body: JSON.stringify({ action: 'briefing', taskId: currentTask.id }),
     })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => { if (d?.briefing) setBriefing(d.briefing); })
@@ -141,7 +141,7 @@ export default function TaskDetail({ task, email, onBack }: Props) {
       const r = await fetch('/api/tasks/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, taskId: currentTask.id, submissionText: text, submissionData }),
+        body: JSON.stringify({ taskId: currentTask.id, submissionText: text, submissionData }),
       });
       if (r.status === 429) {
         setError("You're going a bit fast — give it a moment, then try again.");
@@ -246,7 +246,6 @@ export default function TaskDetail({ task, email, onBack }: Props) {
                   entries={entries}
                   onChange={setEntries}
                   minEntries={fieldConfig.minEntries ?? 1}
-                  email={email}
                 />
               )}
 

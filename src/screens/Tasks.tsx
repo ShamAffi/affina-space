@@ -51,7 +51,7 @@ export default function Tasks({ email, onGoToTask, onGoToDashboard }: Props) {
 
   useEffect(() => {
     if (!email) return;
-    fetch(`/api/tasks?email=${encodeURIComponent(email)}`)
+    fetch('/api/tasks') // identity from the session cookie
       .then((r) => r.json())
       .then((data) => {
         setTaskList(Array.isArray(data.tasks) ? data.tasks : []);
@@ -67,7 +67,7 @@ export default function Tasks({ email, onGoToTask, onGoToDashboard }: Props) {
       const r = await fetch('/api/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, title: addTitle.trim(), instruction: addInstruction.trim() }),
+        body: JSON.stringify({ title: addTitle.trim(), instruction: addInstruction.trim() }),
       });
       const data = await r.json();
       if (data.task) {

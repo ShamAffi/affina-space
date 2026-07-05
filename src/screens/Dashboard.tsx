@@ -43,10 +43,9 @@ export default function Dashboard({ userData, onUpdateUserData, onGoToLMS, onGoT
 
   useEffect(() => {
     if (!userData.email) return;
-    const enc = encodeURIComponent(userData.email);
 
-    // Progress: phase + readiness/growth (server-computed)
-    fetch(`/api/progress?email=${enc}`)
+    // Progress: phase + readiness/growth (server-computed). Identity from the session cookie.
+    fetch('/api/progress')
       .then((r) => r.json())
       .then((data: ProgressResponse) => {
         setProgressData(data);
@@ -63,13 +62,13 @@ export default function Dashboard({ userData, onUpdateUserData, onGoToLMS, onGoT
       .catch(() => {});
 
     // Brain entries: for exercisesCount stat
-    fetch(`/api/brain?email=${enc}`)
+    fetch('/api/brain')
       .then((r) => r.json())
       .then((data) => setBrainEntries(Array.isArray(data) ? data : []))
       .catch(() => {});
 
     // Tasks: real-world tasks column
-    fetch(`/api/tasks?email=${enc}`)
+    fetch('/api/tasks')
       .then((r) => r.json())
       .then((data) => setTaskList(Array.isArray(data.tasks) ? data.tasks : []))
       .catch(() => {});

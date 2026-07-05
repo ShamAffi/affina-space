@@ -44,7 +44,11 @@ export function updateUserData(updates: Partial<UserData>): UserData {
   return updated;
 }
 
-// --- API (syncs with Neon DB when email is known) ---
+// --- API ---
+// Identity model (Auth Phase B): post-auth endpoints derive identity from the session
+// cookie — the browser sends it automatically (same-origin), so authed calls pass NO email.
+// The onboarding writes below (syncUserToDB / captureEmail) are the PRE-AUTH surface: no
+// session yet, so they DO send the email — the server only lets them touch a pending row.
 
 function userPayload(data: UserData): Record<string, unknown> {
   return {
@@ -64,20 +68,35 @@ function userPayload(data: UserData): Record<string, unknown> {
   };
 }
 
-export async function syncUserToDB(data: UserData, opts?: { freshStart?: boolean }): Promise<void> {
+// PRE-AUTH (onboarding) — writes intake/report onto the pending row before verification.
+export async function syncUserToDB(data: UserData): Promise<void> {
   if (!data.email) return;
   try {
     await fetch('/api/user', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...userPayload(data),
-        // Register flow only: re-onboarding an existing email wipes its previous life server-side
-        ...(opts?.freshStart ? { freshStart: true } : {}),
-      }),
+      body: JSON.stringify(userPayload(data)),
     });
   } catch {
     // fail silently — localStorage is the fallback
+  }
+}
+
+// POST-AUTH profile edits (Auth Phase B) — PATCH via the session cookie; NO email in the
+// body (the server derives identity from the session). Used post-verification only.
+export async function patchUserToDB(fields: Partial<UserData>): Promise<void> {
+  const keys = ['name', 'projectName', 'idea', 'customer', 'businessModel', 'stage', 'goal', 'country', 'city', 'timezone'] as const;
+  const body: Record<string, unknown> = {};
+  for (const k of keys) if (fields[k] !== undefined) body[k] = fields[k];
+  if (Object.keys(body).length === 0) return;
+  try {
+    await fetch('/api/user', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    // fail silently
   }
 }
 
@@ -115,12 +134,12 @@ export async function saveLessonInputToDB(
   content: string,
   drafts?: { userDraft?: string; aiDraft?: string },
 ): Promise<void> {
-  if (!email) return;
+  if (!email) return;   // `email` gates the call to logged-in users; identity is the cookie
   try {
     await fetch('/api/brain', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'save-input', email, lessonId, content, ...drafts }),
+      body: JSON.stringify({ action: 'save-input', lessonId, content, ...drafts }),
     });
   } catch {
     // fail silently
@@ -133,7 +152,7 @@ export async function toggleLessonCompleteToDB(email: string, lessonId: string):
     await fetch('/api/brain', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'toggle-complete', email, lessonId }),
+      body: JSON.stringify({ action: 'toggle-complete', lessonId }),
     });
   } catch {
     // fail silently
@@ -146,7 +165,7 @@ export async function loadProgressFromDB(email: string): Promise<{
 } | null> {
   if (!email) return null;
   try {
-    const res = await fetch(`/api/progress?email=${encodeURIComponent(email)}`);
+    const res = await fetch('/api/progress');   // identity from the session cookie
     if (!res.ok) return null;
     return await res.json();
   } catch {
@@ -155,8 +174,9 @@ export async function loadProgressFromDB(email: string): Promise<{
 }
 
 export async function loadUserFromDB(email: string): Promise<UserData | null> {
+  if (!email) return null;
   try {
-    const res = await fetch(`/api/user?email=${encodeURIComponent(email)}`);
+    const res = await fetch('/api/user');   // identity from the session cookie
     if (!res.ok) return null;
     return await res.json();
   } catch {

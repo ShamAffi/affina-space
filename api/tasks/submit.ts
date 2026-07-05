@@ -3,6 +3,7 @@ import { callClaude } from '../../src/server/anthropic.js';
 import { MODELS } from '../../src/server/models.js';
 import { z } from 'zod';
 import { applyCors } from '../../src/server/http.js';
+import { requireAuth } from '../../src/server/requireAuth.js';
 import { checkRateLimit } from '../../src/server/ratelimit.js';
 import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
@@ -41,22 +42,27 @@ ${GLOBAL_RUBRIC_RULES}`;
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (applyCors(req, res, 'POST,OPTIONS')) return;
 
-  const rl = await checkRateLimit(req);
+  // Auth Phase B (§2) — identity from the session cookie; client email ignored.
+  const email = requireAuth(req, res);
+  if (!email) return;
+
+  const rl = await checkRateLimit(req, { email }); // §6 — limiter keys on the session email
   if (!rl.ok) {
     if (rl.retryAfter) res.setHeader('Retry-After', String(rl.retryAfter));
     return res.status(429).json({ error: 'rate_limited', retryAfter: rl.retryAfter });
   }
   if (req.method !== 'POST') return res.status(405).json({ error: 'method not allowed' });
 
-  const { email, taskId, submissionText, submissionData } = req.body;
-  if (!email || !taskId || !submissionText?.trim()) {
-    return res.status(400).json({ error: 'email, taskId, and submissionText required' });
+  const { taskId, submissionText, submissionData } = req.body;
+  if (!taskId || !submissionText?.trim()) {
+    return res.status(400).json({ error: 'taskId and submissionText required' });
   }
 
   const db = getDb();
   const user = await db.query.users.findFirst({ where: eq(users.email, email) });
   if (!user) return res.status(404).json({ error: 'user not found' });
 
+  // §4 ownership — the task must belong to the session user (scoped by userId).
   const task = await db.query.tasks.findFirst({
     where: and(eq(tasks.id, Number(taskId)), eq(tasks.userId, user.id)),
   });

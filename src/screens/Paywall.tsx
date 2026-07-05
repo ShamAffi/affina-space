@@ -15,12 +15,11 @@ const VALUE_STACK = [
 ];
 
 interface Props {
-  email: string;
   onSubscribed: () => void;   // sets subscribed=true in app state, routes to S1 booking
   onDismiss: () => void;      // back to Dashboard
 }
 
-export default function Paywall({ email, onSubscribed, onDismiss }: Props) {
+export default function Paywall({ onSubscribed, onDismiss }: Props) {
   const [working, setWorking] = useState(false);
 
   async function unlock() {
@@ -30,7 +29,7 @@ export default function Paywall({ email, onSubscribed, onDismiss }: Props) {
       await fetch('/api/user', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, subscribed: true }),
+        body: JSON.stringify({ subscribed: true }),
       });
       onSubscribed();
     } catch {

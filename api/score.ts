@@ -53,10 +53,14 @@ const FALLBACK = {
   ],
 };
 
+// PRE-AUTH surface (SPEC_AUTH_PHASE_B §7): this is the onboarding report generator — it
+// runs at the `analyzing` step before a session exists. Pure compute: it scores the intake
+// fields in the body and returns; it never reads/writes user data, so there is nothing to
+// leak and no session to require. Abuse is bounded by IP rate limiting (below).
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (applyCors(req, res, 'POST,OPTIONS')) return;
 
-  const rl = await checkRateLimit(req);
+  const rl = await checkRateLimit(req); // IP-based only (pre-auth, no session email)
   if (!rl.ok) {
     if (rl.retryAfter) res.setHeader('Retry-After', String(rl.retryAfter));
     return res.status(429).json({ error: 'rate_limited', retryAfter: rl.retryAfter });

@@ -38,6 +38,7 @@ function AppRoutes() {
   const navigate = useNavigate();
   const [userData, setUserData] = useState<UserData>(loadUserData);
   const authed = !!userData.email;
+  const sessionExpired = useRef(false);
 
   function update(updates: Partial<UserData>): UserData {
     const merged = updateUserData(updates);
@@ -45,20 +46,53 @@ function AppRoutes() {
     return merged;
   }
 
-  function logout() {
+  // Auth Phase B (§5) — a 401 from any guarded /api call means the session is gone: clear
+  // local state and bounce to /login. Done as a fetch interceptor so every call site is
+  // covered centrally. /api/auth 401s are token errors (handled by Verify), not session
+  // expiry, so they're excluded. Pre-auth onboarding calls never 401 (no session required).
+  useEffect(() => {
+    const orig = window.fetch;
+    window.fetch = async (...args: Parameters<typeof fetch>) => {
+      const res = await orig(...args);
+      try {
+        const first = args[0];
+        const url = typeof first === 'string' ? first : first instanceof Request ? first.url : String(first);
+        if (res.status === 401 && url.includes('/api/') && !url.includes('/api/auth') && !sessionExpired.current) {
+          sessionExpired.current = true;
+          saveUserData(defaultUserData);
+          setUserData(defaultUserData);
+          navigate('/login');
+        }
+      } catch { /* the interceptor must never break a fetch */ }
+      return res;
+    };
+    return () => { window.fetch = orig; };
+  }, [navigate]);
+
+  async function logout() {
+    // §5 — clear the server cookie, then the local state, then land on /login.
+    try {
+      await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'logout' }),
+      });
+    } catch { /* clear locally regardless */ }
     saveUserData(defaultUserData);
     setUserData(defaultUserData);
-    navigate('/');
+    navigate('/login');
   }
 
+  // Loads the SESSION user's profile (identity from the cookie). Called after a verified
+  // magic link — the only way to authenticate in Phase B. `email` seeds localStorage; the
+  // GET itself resolves the session user regardless.
   async function signIn(rawEmail: string, dest: string = '/dashboard') {
-    // Normalize to lowercase — rows are stored lowercased (capture + auth), and every
-    // email-keyed endpoint (progress/brain/tasks) must resolve to the same row.
+    sessionExpired.current = false; // fresh session — re-arm the 401 guard
     const email = rawEmail.trim().toLowerCase();
     const withEmail = update({ email });
     navigate(dest);
     try {
-      const res = await fetch(`/api/user?email=${encodeURIComponent(email)}`);
+      const res = await fetch('/api/user'); // identity from the session cookie
       if (res.ok) {
         const db = await res.json();
         update({
@@ -96,11 +130,11 @@ function AppRoutes() {
       {/* Public — / is the (future) landing; for now reuse the hero with a Start CTA */}
       <Route
         path="/"
-        element={authed ? <Navigate to="/dashboard" replace /> : <Welcome onStart={() => navigate('/start')} onSignIn={signIn} />}
+        element={authed ? <Navigate to="/dashboard" replace /> : <Welcome onStart={() => navigate('/start')} onSignIn={() => navigate('/login')} />}
       />
       <Route
         path="/start"
-        element={<Onboarding userData={userData} update={update} signIn={signIn} />}
+        element={<Onboarding userData={userData} update={update} onSignIn={() => navigate('/login')} />}
       />
       <Route path="/login" element={<Login />} />
       <Route path="/auth/verify" element={<Verify onVerified={onVerified} />} />
@@ -136,7 +170,6 @@ function AppRoutes() {
         path="/unlock"
         element={authed ? (
           <Paywall
-            email={userData.email}
             onSubscribed={() => { update({ subscribed: true }); navigate('/start-session'); }}
             onDismiss={() => navigate('/dashboard')}
           />
@@ -146,7 +179,7 @@ function AppRoutes() {
       <Route
         path="/start-session"
         element={authed ? (
-          <StartSession email={userData.email} onContinue={() => navigate(`/learning/${COURSE_SLUG}/${M5_FIRST}`)} />
+          <StartSession onContinue={() => navigate(`/learning/${COURSE_SLUG}/${M5_FIRST}`)} />
         ) : toLanding}
       />
 

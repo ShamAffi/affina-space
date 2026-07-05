@@ -7,7 +7,7 @@ import { applyCors } from '../src/server/http.js';
 import { checkRateLimit } from '../src/server/ratelimit.js';
 import { users, authTokens } from '../src/db/schema.js';
 import { sendEmail, magicLinkEmail, welcomeEmail } from '../src/server/email.js';
-import { issueSession } from '../src/server/session.js';
+import { issueSession, clearSession } from '../src/server/session.js';
 import { createMagicLink } from '../src/server/magicLink.js';
 import { sendOnce } from '../src/server/emailLog.js';
 
@@ -33,6 +33,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const db = getDb();
   const action = (req.body ?? {}).action;
+
+  // ── logout (Phase B §5) — clear the session cookie ───────────────────────────
+  if (action === 'logout') {
+    clearSession(res);
+    return res.status(200).json({ ok: true });
+  }
 
   // ── request a magic link ─────────────────────────────────────────────────────
   if (action === 'request-link') {

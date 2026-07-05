@@ -18,7 +18,7 @@ export default function ReportPage({ userData, onContinue }: Props) {
   useEffect(() => {
     if (report || !userData.email) { setLoading(false); return; }
     let alive = true;
-    fetch(`/api/user?email=${encodeURIComponent(userData.email)}`)
+    fetch('/api/user') // identity from the session cookie
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => { if (alive && d?.onboardingReport) setReport(d.onboardingReport as OnboardingScore); })
       .catch(() => { /* fall back to the score-only view below */ })

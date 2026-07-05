@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { callClaude } from '../../src/server/anthropic.js';
 import { MODELS } from '../../src/server/models.js';
 import { applyCors } from '../../src/server/http.js';
+import { requireAuth } from '../../src/server/requireAuth.js';
 import { checkRateLimit } from '../../src/server/ratelimit.js';
 import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
@@ -61,7 +62,11 @@ async function syncProgramTasks(db: ReturnType<typeof getDb>, userId: number) {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (applyCors(req, res, 'GET,POST,OPTIONS')) return;
 
-  const rl = await checkRateLimit(req);
+  // Auth Phase B (§2) — identity from the session cookie; client email ignored.
+  const email = requireAuth(req, res);
+  if (!email) return;
+
+  const rl = await checkRateLimit(req, { email }); // §6 — limiter keys on the session email
   if (!rl.ok) {
     if (rl.retryAfter) res.setHeader('Retry-After', String(rl.retryAfter));
     return res.status(429).json({ error: 'rate_limited', retryAfter: rl.retryAfter });
@@ -69,11 +74,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const db = getDb();
 
-  // GET /api/tasks?email=...
+  // GET /api/tasks — the session user's tasks.
   if (req.method === 'GET') {
-    const email = req.query.email as string;
-    if (!email) return res.status(400).json({ error: 'email required' });
-
     const user = await db.query.users.findFirst({ where: eq(users.email, email) });
     if (!user) return res.status(200).json({ tasks: [] });
 
@@ -98,8 +100,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'POST') {
     // §4b — generate & cache the Mission Briefing for a program field task
     if (req.body.action === 'briefing') {
-      const { email, taskId } = req.body;
-      if (!email || !taskId) return res.status(400).json({ error: 'email and taskId required' });
+      const { taskId } = req.body;
+      if (!taskId) return res.status(400).json({ error: 'taskId required' });
 
       const user = await db.query.users.findFirst({ where: eq(users.email, email) });
       if (!user) return res.status(404).json({ error: 'user not found' });
@@ -136,9 +138,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    const { email, title, instruction } = req.body;
-    if (!email || !title?.trim() || !instruction?.trim()) {
-      return res.status(400).json({ error: 'email, title, and instruction required' });
+    const { title, instruction } = req.body;
+    if (!title?.trim() || !instruction?.trim()) {
+      return res.status(400).json({ error: 'title and instruction required' });
     }
 
     const user = await db.query.users.findFirst({ where: eq(users.email, email) });

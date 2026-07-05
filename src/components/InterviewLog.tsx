@@ -20,10 +20,9 @@ interface Props {
   onChange: (entries: InterviewLogEntry[]) => void;
   minEntries: number;
   readOnly?: boolean;
-  email?: string;   // for the "Add Transcript" AI extraction call
 }
 
-export default function InterviewLog({ entries, onChange, minEntries, readOnly = false, email }: Props) {
+export default function InterviewLog({ entries, onChange, minEntries, readOnly = false }: Props) {
   const [draft, setDraft] = useState<InterviewLogEntry | null>(null);
   const [editIdx, setEditIdx] = useState<number | null>(null);
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
@@ -76,7 +75,7 @@ export default function InterviewLog({ entries, onChange, minEntries, readOnly =
     fetch('/api/ai', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode: 'extract-interview', email, text: transcript }),
+      body: JSON.stringify({ mode: 'extract-interview', text: transcript }),
     })
       .then((r) => { if (!r.ok) throw new Error('api'); return r.json(); })
       .then((d: { fields: Record<FieldKey, string>; confidence: Record<FieldKey, 'found' | 'unclear'> }) => {

@@ -6,7 +6,7 @@ interface Props {
   // Creates the pending user + emailCapturedAt server-side. Resolves with the ownership
   // verdict: { blocked } when the email is a VERIFIED account (offer sign-in instead).
   onSubmit: (email: string) => Promise<{ blocked?: boolean; reason?: string }>;
-  onSignIn: (email: string) => void;
+  onSignIn: () => void;   // → /login (magic-link); typing an email no longer authenticates
 }
 
 // Step 2 (SPEC_ONBOARDING_FUNNEL §1) — email capture BEFORE the report, framed as value:
@@ -66,7 +66,7 @@ export default function EmailCapture({ initialEmail, onSubmit, onSignIn }: Props
               <p className="text-xs text-amber-600 mb-3">Sign in to pick up where you left off, or use a different email.</p>
               <div className="flex gap-2">
                 <button
-                  onClick={() => onSignIn(email.trim().toLowerCase())}
+                  onClick={onSignIn}
                   className="flex-1 bg-brand hover:bg-brand-700 text-white text-sm font-semibold py-2.5 rounded-pill transition active:scale-95"
                 >
                   Sign in →

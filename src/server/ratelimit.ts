@@ -24,14 +24,12 @@ function clientIp(req: VercelRequest): string {
   return 'unknown';
 }
 
-function pickEmail(req: VercelRequest, explicit?: string): string | undefined {
-  const body = req.body as { email?: unknown } | undefined;
-  const query = req.query as { email?: unknown } | undefined;
-  const cand =
-    explicit ??
-    (typeof body?.email === 'string' ? body.email : undefined) ??
-    (typeof query?.email === 'string' ? query.email : undefined);
-  const e = cand?.trim().toLowerCase();
+// Auth Phase B (§6): the email dimension keys ONLY on the SESSION email, passed
+// explicitly by guarded endpoints. We no longer read email from body/query — a client
+// email is untrusted (spoofable), and letting it key the limiter would let an attacker
+// exhaust a victim's bucket. Pre-auth surfaces (§7) pass no email → IP-based limiting only.
+function pickEmail(explicit?: string): string | undefined {
+  const e = explicit?.trim().toLowerCase();
   return e || undefined;
 }
 
@@ -63,7 +61,7 @@ export async function checkRateLimit(
   try {
     const sql = neon(url);
     const ip = clientIp(req);
-    const email = pickEmail(req, opts?.email);
+    const email = pickEmail(opts?.email);
 
     const keys = [`ip:${ip}:min`, `ip:${ip}:day`];
     if (email) keys.push(`email:${email}:day`);

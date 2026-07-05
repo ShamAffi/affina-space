@@ -4,32 +4,32 @@ import { useState } from 'react';
 // between payment and M5: both CTAs advance to M5; booking is optional and never
 // blocks continuing. Marks S1 state in the existing mentorSessions model.
 interface Props {
-  email: string;
   onContinue: () => void;   // → Module 5 (both CTAs call this)
 }
 
-async function markS1(email: string, patch: { booked?: boolean; seen?: boolean }) {
+// PATCH via the session cookie (Auth Phase B) — no email in the body.
+async function markS1(patch: { booked?: boolean; seen?: boolean }) {
   try {
     await fetch('/api/user', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, mentorSessions: { S1: patch } }),
+      body: JSON.stringify({ mentorSessions: { S1: patch } }),
     });
   } catch { /* non-blocking */ }
 }
 
-export default function StartSession({ email, onContinue }: Props) {
+export default function StartSession({ onContinue }: Props) {
   const [advancing, setAdvancing] = useState(false);
 
   async function book() {
     setAdvancing(true);
-    await markS1(email, { booked: true, seen: true });
+    await markS1({ booked: true, seen: true });
     window.location.href = `mailto:sk@affina.space?subject=Book my Start session (S1)`;
     onContinue();
   }
   async function later() {
     setAdvancing(true);
-    await markS1(email, { seen: true });   // seen but not booked → Dashboard nudge still applies
+    await markS1({ seen: true });   // seen but not booked → Dashboard nudge still applies
     onContinue();
   }
 

@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { applyCors } from '../src/server/http.js';
+import { requireAuth } from '../src/server/requireAuth.js';
 import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
 import { eq } from 'drizzle-orm';
@@ -57,7 +58,9 @@ async function buildTraction(db: ReturnType<typeof getDb>, userId: number) {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (applyCors(req, res, 'GET,POST,OPTIONS', 'Content-Type,X-Mentor-Secret')) return;
 
-  // POST /api/progress — mentor validates launch, moves user to growth phase
+  // POST /api/progress — mentor validates launch, moves user to growth phase.
+  // ADMIN surface (not a user session): gated by MENTOR_SECRET like api/cron.ts; it acts
+  // on a specified user's row, so it legitimately takes the target email in the body (§7).
   if (req.method === 'POST') {
     const secret = req.headers['x-mentor-secret'];
     if (!secret || secret !== process.env.MENTOR_SECRET) {
@@ -87,8 +90,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (req.method !== 'GET') return res.status(405).json({ error: 'method not allowed' });
 
-  const email = req.query.email as string;
-  if (!email) return res.status(400).json({ error: 'email required' });
+  // GET — identity from the session cookie (§2), never a client param.
+  const email = requireAuth(req, res);
+  if (!email) return;
 
   try {
     const db = getDb();

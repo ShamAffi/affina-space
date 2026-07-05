@@ -54,8 +54,8 @@ export default function MetricPulse({ email, projectName, onBack }: Props) {
   const [newTasks, setNewTasks] = useState<{ title: string }[]>([]);
 
   useEffect(() => {
-    if (!email) return;
-    fetch(`/api/pulse?email=${encodeURIComponent(email)}`)
+    if (!email) return;   // gates to logged-in users; identity is the session cookie
+    fetch('/api/pulse')
       .then((r) => r.json())
       .then((data) => {
         setCheckIns(Array.isArray(data.checkIns) ? data.checkIns : []);
@@ -81,7 +81,7 @@ export default function MetricPulse({ email, projectName, onBack }: Props) {
       const r = await fetch('/api/pulse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'draft', email, rawText }),
+        body: JSON.stringify({ action: 'draft', rawText }),
       });
       if (r.status === 429) {
         setError("You're going a bit fast — give it a moment, then try again.");
@@ -106,12 +106,12 @@ export default function MetricPulse({ email, projectName, onBack }: Props) {
       const r = await fetch('/api/pulse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'commit', email, rawText, confirmedMetrics: editedMetrics, draft }),
+        body: JSON.stringify({ action: 'commit', rawText, confirmedMetrics: editedMetrics, draft }),
       });
       const data = await r.json();
       setNewStreak(data.streak ?? 0);
       setNewTasks(draft.tasks?.slice(0, 3) ?? []);
-      fetch(`/api/pulse?email=${encodeURIComponent(email)}`)
+      fetch('/api/pulse')
         .then((r) => r.json())
         .then((d) => {
           setCheckIns(Array.isArray(d.checkIns) ? d.checkIns : []);

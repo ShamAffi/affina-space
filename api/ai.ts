@@ -3,6 +3,7 @@ import { callClaude } from '../src/server/anthropic.js';
 import { MODELS } from '../src/server/models.js';
 import { z } from 'zod';
 import { applyCors } from '../src/server/http.js';
+import { requireAuth } from '../src/server/requireAuth.js';
 import { checkRateLimit } from '../src/server/ratelimit.js';
 import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
@@ -119,13 +120,24 @@ Rules:
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (applyCors(req, res, 'POST,OPTIONS')) return;
+  if (req.method !== 'POST') return res.status(405).json({ error: 'method not allowed' });
 
-  const rl = await checkRateLimit(req);
+  // Auth Phase B (§2/§7): every mode operates on HER data → session-guarded, EXCEPT
+  // `generate-name`, which runs during onboarding (project-name step) before a session
+  // exists and is pure compute (no user data). Pre-auth = IP-limited; the rest key the
+  // limiter on the session email and derive identity ONLY from the cookie.
+  const preAuth = req.body?.mode === 'generate-name';
+  let email = '';
+  if (!preAuth) {
+    const authed = requireAuth(req, res);
+    if (!authed) return;
+    email = authed;
+  }
+  const rl = await checkRateLimit(req, preAuth ? undefined : { email });
   if (!rl.ok) {
     if (rl.retryAfter) res.setHeader('Retry-After', String(rl.retryAfter));
     return res.status(429).json({ error: 'rate_limited', retryAfter: rl.retryAfter });
   }
-  if (req.method !== 'POST') return res.status(405).json({ error: 'method not allowed' });
 
   // Interview transcript extraction (SPEC_INTERVIEW_LOG_TRANSCRIPT §5).
   // NOT a Delegate mode (§6): this only RESTRUCTURES her own pasted real data into
@@ -156,7 +168,7 @@ For each field, mark confidence: "found" (clearly stated) or "unclear" (inferred
 Respond ONLY with valid JSON:
 {"who":{"value":"...","confidence":"found|unclear"},"mainPain":{...},"keyQuotes":{...},"priceSignal":{...},"verdict":{...}}`,
         messages: [{ role: 'user', content: `Raw interview notes / transcript:\n"""\n${String(text).slice(0, 8000)}\n"""` }],
-      }, { endpoint: 'ai', mode: 'extract-interview', email: req.body.email });
+      }, { endpoint: 'ai', mode: 'extract-interview', email });
       const raw = msg.content[0].type === 'text' ? msg.content[0].text : '';
       const match = raw.match(/\{[\s\S]*\}/);
       if (!match) throw new Error('no JSON');
@@ -180,8 +192,6 @@ Respond ONLY with valid JSON:
   // m4l5 per-block AI assist (SPEC_M4L5_THREE_BLOCK). Structures her own Brain data
   // into evidence blocks; each mode fills ONLY its own block(s), never the others.
   if (req.body.mode === 'psc-for-against') {
-    const { email } = req.body;
-    if (!email) return res.status(400).json({ error: 'email required' });
     const db = getDb();
     const user = await db.query.users.findFirst({ where: eq(users.email, email) });
     if (!user) return res.status(404).json({ error: 'user not found' });
@@ -268,8 +278,8 @@ Stage: ${stage || 'early'}${avoidLine}`,
 
   // §4 Delegate — "Let AI mentor draft this for me" (after ≥1 user attempt; logged for the credit model)
   if (req.body.mode === 'delegate') {
-    const { email, lessonId, lessonTitle, prompt, delegateMode } = req.body;
-    if (!email || !lessonId) return res.status(400).json({ error: 'email and lessonId required' });
+    const { lessonId, lessonTitle, prompt, delegateMode } = req.body;
+    if (!lessonId) return res.status(400).json({ error: 'lessonId required' });
     const dMode: 'A' | 'B' | 'C' = delegateMode === 'B' || delegateMode === 'C' ? delegateMode : 'A';
 
     const db = getDb();
@@ -329,12 +339,12 @@ Stage: ${stage || 'early'}${avoidLine}`,
     }
   }
 
-  const { email, lessonId, lessonTitle, prompt, answer, aiMode, context } = req.body;
+  const { lessonId, lessonTitle, prompt, answer, aiMode, context } = req.body;
   const contextBlock = context?.idea
     ? `\n\nFounder context (use this to personalize feedback — reference their actual project and address them by name):\n- Name: ${context.name || 'not provided'}\n- Idea: ${context.idea}\n- Target customer: ${context.customer || 'not specified'}\n- Stage: ${context.stage || 'not specified'}`
     : '';
-  if (!email || !lessonId || !answer?.trim()) {
-    return res.status(400).json({ error: 'email, lessonId, and answer are required' });
+  if (!lessonId || !answer?.trim()) {
+    return res.status(400).json({ error: 'lessonId and answer are required' });
   }
 
   const isCompare = aiMode === 'compare';
