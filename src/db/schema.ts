@@ -31,8 +31,13 @@ export const users = pgTable('users', {
   snapshotHistory: jsonb('snapshot_history'),  // StartupSnapshot[] — last 5 versions
   // Mentor sessions (§6.5): { S1?: { completed?, booked?, seen? }, S2?: ..., S3?: ... }
   mentorSessions: jsonb('mentor_sessions'),
-  // Paywall entitlement (SPEC_PAYWALL) — M5–M12 gated on this. Stripe sets it later.
+  // Paywall entitlement (SPEC_PAYWALL) — M5–M12 gated on this. Driven by the Stripe webhook.
   subscribed: boolean('subscribed').default(false),
+  // Stripe subscription (SPEC_STRIPE §5) — set/updated by the webhook (source of truth).
+  stripeCustomerId: text('stripe_customer_id'),
+  stripeSubscriptionId: text('stripe_subscription_id'),        // the subscription (schedule-managed)
+  subscriptionStatus: text('subscription_status'),             // active | past_due | canceled | …
+  currentPeriodEnd: timestamp('current_period_end', { withTimezone: true }),  // "renews on …" + grace
   verifiedAt: timestamp('verified_at', { withTimezone: true }),   // AMENDMENT: null = pending (email not yet verified via magic link)
   // Onboarding funnel (SPEC_ONBOARDING_FUNNEL): email captured before the report.
   emailCapturedAt: timestamp('email_captured_at', { withTimezone: true }),  // set at email capture; drives the finish-sequence clock (day 0/1/3/7)

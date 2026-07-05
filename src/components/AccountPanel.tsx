@@ -11,6 +11,18 @@ export default function AccountPanel({ userData, onClose, onSave }: Props) {
   const [name, setName] = useState(userData.name || '');
   const [projectName, setProjectName] = useState(userData.projectName || '');
   const [saved, setSaved] = useState(false);
+  const [portalLoading, setPortalLoading] = useState(false);
+
+  // SPEC_STRIPE §7 — hosted Customer Portal (cancel / card / invoices).
+  async function openPortal() {
+    setPortalLoading(true);
+    try {
+      const r = await fetch('/api/stripe?action=portal', { method: 'POST' });
+      const d = await r.json().catch(() => ({}));
+      if (d.url) { window.location.href = d.url; return; }
+    } catch { /* fall through */ }
+    setPortalLoading(false);
+  }
 
   function handleSave() {
     onSave({ name, projectName });
@@ -89,6 +101,21 @@ export default function AccountPanel({ userData, onClose, onSave }: Props) {
               className="rounded-control border border-hairline bg-inset focus:bg-surface focus:border-brand-400 focus:ring-2 focus:ring-brand-100 outline-none px-4 py-3 text-sm text-ink transition"
             />
           </div>
+
+          {/* Subscription (SPEC_STRIPE §7) — only for subscribers */}
+          {userData.subscribed && (
+            <div className="flex flex-col gap-1.5 pt-4 border-t border-hairline">
+              <label className="text-sm font-semibold text-ink-soft">Subscription</label>
+              <button
+                onClick={openPortal}
+                disabled={portalLoading}
+                className="text-left text-sm font-semibold text-brand hover:text-brand-700 disabled:opacity-50 transition"
+              >
+                {portalLoading ? 'Opening…' : 'Manage subscription →'}
+              </button>
+              <p className="text-xs text-ink-mute">Cancel, update your card, or view invoices.</p>
+            </div>
+          )}
         </div>
 
         {/* Footer */}

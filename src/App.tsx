@@ -165,14 +165,16 @@ function AppRoutes() {
 
       <Route path="/tasks" element={authed ? <TasksRoute email={userData.email} /> : toLanding} />
 
-      {/* SPEC_PAYWALL — full-page overlay gating M5–M12 (dismissible → Dashboard) */}
+      {/* SPEC_PAYWALL + SPEC_STRIPE — full-page overlay gating M5–M12 (→ Stripe Checkout) */}
       <Route
         path="/unlock"
+        element={authed ? <Paywall onDismiss={() => navigate('/dashboard')} /> : toLanding}
+      />
+      {/* Stripe success return — the webhook flips `subscribed`; this polls for it then continues */}
+      <Route
+        path="/unlock/success"
         element={authed ? (
-          <Paywall
-            onSubscribed={() => { update({ subscribed: true }); navigate('/start-session'); }}
-            onDismiss={() => navigate('/dashboard')}
-          />
+          <PaymentSuccess onConfirmed={() => { update({ subscribed: true }); navigate('/start-session'); }} />
         ) : toLanding}
       />
       {/* Post-paywall S1 booking — required step, both CTAs advance to M5 */}
@@ -357,6 +359,52 @@ function Verify({ onVerified }: { onVerified: (email: string, isNew: boolean, ne
       <span className="text-brand-700 font-bold text-xl tracking-tight">Affina<span className="text-ink">Space</span></span>
       <div className="mt-8 w-10 h-10 rounded-pill bg-brand animate-orb-pulse" />
       <p className="mt-4 text-ink-soft text-sm">Signing you in…</p>
+    </div>
+  );
+}
+
+// SPEC_STRIPE §3/§4 — Stripe redirects here after payment. `subscribed` is set by the
+// webhook (the source of truth), never the redirect — so poll the server for it, then
+// continue into the program. The redirect alone never grants access.
+function PaymentSuccess({ onConfirmed }: { onConfirmed: () => void }) {
+  const [slow, setSlow] = useState(false);
+  const ran = useRef(false);
+
+  useEffect(() => {
+    if (ran.current) return;
+    ran.current = true;
+    let alive = true;
+    let tries = 0;
+    const poll = async () => {
+      if (!alive) return;
+      tries++;
+      try {
+        const r = await fetch('/api/user'); // session cookie
+        if (r.ok) { const d = await r.json(); if (d.subscribed) { onConfirmed(); return; } }
+      } catch { /* keep polling */ }
+      if (tries >= 12) { setSlow(true); return; } // ~18s
+      setTimeout(poll, 1500);
+    };
+    poll();
+    return () => { alive = false; };
+  }, [onConfirmed]);
+
+  return (
+    <div className="min-h-screen bg-canvas flex flex-col items-center justify-center px-5 text-center">
+      <span className="text-brand-700 font-bold text-xl tracking-tight">Affina<span className="text-ink">Space</span></span>
+      <div className="mt-8 text-4xl">🎉</div>
+      <h1 className="mt-4 text-2xl font-extrabold text-ink mb-2">Payment received</h1>
+      {slow ? (
+        <p className="text-sm text-ink-soft max-w-sm">
+          You're all set — it's taking a moment to sync.{' '}
+          <button onClick={onConfirmed} className="text-brand font-semibold underline">Continue to the program →</button>
+        </p>
+      ) : (
+        <>
+          <div className="mt-2 w-8 h-8 rounded-pill bg-brand animate-orb-pulse" />
+          <p className="mt-4 text-ink-soft text-sm">Unlocking the full program…</p>
+        </>
+      )}
     </div>
   );
 }

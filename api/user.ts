@@ -7,7 +7,7 @@ import { drizzle } from 'drizzle-orm/neon-http';
 import { eq } from 'drizzle-orm';
 import { users, lessonInputs, completedLessons, brainEntries, tasks, checkIns, achievements, delegations } from '../src/db/schema.js';
 import { GROWTH_SEED_XP } from '../src/server/progressUtils.js';
-import { sendEmail, subscriptionEmail, mentorBookedEmail } from '../src/server/email.js';
+import { sendEmail, mentorBookedEmail } from '../src/server/email.js';
 import { logEmail } from '../src/server/emailLog.js';
 
 // Auth Phase B (SPEC_AUTH_PHASE_B): GET + PATCH derive identity from the session cookie
@@ -167,13 +167,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'PATCH') {
     const email = requireAuth(req, res);
     if (!email) return;
-    const { name, projectName, idea, customer, businessModel, stage, goal, country, city, timezone, mentorSessions, subscribed } = req.body ?? {};
+    // NOTE: `subscribed` is NOT accepted here — it's driven ONLY by the Stripe webhook
+    // (SPEC_STRIPE §3), never from the browser. The paywall now redirects to Checkout.
+    const { name, projectName, idea, customer, businessModel, stage, goal, country, city, timezone, mentorSessions } = req.body ?? {};
     const existingUser = await db.query.users.findFirst({ where: eq(users.email, email) });
     const patchFields: Record<string, unknown> = { updatedAt: new Date() };
     for (const [k, v] of Object.entries({ name, projectName, idea, customer, businessModel, stage, goal, country, city, timezone })) {
       if (v !== undefined) patchFields[k] = v;
     }
-    if (subscribed !== undefined) patchFields.subscribed = subscribed;
     // Merge mentorSessions (partial patch per session) — never clobber other sessions.
     const newlyBooked: string[] = [];
     if (mentorSessions !== undefined) {
@@ -199,11 +200,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     await db.update(users).set(patchFields).where(eq(users.email, email));
-    // §2.3 — subscription-confirmed email when `subscribed` flips false→true (the /unlock path)
-    if (subscribed === true && existingUser?.subscribed !== true) {
-      await sendEmail(subscriptionEmail(email));
-      if (existingUser) await logEmail(existingUser.id, 'subscription');
-    }
     // §2.4 — mentor-session-booked email when a session's `booked` flips true (once per session)
     for (const sid of newlyBooked) {
       await sendEmail(mentorBookedEmail(email, sid));

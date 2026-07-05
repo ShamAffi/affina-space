@@ -1,10 +1,10 @@
 import { useState } from 'react';
 
-// SPEC_PAYWALL §1–3 — full-page blocking-but-dismissible overlay gating M5–M12.
-// v2: "Unlock" is NOT wired to payment — it just sets subscribed=true and proceeds
-// to the S1 booking step. A real Stripe checkout drops in between the click and
-// setSubscribed() later without touching the gating.
-const PRICE = '[PRICE]'; // pending Shamil (see spec §6) — placeholder, not a blocker
+// SPEC_PAYWALL + SPEC_STRIPE — full-page blocking-but-dismissible overlay gating M5–M12.
+// "Unlock" now starts a real Stripe Checkout (subscription; €360 first 3 months → €1,200/yr).
+// `subscribed` is flipped by the Stripe webhook, never here — on return the success page
+// polls the server for it. Gating logic (M5–M12 on users.subscribed) is unchanged.
+const PRICE = '€360 for your first 3 months, then €1,200/year · cancel anytime';
 
 const VALUE_STACK = [
   { title: 'The full Launch Program', sub: 'all 12 modules, idea → first paying customer (you’ve done 4)' },
@@ -15,25 +15,25 @@ const VALUE_STACK = [
 ];
 
 interface Props {
-  onSubscribed: () => void;   // sets subscribed=true in app state, routes to S1 booking
   onDismiss: () => void;      // back to Dashboard
 }
 
-export default function Paywall({ onSubscribed, onDismiss }: Props) {
+export default function Paywall({ onDismiss }: Props) {
   const [working, setWorking] = useState(false);
+  const [error, setError] = useState('');
 
   async function unlock() {
     setWorking(true);
+    setError('');
     try {
-      // v2 stub: no checkout, just flip the entitlement flag. Stripe goes here later.
-      await fetch('/api/user', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subscribed: true }),
-      });
-      onSubscribed();
+      // Start Stripe Checkout (session-authed server-side). The webhook flips `subscribed`.
+      const r = await fetch('/api/stripe?action=checkout', { method: 'POST' });
+      const d = await r.json().catch(() => ({}));
+      if (d.url) { window.location.href = d.url; return; }
+      throw new Error('no url');
     } catch {
       setWorking(false);
+      setError('Could not start checkout — please try again.');
     }
   }
 
@@ -85,15 +85,19 @@ export default function Paywall({ onSubscribed, onDismiss }: Props) {
           </ul>
         </div>
 
-        <p className="text-center text-sm font-bold text-ink mb-4">{PRICE} · Cancel anytime.</p>
+        <p className="text-center text-sm font-bold text-ink mb-1">{PRICE}</p>
+        <p className="text-center text-[11px] text-ink-mute leading-relaxed mb-4">
+          Cancel anytime — your first 3 months are yours; cancel before renewal to stop the annual plan.
+        </p>
 
         <button
           onClick={unlock}
           disabled={working}
           className="w-full bg-brand hover:bg-brand-700 active:scale-95 disabled:opacity-60 text-white text-base font-semibold py-4 rounded-pill transition-all duration-150"
         >
-          {working ? 'Unlocking…' : 'Unlock the full program →'}
+          {working ? 'Starting checkout…' : 'Unlock the full program →'}
         </button>
+        {error && <p className="text-center text-xs text-red-500 mt-3">{error}</p>}
         <button
           onClick={onDismiss}
           className="w-full mt-3 text-sm font-semibold text-ink-mute hover:text-ink-soft transition text-center py-2"
