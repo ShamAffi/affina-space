@@ -157,7 +157,8 @@ export default function Onboarding({ userData, update, signIn }: Props) {
               const res = await fetch('/api/auth', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'request-link', email }),
+                // happy path: verifying lands straight in the program (welcome zone), as before
+                body: JSON.stringify({ action: 'request-link', email, next: '/learning/launch/m0l1' }),
               });
               return res.ok;
             } catch {

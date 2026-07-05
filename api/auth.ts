@@ -40,8 +40,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!email || !email.includes('@')) return res.status(400).json({ error: 'valid email required' });
 
     try {
+      // Optional post-verify redirect (funnel confirm-email → program start). Only safe
+      // in-app paths; Verify re-sanitizes on read too.
+      const rawNext = req.body?.next;
+      const next = typeof rawNext === 'string' && /^\/[A-Za-z0-9/_-]*$/.test(rawNext) ? rawNext : undefined;
       // 15-min magic link; only sha256(token) is stored (raw lives in the emailed link).
-      const link = await createMagicLink(email, 15 * 60 * 1000);
+      const link = await createMagicLink(email, 15 * 60 * 1000, next);
       // fire-and-forget: sendEmail never throws; await so the lambda doesn't freeze mid-send.
       await sendEmail(magicLinkEmail(email, link));
     } catch (err) {
