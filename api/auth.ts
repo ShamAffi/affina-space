@@ -8,6 +8,8 @@ import { checkRateLimit } from '../src/server/ratelimit.js';
 import { users, authTokens } from '../src/db/schema.js';
 import { sendEmail, magicLinkEmail, welcomeEmail } from '../src/server/email.js';
 import { issueSession } from '../src/server/session.js';
+import { createMagicLink } from '../src/server/magicLink.js';
+import { sendOnce } from '../src/server/emailLog.js';
 
 // Dedicated Resend + magic-link auth function (SPEC_RESEND_AUTH §4). Action-routed,
 // rate-limited. Phase A: issue a session on verify; enforcement elsewhere is Phase B.
@@ -18,7 +20,6 @@ function getDb() {
 }
 
 const sha256 = (s: string) => crypto.createHash('sha256').update(s).digest('hex');
-const appUrl = () => process.env.APP_URL || 'https://affina-space.vercel.app';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (applyCors(req, res, 'POST,OPTIONS')) return;
@@ -38,12 +39,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const email = String(req.body?.email ?? '').trim().toLowerCase();
     if (!email || !email.includes('@')) return res.status(400).json({ error: 'valid email required' });
 
-    // 32-byte token; store only its sha256 hash + a 15-min expiry. Raw token → link only.
-    const rawToken = crypto.randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
     try {
-      await db.insert(authTokens).values({ email, tokenHash: sha256(rawToken), expiresAt });
-      const link = `${appUrl()}/auth/verify?token=${rawToken}`;
+      // 15-min magic link; only sha256(token) is stored (raw lives in the emailed link).
+      const link = await createMagicLink(email, 15 * 60 * 1000);
       // fire-and-forget: sendEmail never throws; await so the lambda doesn't freeze mid-send.
       await sendEmail(magicLinkEmail(email, link));
     } catch (err) {
@@ -71,14 +69,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Single-use: consume the token.
     await db.update(authTokens).set({ usedAt: new Date() }).where(eq(authTokens.id, row.id));
 
-    // Upsert user by email — creating the shell doubles as signup.
+    // Upsert user by email — creating the shell doubles as signup. AMENDMENT: welcome
+    // fires on the verifiedAt null→set transition only (genuine first verification).
     const existing = await db.query.users.findFirst({ where: eq(users.email, row.email) });
     let isNew = false;
+    let firstVerify = false;
+    let userId: number;
     if (!existing) {
-      await db.insert(users).values({ email: row.email });
+      const [created] = await db.insert(users).values({ email: row.email, verifiedAt: new Date() }).returning({ id: users.id });
+      userId = created.id;
       isNew = true;
-      await sendEmail(welcomeEmail(row.email)); // §8 welcome on first creation (throw-safe)
+      firstVerify = true;
+    } else {
+      userId = existing.id;
+      if (!existing.verifiedAt) {
+        await db.update(users).set({ verifiedAt: new Date() }).where(eq(users.id, existing.id));
+        firstVerify = true;
+      }
     }
+    if (firstVerify) await sendOnce(userId, 'welcome', 'once', welcomeEmail(row.email, existing?.name ?? undefined));
 
     issueSession(res, row.email);
     return res.status(200).json({ ok: true, email: row.email, isNew });

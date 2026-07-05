@@ -43,16 +43,21 @@
 | # | Email | Type | Trigger | Phase |
 |---|---|---|---|---|
 | 1 | Magic link | transactional | user requests login link | A |
-| 2 | Welcome | transactional | first signup / onboarding done | A |
+| 2 | Welcome | transactional | **email VERIFIED via magic link (verify-link) — see AMENDMENT** | A |
 | 3 | Subscription confirmed | transactional | `subscribed` flips true (unlock) | A |
 | 4 | Mentor session booked | transactional | user books S1/S2/S3 | A |
-| 5 | Weekly tasks | lifecycle (cron) | Thursday, IF ≥1 open task | B |
-| 6 | Business-week reflection | lifecycle (cron) | Saturday, active users | B |
-| 7 | Book your mentor | lifecycle (cron) | session due & unbooked | B |
-| 8 | Re-engagement | lifecycle (cron) | 14 days no login, once | B |
+| 5 | Weekly tasks | lifecycle (cron) | Thursday, IF ≥1 open task — **registered only** | B |
+| 6 | Business-week reflection | lifecycle (cron) | Saturday, active users — **registered only** | B |
+| 7 | Book your mentor | lifecycle (cron) | session due & unbooked — **registered only** | B |
+| 8 | Re-engagement | lifecycle (cron) | 14 days no login, once — **registered only** | B |
+| 9 | Finish registration #1 | lifecycle (cron) | pending user, +1 day | B |
+| 10 | Finish registration #2 | lifecycle (cron) | pending user, +3 days | B |
+| 11 | Finish registration #3 | lifecycle (cron) | pending user, +7 days | B |
 | — | Updates / tips | broadcast | manual, Resend dashboard | later |
 
 Dropped by decision: "first paying customer" and "milestone completed" emails.
+**See AMENDMENT (registration states) below — it changes #2's trigger and gates
+#5–#8 to registered users only.**
 
 ---
 
@@ -275,3 +280,107 @@ confused with lifecycle emails.
 - [ ] Mentor-due-unbooked → one booking nudge, not repeated.
 - [ ] No email sends twice (email_log dedupe verified on a re-run).
 - [ ] `tsc -b` + `vite build` pass; prod smoke green.
+
+---
+
+## AMENDMENT (2026-07-05) — registration states + finish-registration sequence
+
+> Change request to the already-shipped email code. Introduces TWO user states
+> and a 3-part "finish registration" nudge sequence. Overrides the Welcome
+> trigger and gates all lifecycle emails to registered users.
+
+### A. Two user states
+| State | How reached | Emails they get |
+|---|---|---|
+| **Pending** | entered email (requested a magic link) but has NOT clicked/verified | ONLY the finish-registration sequence (#9–#11) |
+| **Registered** | verified email via magic link | Welcome (on verify) + the full lifecycle (#5–#8) |
+
+- **New column `users.verifiedAt` (timestamptz, null = pending).** Set to `now()`
+  inside `api/auth.ts` verify-link, only on the transition to verified. Migrate
+  via node script (`ADD COLUMN IF NOT EXISTS`), update `schema.ts`.
+- A pending user row exists as soon as she requests a link (email captured).
+
+### B. Welcome moves — fires on VERIFICATION only
+- Send Welcome (#2) from `api/auth.ts` verify-link, **only when `verifiedAt`
+  transitions from null → set** (i.e. genuine first verification). Dedupe via
+  `email_log` (`welcome`, once).
+- **Remove the Welcome send from `api/user.ts`.** Entering email / saving profile
+  is no longer "registration" and must not trigger Welcome. (Onboarding just
+  writes profile fields.)
+
+### C. Lifecycle gating (cron)
+The daily sweep in `api/cron.ts` branches on state:
+```
+if verifiedAt is null (PENDING):
+    send finish-registration by age since email captured:
+      +1 day  → #9  (once)
+      +3 days → #10 (once)
+      +7 days → #11 (once)
+    after #11 → stop. Verifies at any point → stop immediately.
+else (REGISTERED):
+    the existing active/inactive logic (#5–#8) — unchanged, but now only
+    ever runs for registered users.
+```
+- Dedupe each finish email separately in `email_log`: types `finish_1`,
+  `finish_3`, `finish_7` (once each). "Age since captured" = `createdAt` (or a
+  dedicated `emailCapturedAt`) of the pending row.
+- Re-engagement (#8) is **registered-only** — a pending user who goes quiet gets
+  the finish sequence, never re-engagement.
+- Each finish email's CTA generates a **fresh magic link** (same mechanism as
+  login) so one tap both verifies and signs her in.
+
+### D. Copy — the 3 finish-registration emails (distinct angles)
+
+**#9 — Day 1 · simple reminder**
+- **Subject:** Your project is waiting — one click to continue
+- **Body:**
+  > Hey 👋
+  > You started with Affina but haven't confirmed your email yet — so your spot (and your project) is on pause. One tap and you're in for good, no password:
+  >
+  > **[ Confirm my email & continue ]**
+  >
+  > — Affina
+
+**#10 — Day 3 · the odds (guidance raises success)**
+- ✅ **Source-verified (keep the copy below as-is):** SCORE (an SBA resource
+  partner) — **5× more likely to start a business + higher revenues & growth.**
+  SCORE's stat is about working with a *mentor*; we intentionally frame it as
+  "the right support" (Affina = AI + mentors + community, which includes
+  mentorship). 5× is about *starting* (NOT "start and succeed"). Do NOT "correct"
+  the phrasing back to "with a mentor." Source: https://www.score.org/press-releases/mentorship-improves-odds-success-entrepreneurs/
+- **Subject:** With the right support, you're 5× more likely to start
+- **Body:**
+  > Hey 👋
+  > Do you know: **entrepreneurs with the right support are 5× more likely to start a business — and report higher revenues and increased business growth** (SCORE, an SBA partner).
+  >
+  > Most ideas never launch — not because they're bad, but because going it alone is overwhelming. With real guidance you stop guessing and just take the next step.
+  >
+  > That's exactly Affina — AI incubation and real mentors guiding you the whole way, with honest feedback at each step. Your project's waiting:
+  >
+  > **[ Confirm my email & start ]**
+  >
+  > — Affina
+
+**#11 — Day 7 · the dream + the right support**
+- **Subject:** You had a reason to start. Don't let it fade.
+- **Body:**
+  > Hey 👋
+  > You came to Affina for a reason — a dream, an itch, a *"what if I actually did this?"* Don't let it quietly slip.
+  >
+  > You don't have to do it alone. With Affina you get **AI incubation** guiding each step, **live expert mentors** when it matters, and a **community of women founders** building right alongside you.
+  >
+  > Your idea deserves that. One tap and it's yours:
+  >
+  > **[ Confirm my email & begin ]**
+  >
+  > — Affina
+  >
+  > *(after this we'll stop reminding — no spam, promise)*
+
+### E. Amendment acceptance
+- [ ] `users.verifiedAt` added; set on verify-link transition; `schema.ts` updated.
+- [ ] Welcome fires ONLY on first verification; removed from `api/user.ts`.
+- [ ] Pending user gets #9/#10/#11 at +1/+3/+7 days, each once, then stops.
+- [ ] Verifying at any point stops the finish sequence immediately.
+- [ ] #5–#8 (incl. re-engagement) never send to a pending (unverified) user.
+- [ ] Finish-email CTAs mint a fresh magic link that verifies + logs in.

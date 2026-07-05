@@ -5,7 +5,7 @@ import { drizzle } from 'drizzle-orm/neon-http';
 import { eq } from 'drizzle-orm';
 import { users, lessonInputs, completedLessons, brainEntries, tasks, checkIns, achievements, delegations } from '../src/db/schema.js';
 import { GROWTH_SEED_XP } from '../src/server/progressUtils.js';
-import { sendEmail, welcomeEmail, subscriptionEmail, mentorBookedEmail } from '../src/server/email.js';
+import { sendEmail, subscriptionEmail, mentorBookedEmail } from '../src/server/email.js';
 import { logEmail } from '../src/server/emailLog.js';
 
 function getDb() {
@@ -112,9 +112,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const [created] = await db.insert(users)
         .values({ email, name, projectName, idea, customer, businessModel, stage, goal, score, country, city, timezone })
         .returning({ id: users.id });
-      // §2.2 — welcome email on first user creation (fire-and-forget; sendEmail never throws)
-      await sendEmail(welcomeEmail(email, name));
-      await logEmail(created.id, 'welcome');
+      // AMENDMENT: Welcome no longer fires here — entering email/saving profile isn't
+      // "registration". Welcome fires on magic-link verification (api/auth.ts verify-link).
       return res.status(201).json({ id: created.id });
     }
   }

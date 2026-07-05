@@ -196,3 +196,55 @@ export function reengagementEmail(to: string, moduleLabel: string, snapshotLine:
     `, LIFECYCLE_NOTE),
   };
 }
+
+// ── Finish-registration sequence (AMENDMENT §D) — pending users (email not verified).
+// CTA = a fresh magic link (one tap verifies + signs in). ──────────────────────────
+
+// #9 — Day 1 · simple reminder
+export function finish1Email(to: string, link: string): Mail {
+  return {
+    to,
+    subject: 'Your project is waiting — one click to continue',
+    html: wrap(`
+      <p style="${P}">Hey 👋</p>
+      <p style="${P}">You started with Affina but haven't confirmed your email yet — so your spot (and your project) is on pause. One tap and you're in for good, no password:</p>
+      <p style="margin:0;">${button(link, 'Confirm my email &amp; continue')}</p>
+      ${sign}
+    `, LIFECYCLE_NOTE),
+  };
+}
+
+// #10 — Day 3 · the odds. NOTE: stat/framing per Shamil's amendment instruction
+// ("up to 3.5× more likely to scale, twice as likely to survive") — NOT the "5× to
+// start (SCORE)" wording in SPEC_EMAILS §D. Flagged the discrepancy; using the chat
+// instruction. No specific source cited per that instruction.
+export function finish2Email(to: string, link: string): Mail {
+  return {
+    to,
+    subject: "With a mentor, you're far more likely to make it",
+    html: wrap(`
+      <p style="${P}">Hey 👋</p>
+      <p style="${P}">Here's a number worth knowing: founders who work with a mentor are up to <strong>3.5× more likely to scale</strong> — and <strong>twice as likely to still be in business</strong> years later (mentorship research).</p>
+      <p style="${P}">Most ideas never get far — not because they're bad, but because going it alone is overwhelming. With real guidance you stop guessing and just take the next step.</p>
+      <p style="${P}">That's exactly Affina — AI incubation and real mentors guiding you the whole way, with honest feedback at each step. Your project's waiting:</p>
+      <p style="margin:0;">${button(link, 'Confirm my email &amp; start')}</p>
+      ${sign}
+    `, LIFECYCLE_NOTE),
+  };
+}
+
+// #11 — Day 7 · the dream + the right support (last one)
+export function finish3Email(to: string, link: string): Mail {
+  return {
+    to,
+    subject: "You had a reason to start. Don't let it fade.",
+    html: wrap(`
+      <p style="${P}">Hey 👋</p>
+      <p style="${P}">You came to Affina for a reason — a dream, an itch, a <em>"what if I actually did this?"</em> Don't let it quietly slip.</p>
+      <p style="${P}">You don't have to do it alone. With Affina you get <strong>AI incubation</strong> guiding each step, <strong>live expert mentors</strong> when it matters, and a <strong>community of women founders</strong> building right alongside you.</p>
+      <p style="${P}">Your idea deserves that. One tap and it's yours:</p>
+      <p style="margin:0 0 16px 0;">${button(link, 'Confirm my email &amp; begin')}</p>
+      <p style="font-size:13px;line-height:1.5;color:#71717a;margin:0;">(after this we'll stop reminding — no spam, promise)</p>
+    `, LIFECYCLE_NOTE),
+  };
+}

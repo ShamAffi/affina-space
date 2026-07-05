@@ -4,17 +4,21 @@ import { drizzle } from 'drizzle-orm/neon-http';
 import { eq, and, ne } from 'drizzle-orm';
 import { users, tasks, completedLessons } from '../src/db/schema.js';
 import { MODULES } from '../src/data.js';
-import { sendOnce } from '../src/server/emailLog.js';
-import { weeklyTasksEmail, reflectionEmail, bookMentorEmail, reengagementEmail } from '../src/server/email.js';
+import { sendOnce, alreadyLogged, logEmail } from '../src/server/emailLog.js';
+import {
+  weeklyTasksEmail, reflectionEmail, bookMentorEmail, reengagementEmail,
+  finish1Email, finish2Email, finish3Email, sendEmail,
+} from '../src/server/email.js';
+import { createMagicLink } from '../src/server/magicLink.js';
 
-// Lifecycle-email sweep (SPEC_EMAILS §3). Sends each lifecycle email at the user's
-// LOCAL 11:00 (from users.timezone, browser-captured at onboarding). Driven HOURLY by
-// a GitHub Actions workflow (Vercel Hobby caps cron at daily) — each run only acts on
-// users whose local hour == 11 right now, so across a day everyone is hit at their 11:00.
-// Protected by CRON_SECRET. Dedup via email_log (sendOnce): weeklies once/week,
-// book-mentor once/session, re-engagement once ever.
-// Test hooks (secret-gated): ?day=0..6 forces DOW, ?hour=0..23 forces local hour,
-// ?dry=1 computes without sending, ?only=<email> scopes to one user.
+// Lifecycle-email sweep (SPEC_EMAILS §3 + AMENDMENT §C). Sends each email at the user's
+// LOCAL 11:00 (from users.timezone). Driven HOURLY by GitHub Actions (Vercel Hobby caps
+// cron at daily). Branches on registration state:
+//   PENDING  (verifiedAt null) → finish-registration chain (#9/#10/#11) by age since
+//             createdAt: +1d/+3d/+7d, each once, then stop. Verifying stops it. No #5–#8.
+//   REGISTERED (verifiedAt set) → the existing #5–#8 lifecycle (weekly/reflection/
+//             book-mentor / re-engagement) — never runs for pending users.
+// Protected by CRON_SECRET. Dedup via email_log. Test hooks: ?day/?hour/?dry=1/?only.
 
 function getDb() {
   return drizzle(neon(process.env.DATABASE_URL!), { schema: { users, tasks, completedLessons } });
@@ -22,6 +26,7 @@ function getDb() {
 
 const DAY_MS = 86_400_000;
 const ACTIVE_WINDOW_MS = 14 * DAY_MS;
+const FINISH_TTL_MS = 14 * DAY_MS; // finish-email magic links live long enough to sit in an inbox
 const SEND_HOUR = 11; // 11:00 local
 const THURSDAY = 4;
 const SATURDAY = 6;
@@ -74,8 +79,8 @@ function currentModuleLabel(completedIds: Set<string>): string {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // §3 — CRON_SECRET gate. GitHub Actions / Vercel Cron send `Authorization: Bearer <secret>`;
-  // manual runs can pass ?secret= instead.
+  // §3 — CRON_SECRET gate. GitHub Actions / manual runs send `Authorization: Bearer <secret>`
+  // (or ?secret=).
   const secret = process.env.CRON_SECRET;
   const auth = req.headers.authorization;
   const provided = (auth?.startsWith('Bearer ') ? auth.slice(7) : '') || (req.query.secret as string) || '';
@@ -91,28 +96,50 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   let allUsers = await db.query.users.findMany();
   if (only) allUsers = allUsers.filter((u) => u.email === only);
 
-  const summary: { email: string; tz: string; active: boolean; sent: string[]; skipped: string[] }[] = [];
+  const summary: { email: string; tz: string; state: string; active?: boolean; sent: string[]; skipped: string[] }[] = [];
 
   for (const u of allUsers) {
-    const tz = u.timezone?.trim() || 'UTC'; // existing users w/o location default to UTC 11:00
+    const tz = u.timezone?.trim() || 'UTC';
     const local = localParts(now, tz);
     const hour = forcedHour ?? local.hour;
     const dow = forcedDay ?? local.dow;
 
-    // Only act at the user's local 11:00. Cheap skip BEFORE the per-user DB queries.
+    // Only act at the user's local 11:00. Cheap skip BEFORE per-user DB work.
     if (hour !== SEND_HOUR) continue;
 
-    const active = !!u.lastActiveAt && now.getTime() - new Date(u.lastActiveAt).getTime() < ACTIVE_WINDOW_MS;
     const sent: string[] = [];
     const skipped: string[] = [];
     const mark = (label: string, ok: boolean) => (ok ? sent : skipped).push(label);
 
+    if (!u.verifiedAt) {
+      // ── PENDING → finish-registration chain (age since createdAt; no #5–#8) ─────
+      const ageDays = (now.getTime() - new Date(u.createdAt as Date).getTime()) / DAY_MS;
+      const stage =
+        ageDays >= 7 ? { type: 'finish_7', build: finish3Email }
+        : ageDays >= 3 ? { type: 'finish_3', build: finish2Email }
+        : ageDays >= 1 ? { type: 'finish_1', build: finish1Email }
+        : null;
+      if (stage) {
+        if (dry) mark(stage.type, true);
+        else if (await alreadyLogged(u.id, stage.type, 'once')) mark(stage.type, false);
+        else {
+          const link = await createMagicLink(u.email, FINISH_TTL_MS); // fresh link = verify + login
+          await sendEmail(stage.build(u.email, link));
+          await logEmail(u.id, stage.type, 'once');
+          mark(stage.type, true);
+        }
+      }
+      summary.push({ email: u.email, tz, state: 'pending', sent, skipped });
+      continue;
+    }
+
+    // ── REGISTERED → existing #5–#8 lifecycle ──────────────────────────────────
+    const active = !!u.lastActiveAt && now.getTime() - new Date(u.lastActiveAt).getTime() < ACTIVE_WINDOW_MS;
     const completed = await db.query.completedLessons.findMany({ where: eq(completedLessons.userId, u.id) });
     const completedIds = new Set(completed.map((c) => c.lessonId));
     const ms = (u.mentorSessions ?? null) as Record<string, { booked?: boolean }> | null;
 
     if (active) {
-      // Thursday + ≥1 open task → weekly tasks (real titles, deterministic; none → nothing)
       if (dow === THURSDAY) {
         const open = await db.query.tasks.findMany({ where: and(eq(tasks.userId, u.id), ne(tasks.status, 'done')) });
         if (open.length >= 1) {
@@ -120,23 +147,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           mark('weekly_tasks', dry ? true : await sendOnce(u.id, 'weekly_tasks', weekOf(now), weeklyTasksEmail(u.email, titles)));
         }
       }
-      // Saturday → business-week reflection
       if (dow === SATURDAY) {
         mark('reflection', dry ? true : await sendOnce(u.id, 'reflection', weekOf(now), reflectionEmail(u.email)));
       }
-      // mentor session due & unbooked → book-mentor nudge (once per session)
       const dueSid = dueUnbookedSession(completedIds, ms);
       if (dueSid) {
         mark(`book_mentor:${dueSid}`, dry ? true : await sendOnce(u.id, 'book_mentor', dueSid, bookMentorEmail(u.email, dueSid)));
       }
     } else {
-      // ≥14 days inactive → re-engagement, once ever
+      // registered-only: a PENDING quiet user gets the finish chain above, never re-engagement
       const label = currentModuleLabel(completedIds);
       const line = (u.idea?.trim() || u.projectName?.trim() || 'your idea').slice(0, 120);
       mark('reengagement', dry ? true : await sendOnce(u.id, 'reengagement', 'once', reengagementEmail(u.email, label, line)));
     }
 
-    summary.push({ email: u.email, tz, active, sent, skipped });
+    summary.push({ email: u.email, tz, state: 'registered', active, sent, skipped });
   }
 
   return res.status(200).json({

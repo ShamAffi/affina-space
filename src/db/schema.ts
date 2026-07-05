@@ -33,6 +33,7 @@ export const users = pgTable('users', {
   mentorSessions: jsonb('mentor_sessions'),
   // Paywall entitlement (SPEC_PAYWALL) — M5–M12 gated on this. Stripe sets it later.
   subscribed: boolean('subscribed').default(false),
+  verifiedAt: timestamp('verified_at', { withTimezone: true }),   // AMENDMENT: null = pending (email not yet verified via magic link)
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
