@@ -157,8 +157,9 @@ export default function Onboarding({ userData, update, onSignIn }: Props) {
               const res = await fetch('/api/auth', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                // happy path: verifying lands straight in the program (welcome zone), as before
-                body: JSON.stringify({ action: 'request-link', email, next: '/learning/launch/m0l1' }),
+                // No `next`: verifying a freshly-onboarded account (firstLogin) lands on the
+                // welcome zone (App.onVerified), which then starts the program.
+                body: JSON.stringify({ action: 'request-link', email }),
               });
               return res.ok;
             } catch {

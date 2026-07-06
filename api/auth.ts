@@ -100,7 +100,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (firstVerify) await sendOnce(userId, 'welcome', 'once', welcomeEmail(row.email, existing?.name ?? undefined));
 
     issueSession(res, row.email);
-    return res.status(200).json({ ok: true, email: row.email, isNew });
+    // firstLogin = the account was just verified for the first time (drives the welcome
+    // screen on the client). Reliable across devices (server state), unlike a localStorage flag.
+    return res.status(200).json({ ok: true, email: row.email, isNew, firstLogin: firstVerify });
   }
 
   return res.status(400).json({ error: 'unknown action (expected request-link|verify-link)' });

@@ -14,6 +14,7 @@ import MetricPulse from './screens/MetricPulse';
 import Paywall from './screens/Paywall';
 import StartSession from './screens/StartSession';
 import ReportPage from './screens/ReportPage';
+import WelcomeZone from './screens/WelcomeZone';
 
 const M0_FIRST = 'm0l1';
 
@@ -119,12 +120,15 @@ function AppRoutes() {
     } catch { /* fail silently — localStorage is the fallback */ }
   }
 
-  // After a verified magic link: recovery emails carry ?next=/report (land on the report +
-  // continue); otherwise new user → onboarding, existing → dashboard (SPEC_RESEND_AUTH §7 +
-  // SPEC_ONBOARDING_FUNNEL §4).
-  function onVerified(email: string, isNew: boolean, next?: string | null) {
+  // After a verified magic link:
+  //   • recovery emails carry ?next=/report → land on the report + continue
+  //   • brand-new (no onboarding, created at verify) → onboarding
+  //   • FIRST verification of an onboarded account → the welcome zone (once)
+  //   • returning (already verified) → dashboard
+  function onVerified(email: string, isNew: boolean, next?: string | null, firstLogin?: boolean) {
     if (next) { signIn(email, next); }
     else if (isNew) { update({ email }); navigate('/start'); }
+    else if (firstLogin) { signIn(email, '/welcome'); }
     else { signIn(email); }
   }
 
@@ -143,6 +147,11 @@ function AppRoutes() {
       />
       <Route path="/login" element={<Login />} />
       <Route path="/auth/verify" element={<Verify onVerified={onVerified} />} />
+      {/* Welcome zone — shown once, on the first verification of a freshly-onboarded account */}
+      <Route
+        path="/welcome"
+        element={authed ? <WelcomeZone onStart={() => navigate(`/learning/${COURSE_SLUG}/${M0_FIRST}`)} /> : toLanding}
+      />
       {/* Interactive report (SPEC_ONBOARDING_FUNNEL §3) — recovery-email magic links land here */}
       <Route
         path="/report"
@@ -317,7 +326,7 @@ function Login() {
   );
 }
 
-function Verify({ onVerified }: { onVerified: (email: string, isNew: boolean, next?: string | null) => void }) {
+function Verify({ onVerified }: { onVerified: (email: string, isNew: boolean, next?: string | null, firstLogin?: boolean) => void }) {
   const navigate = useNavigate();
   const [status, setStatus] = useState<'checking' | 'error'>('checking');
   const ran = useRef(false);
@@ -339,7 +348,7 @@ function Verify({ onVerified }: { onVerified: (email: string, isNew: boolean, ne
       .then(async (r) => {
         if (!r.ok) throw new Error('invalid');
         const d = await r.json();
-        onVerified(d.email, !!d.isNew, next);
+        onVerified(d.email, !!d.isNew, next, !!d.firstLogin);
       })
       .catch(() => setStatus('error'));
   }, [onVerified]);
