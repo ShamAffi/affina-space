@@ -13,7 +13,7 @@ import CompareCard from '../components/CompareCard';
 import LessonBody from '../components/LessonBody';
 import { splitMissionVision, composeMissionVision } from '../missionVision';
 import { composePSC, splitPSC, pscRecapBlocks, PSC_LABELS, type PscBlocks } from '../problemSolution';
-import { checkRes, isRateLimit, RATE_LIMIT_MESSAGE } from '../rateLimit';
+import { checkRes, isRateLimit, isSessionExpired, RATE_LIMIT_MESSAGE } from '../rateLimit';
 
 // Block-kind chips (§5 LMS sidebar): label + tint per kind. Theory renders no chip.
 const KIND_CHIP: Partial<Record<BlockKind, { label: string; cls: string }>> = {
@@ -254,6 +254,7 @@ My motivation & 12-week goal: …`;
         })
         .catch((e) => {
           setSavingLesson(null);
+          if (isSessionExpired(e)) return; // redirecting to /login — don't flash a fake error
           if (isRateLimit(e)) setRateLimitedLesson(lessonId);
           else setAiErrorLesson(lessonId);
         });
@@ -280,7 +281,7 @@ My motivation & 12-week goal: …`;
           setResearchQuestions(d.questions);
         }
       })
-      .catch((e) => setResearchError(isRateLimit(e) ? RATE_LIMIT_MESSAGE : 'Something went wrong — try again.'))
+      .catch((e) => setResearchError(isRateLimit(e) ? RATE_LIMIT_MESSAGE : isSessionExpired(e) ? '' : 'Something went wrong — try again.'))
       .finally(() => setResearchLoading(false));
   }
 
@@ -321,6 +322,7 @@ My motivation & 12-week goal: …`;
         }
       })
       .catch((e) => {
+        if (isSessionExpired(e)) return; // redirecting to /login
         if (isRateLimit(e)) setRateLimitedLesson(lessonId);
         setDelegateErrorLesson(lessonId);
       })

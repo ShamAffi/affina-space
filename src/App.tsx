@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams, useLocation } from 'react-router-dom';
 import type { UserData, Task } from './types';
 import { loadUserData, updateUserData, defaultUserData, saveUserData } from './store';
+import { setSessionExpiredHandler, triggerSessionExpired, resetSessionExpired } from './rateLimit';
 import { MODULES } from './data';
 import Welcome from './screens/Welcome';
 import Onboarding from './screens/Onboarding';
@@ -38,7 +39,6 @@ function AppRoutes() {
   const navigate = useNavigate();
   const [userData, setUserData] = useState<UserData>(loadUserData);
   const authed = !!userData.email;
-  const sessionExpired = useRef(false);
 
   function update(updates: Partial<UserData>): UserData {
     const merged = updateUserData(updates);
@@ -46,10 +46,20 @@ function AppRoutes() {
     return merged;
   }
 
-  // Auth Phase B (§5) — a 401 from any guarded /api call means the session is gone: clear
-  // local state and bounce to /login. Done as a fetch interceptor so every call site is
-  // covered centrally. /api/auth 401s are token errors (handled by Verify), not session
-  // expiry, so they're excluded. Pre-auth onboarding calls never 401 (no session required).
+  // Auth Phase B (§5) — session expiry is handled centrally: a 401 from any guarded /api
+  // call clears local state and bounces to /login. Register the action here; rateLimit's
+  // checkRes AND the fetch interceptor below both route through triggerSessionExpired, so
+  // every call site behaves identically (never a fake "server hiccup").
+  useEffect(() => {
+    setSessionExpiredHandler(() => {
+      saveUserData(defaultUserData);
+      setUserData(defaultUserData);
+      navigate('/login');
+    });
+  }, [navigate]);
+
+  // Catch 401s from raw fetches that don't go through checkRes (GET progress/brain/tasks,
+  // PATCH user, …). /api/auth 401s are token errors (handled by Verify), not session expiry.
   useEffect(() => {
     const orig = window.fetch;
     window.fetch = async (...args: Parameters<typeof fetch>) => {
@@ -57,17 +67,12 @@ function AppRoutes() {
       try {
         const first = args[0];
         const url = typeof first === 'string' ? first : first instanceof Request ? first.url : String(first);
-        if (res.status === 401 && url.includes('/api/') && !url.includes('/api/auth') && !sessionExpired.current) {
-          sessionExpired.current = true;
-          saveUserData(defaultUserData);
-          setUserData(defaultUserData);
-          navigate('/login');
-        }
+        if (res.status === 401 && url.includes('/api/') && !url.includes('/api/auth')) triggerSessionExpired();
       } catch { /* the interceptor must never break a fetch */ }
       return res;
     };
     return () => { window.fetch = orig; };
-  }, [navigate]);
+  }, []);
 
   async function logout() {
     // §5 — clear the server cookie, then the local state, then land on /login.
@@ -87,7 +92,7 @@ function AppRoutes() {
   // magic link — the only way to authenticate in Phase B. `email` seeds localStorage; the
   // GET itself resolves the session user regardless.
   async function signIn(rawEmail: string, dest: string = '/dashboard') {
-    sessionExpired.current = false; // fresh session — re-arm the 401 guard
+    resetSessionExpired(); // fresh session — re-arm so a later expiry redirects again
     const email = rawEmail.trim().toLowerCase();
     const withEmail = update({ email });
     navigate(dest);
