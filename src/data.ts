@@ -100,7 +100,7 @@ export const QUESTIONS: Question[] = [
 // ─────────────────────────────────────────────────────────────────────────────
 // Program v2 — 13 modules (SPEC_PROGRAM_V2.md §2).
 // Tracks: M0–M1 Foundations · M2–M5 Validation · M6 Building · M7–M9 Launch · M10–M12 Growth.
-// NEW theory bodies below are placeholders (2–3 sentences) — final texts land with the content pass.
+// Theory bodies below are the finalized lecture texts (CONTENT_M0-M4/M5-M12_LECTURES_V2 pass).
 // ─────────────────────────────────────────────────────────────────────────────
 export const MODULES: Module[] = [
   // ─── M0: Welcome to Affina Space ──────────────────────────────────────────
@@ -288,7 +288,6 @@ Your job next, in the exercise that follows: write the sharp version of your own
     courseId: 'launching',
     lessons: [
       {
-        // TODO: rewrite per spec — add Thiel's "own a small market" thesis
         id: 'm2l1',
         type: 'text',
         kind: 'theory',
@@ -331,7 +330,6 @@ So the exercise ahead asks something that feels almost too simple: map exactly w
 That honesty is uncomfortable, and it's exactly where your real opening hides. The gap between "good enough most of the time" and "actually solves it" is the only space you have to build a business in. Founders who skip this step build products that are better on paper and still lose — because paper isn't what she's comparing you against. Her Tuesday afternoon is.`,
       },
       {
-        // TODO: rewrite per spec — focus on TAM bottom-up (money math moves to M5)
         id: 'm2l3',
         type: 'text',
         kind: 'theory',
@@ -547,7 +545,9 @@ You now hold something most founders skip straight past on their way to building
         type: 'text',
         kind: 'theory',
         title: 'Full life-cycle use case',
-        body: `Most founders picture their product at exactly one moment — she opens the app, gets value, done. But that's a single frame lifted out of an entire film.
+        body: `*Framework: MIT Disciplined Entrepreneurship, Step 6 (Bill Aulet).*
+
+Most founders picture their product at exactly one moment — she opens the app, gets value, done. But that's a single frame lifted out of an entire film.
 
 **Bill Aulet's MIT framework calls this the Full Life Cycle Use Case, and it insists you map every single stage.**
 
@@ -562,7 +562,9 @@ Walk through your own product this way, stage by stage, and ask honestly at each
         type: 'text',
         kind: 'theory',
         title: 'Sketch your product, not your tech',
-        body: `Here's a trap founders fall into constantly, almost without noticing: describing the product by its technology instead of by the experience it creates. "An AI-powered platform with a recommendation engine" tells a real customer nothing whatsoever about her actual life. "You open it, tell it your problem, and get three matched options back in ten seconds" — that, she can picture clearly, without any translation required.
+        body: `*Framework: MIT Disciplined Entrepreneurship, Step 7 — High-Level Product Specification (Bill Aulet).*
+
+Here's a trap founders fall into constantly, almost without noticing: describing the product by its technology instead of by the experience it creates. "An AI-powered platform with a recommendation engine" tells a real customer nothing whatsoever about her actual life. "You open it, tell it your problem, and get three matched options back in ten seconds" — that, she can picture clearly, without any translation required.
 
 **Aulet's High-Level Product Spec asks for exactly that: what the product does and feels like, never what powers it underneath.**
 
@@ -577,7 +579,9 @@ Sketch the moments first: what she sees, what she taps, what changes for her imm
         type: 'text',
         kind: 'theory',
         title: 'Value in numbers: before and after',
-        body: `"Makes life easier" doesn't sell anything to anyone. "Saves six hours a week" sells, every time, because one is a vague feeling and the other is a number she can immediately picture sitting inside her own actual calendar.
+        body: `*Framework: MIT Disciplined Entrepreneurship, Step 8 — Quantify the Value Proposition (Bill Aulet).*
+
+"Makes life easier" doesn't sell anything to anyone. "Saves six hours a week" sells, every time, because one is a vague feeling and the other is a number she can immediately picture sitting inside her own actual calendar.
 
 **Aulet's Quantified Value Proposition step exists purely to force that exact translation — from soft adjectives into hard arithmetic.**
 
@@ -617,7 +621,6 @@ This exercise is short on the page and heavy in what it does downstream: this ex
         inputPrompt: 'Sketch your product: what it does for her, what the core screen or step looks like, and what you\'re deliberately leaving out.',
       },
       {
-        // TODO: rewrite per spec — merged quantified value + core advantage into one block
         id: 'm4l8',
         delegateMode: 'B', // RULES §2.3: phrasing variants; numbers only from her data
         type: 'structured',
@@ -661,7 +664,6 @@ Core advantage & why it's hard to copy: …`,
     paid: true,
     lessons: [
       {
-        // TODO: rewrite per spec — add "модель определяет продукт и цель года"
         id: 'm5l1',
         type: 'text',
         kind: 'theory',
@@ -683,7 +685,6 @@ That's why we do this now, before the MVP: the model you pick in the next exerci
 So don't pick the model that sounds most impressive. Pick the one that fits how your customer actually wants to pay, and the life you actually want to run. We'll pressure-test that fit in the exercise.`,
       },
       {
-        // TODO: rewrite per spec — add women-specific underpricing patterns
         id: 'm5l2',
         type: 'text',
         kind: 'theory',
@@ -707,7 +708,6 @@ A price is a message about value before it's a transaction. Set it too low and y
 You don't have to get this perfect today — you have zero real pricing data yet, and that's fine. The exercise ahead is about picking a starting price anchored to value, not cost, and holding it a little higher than feels comfortable. The market, in the modules ahead, will tell you if you were wrong — and it's far easier to lower a price than to raise one.`,
       },
       {
-        // TODO: rewrite per spec — merge LTV & CAC (old m8l1+m8l2) with North Star Metric intro
         id: 'm5l3',
         type: 'text',
         kind: 'theory',
@@ -731,7 +731,6 @@ The rough rule of thumb people quote is LTV should be at least 3× CAC. Don't tr
 You'll estimate LTV and CAC roughly in the exercises — "roughly" is the operative word, honest guesses beat fake precision. And you'll pick your North Star: the one number you'll report every single week from here on. Choose it well, because a founder who watches the right number, and only that number, moves faster than one drowning in a dashboard of twenty.`,
       },
       {
-        // TODO: rewrite per spec — add written defense "why this model"
         id: 'm5l4',
         delegateMode: 'C', // RULES §2.4: 2 scenarios w/ trade-offs; choice+defense hers
         type: 'input',
@@ -741,7 +740,6 @@ You'll estimate LTV and CAC roughly in the exercises — "roughly" is the operat
         inputPrompt: 'Name your business model (subscription / transaction / freemium / other) and defend it in writing: why THIS model fits your customer\'s buying behavior better than the alternatives.',
       },
       {
-        // TODO: rewrite per spec — AI flags the 2–3 shakiest assumptions
         id: 'm5l5',
         delegateMode: 'C', // RULES §2.4: 2 scenarios (mass vs premium), assumptions visible; she picks
         type: 'input',
@@ -751,7 +749,6 @@ You'll estimate LTV and CAC roughly in the exercises — "roughly" is the operat
         inputPrompt: 'Estimate your LTV (lifetime revenue per customer) and CAC (cost to acquire one customer). Show your assumptions. What is the LTV:CAC ratio, and what does it tell you about your model\'s health?',
       },
       {
-        // TODO: rewrite per spec — add year-goal decomposition into quarterly milestones
         id: 'm5l6',
         type: 'structured',
         kind: 'exercise',
@@ -831,7 +828,6 @@ The mindset shift is the whole lesson: your job right now is not to build a prod
 In the exercises you'll pick which pretotype fits your riskiest assumption — and design the cheapest version of it you can run this week.`,
       },
       {
-        // TODO: rewrite per spec — merge MVBP (m10l1) + scope knife/no-code (m10l2) + "how AI changed the game"
         id: 'm6l3',
         type: 'text',
         kind: 'theory',
@@ -1225,7 +1221,6 @@ That's the gift of a funnel: it doesn't just measure, it *points*. A single hone
 The uncomfortable part is that funnel numbers are often small and unflattering early on. Two paying customers out of two hundred visitors doesn't feel like a triumph. But it's real, it's yours, and it tells you precisely where the business leaks. In the exercise you'll build your own funnel from real numbers and find the one conversion step that's costing you the most — the leak worth fixing first.`,
       },
       {
-        // TODO: rewrite per spec — moved from old m11l2; add Sean Ellis PMF test
         id: 'm9l3',
         type: 'text',
         kind: 'theory',
@@ -1249,7 +1244,6 @@ Why does retention deserve a whole lesson? Because it changes what you should do
 This connects straight to the decision you'll face in Module 11 — scale or pivot — which rests almost entirely on whether people come back. In the exercises you'll measure your own retention honestly, run the Sean Ellis question on real users, and read what the answer is telling you to do.`,
       },
       {
-        // TODO: rewrite per spec — moved from old m11l3; funnel + main leak + AI diagnosis
         id: 'm9l4',
         type: 'input',
         kind: 'exercise',
@@ -1490,7 +1484,6 @@ Evidence for pivot: …
 My leaning and why: …`,
       },
       {
-        // TODO: rewrite per spec — moved from old m11l4 Product roadmap; 12-month plan with milestones
         id: 'm11l5',
         type: 'input',
         kind: 'exercise',
@@ -1565,7 +1558,6 @@ You don't need to master the fine print — that's what a good startup lawyer is
 The one number to feel in your bones is dilution. Every round, you sell part of your company to fund its growth. A little dilution to build something huge is a great trade; too much, too early, at too low a valuation, and you can end up a minority owner of your own company before it's even working. Raise what you need to hit real milestones, not the biggest number your ego enjoys. In the exercises you'll see how the maths actually plays out on your own hypothetical round.`,
       },
       {
-        // TODO: rewrite per spec — merge old m12l1 storytelling + m12l2 deck structure; Sequoia structure
         id: 'm12l3',
         type: 'text',
         kind: 'theory',
@@ -1591,7 +1583,6 @@ The founders who raise well aren't the ones with the most beautiful slides. They
 Here's the quiet payoff of doing the program in order: you're not inventing a story for the deck. You're assembling one from things that actually happened — the market you sized, the persona you found, the problem you validated, the first sale you closed. In the exercise, the platform will draft your deck from your Brain, and you'll shape the narrative until it sounds like you — and until you can tell it, compellingly, in two sentences.`,
       },
       {
-        // TODO: rewrite per spec — becomes "Create your pitch deck" with auto-assembly from Brain + Q&A trainer
         id: 'm12l4',
         type: 'input',
         kind: 'exercise',
