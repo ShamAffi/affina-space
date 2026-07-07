@@ -12,16 +12,20 @@ import { users, brainEntries, tasks, delegations } from '../src/db/schema.js';
 import { computeExercisePoints, LAYER_LABELS } from '../src/server/progressUtils.js';
 import { RUBRICS, GLOBAL_RUBRIC_RULES, NO_SCORE_LESSONS } from '../src/rubrics.js';
 
+// Tolerant to LLM looseness (CLAUDE.md pattern): the model sometimes returns 3 strengths,
+// 0 gaps, a stringy score, etc. Strict .min()/.max() used to THROW on those → a silent 502
+// ("mentor couldn't respond") even though the answer was fine. Accept any counts and coerce;
+// we clamp for display after parsing.
 const FeedbackSchema = z.object({
-  score: z.number().int().min(0).max(100).nullable(),
-  verdict: z.enum(['strong', 'ok', 'can_be_stronger']),
-  good: z.array(z.string()).min(1).max(2),
-  missing: z.array(z.string()).min(1).max(3),
-  nextStep: z.string(),
+  score: z.coerce.number().int().min(0).max(100).nullable().catch(null),
+  verdict: z.enum(['strong', 'ok', 'can_be_stronger']).catch('ok'),
+  good: z.array(z.coerce.string()).catch([]),
+  missing: z.array(z.coerce.string()).catch([]),
+  nextStep: z.coerce.string().catch(''),
   realWorldTask: z.union([
-    z.object({ title: z.string(), instruction: z.string() }),
+    z.object({ title: z.coerce.string(), instruction: z.coerce.string() }),
     z.null(),
-  ]).default(null),
+  ]).catch(null),
 });
 
 export type AiFeedback = z.infer<typeof FeedbackSchema>;
@@ -426,9 +430,14 @@ Return JSON with exactly this structure:
       const raw = message.content[0].type === 'text' ? message.content[0].text : '';
       const match = raw.match(/\{[\s\S]*\}/);
       if (!match) throw new Error('no JSON in response');
-      result = FeedbackSchema.parse(JSON.parse(match[0]));
+      const parsed = FeedbackSchema.parse(JSON.parse(match[0]));
+      // Schema no longer enforces counts (was a silent-502 source); clamp for a tidy card.
+      parsed.good = parsed.good.slice(0, 3);
+      parsed.missing = parsed.missing.slice(0, 3);
+      result = parsed;
     }
-  } catch {
+  } catch (err) {
+    console.error('[ai] feedback/compare failed:', err instanceof Error ? err.message : err);
     return res.status(502).json({ error: 'ai_unavailable' });
   }
 
