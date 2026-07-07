@@ -30,18 +30,22 @@ const FeedbackSchema = z.object({
 
 export type AiFeedback = z.infer<typeof FeedbackSchema>;
 
+// Tolerant like FeedbackSchema (CLAUDE.md): the model sometimes scores 0/6, mismatches the
+// total, or returns 5 candidates — strict ranges used to THROW → a silent 502. Coerce +
+// clamp per field; total is recomputed from the scores after parse, and candidates sliced to 4.
+const score = z.coerce.number().int().min(1).max(5).catch(3);
 const CompareSchema = z.object({
   candidates: z.array(z.object({
-    label: z.string(),
-    painIntensity: z.number().int().min(1).max(5),
-    reachability: z.number().int().min(1).max(5),
-    abilityToPay: z.number().int().min(1).max(5),
-    wordOfMouth: z.number().int().min(1).max(5),
-    total: z.number().int().min(4).max(20),
-  })).min(1).max(4),
-  recommendation: z.string(),
-  runnerUp: z.string(),
-  nextStep: z.string(),
+    label: z.coerce.string().catch(''),
+    painIntensity: score,
+    reachability: score,
+    abilityToPay: score,
+    wordOfMouth: score,
+    total: z.coerce.number().int().catch(0),
+  })).catch([]),
+  recommendation: z.coerce.string().catch(''),
+  runnerUp: z.coerce.string().catch(''),
+  nextStep: z.coerce.string().catch(''),
 });
 
 export type CompareResult = z.infer<typeof CompareSchema>;
@@ -391,7 +395,12 @@ Return JSON with exactly this structure:
       const raw = message.content[0].type === 'text' ? message.content[0].text : '';
       const match = raw.match(/\{[\s\S]*\}/);
       if (!match) throw new Error('no JSON in response');
-      result = CompareSchema.parse(JSON.parse(match[0]));
+      const parsed = CompareSchema.parse(JSON.parse(match[0]));
+      // Trust the 4 scores; recompute total (the model often mismatches it) + cap at 4 cards.
+      parsed.candidates = parsed.candidates.slice(0, 4).map((c) => ({
+        ...c, total: c.painIntensity + c.reachability + c.abilityToPay + c.wordOfMouth,
+      }));
+      result = parsed;
     } else {
       const rubric = RUBRICS[lessonId];
       const noScore = NO_SCORE_LESSONS.includes(lessonId);
