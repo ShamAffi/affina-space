@@ -76,19 +76,34 @@ MODE B (variants): produce 2–3 genuinely DIFFERENT takes (different angle each
 pain-led vs result-led vs audience-led), not paraphrases. Respond ONLY with valid JSON:
 { "variants": [{ "label": "<the angle, 2-4 words>", "text": "<the draft>" }] }
 
-MODE C (analysis only): you NEVER write her decision. Produce a balanced case file.
+MODE C (analysis only): you NEVER write her decision — you give her a fast read to decide
+from. Speak in SECOND PERSON, directly to the founder ("you", "your interviews"). NEVER
+third person — no "she", "her", "the founder". Build every point from her Brain; no
+fabrication (if the Brain lacks material, ask ONE question instead).
 Respond ONLY with valid JSON:
-{ "analysis": { "for": ["<evidence-backed point>"], "against": ["<evidence-backed point>"],
-  "recommendation": "<your recommendation with reasoning, clearly labeled as a recommendation for HER decision>" } }`;
+{ "analysis": {
+  "verdict": "ONE line: the lean, decisive. 'Your evidence points to <X>.' Name a concrete choice — never 'it depends'.",
+  "reason":  "ONE line: the single strongest reason from her Brain.",
+  "gap":     "ONE line: the one thing that would let you defend the other option — 'To defend <Y> instead, you'd first need <Z>.'",
+  "for":     ["≤3 points, ONE line each (≤15 words), each anchored to a real Brain fact"],
+  "against": ["≤3 points, ONE line each (≤15 words), same rule"]
+} }
+No paragraphs. No disclaimers, no meta-labels, no 'this is a recommendation' preamble in
+any field — the UI shows the 'analysis, not your decision' note.`;
 
 const DelegateVariantsSchema = z.object({
   variants: z.array(z.object({ label: z.string(), text: z.string() })).min(2).max(3),
 });
+// Mode C "mentor's read" (SPEC_DELEGATE_C_REWORK §2): verdict/reason/gap replace the old
+// buried recommendation; for/against are the collapsed detail. Tolerant (coerce/.catch, no
+// strict counts that could 502); clamped to ≤3 bullets in the handler.
 const DelegateAnalysisSchema = z.object({
   analysis: z.object({
-    for: z.array(z.string()).min(1).max(6),
-    against: z.array(z.string()).min(1).max(6),
-    recommendation: z.string(),
+    verdict: z.coerce.string().catch(''),
+    reason: z.coerce.string().catch(''),
+    gap: z.coerce.string().catch(''),
+    for: z.array(z.coerce.string()).catch([]),
+    against: z.array(z.coerce.string()).catch([]),
   }),
 });
 
@@ -306,13 +321,13 @@ Stage: ${stage || 'early'}${avoidLine}`,
 
     const modeTask =
       dMode === 'B' ? `MODE B — produce the JSON variants for this exercise.`
-      : dMode === 'C' ? `MODE C — produce the JSON analysis case file for this decision. Do NOT write the decision itself.`
+      : dMode === 'C' ? `MODE C — give her the fast read (verdict + reason + gap, then ≤3 short for/against one-liners) to decide from. Do NOT write the decision itself.`
       : `MODE A — draft the founder's answer.`;
 
     try {
       const msg = await callClaude({
         model: MODELS.standard,
-        max_tokens: dMode === 'A' ? 900 : 1400,
+        max_tokens: dMode === 'A' ? 900 : dMode === 'C' ? 600 : 1400,
         system: DELEGATE_SYSTEM,
         messages: [{
           role: 'user',
@@ -336,6 +351,9 @@ Stage: ${stage || 'early'}${avoidLine}`,
           return res.status(200).json({ variants: parsed.variants });
         }
         const parsed = DelegateAnalysisSchema.parse(JSON.parse(match[0]));
+        // ≤3 one-line bullets each (schema stays tolerant so an off-count never 502s).
+        parsed.analysis.for = parsed.analysis.for.slice(0, 3);
+        parsed.analysis.against = parsed.analysis.against.slice(0, 3);
         return res.status(200).json({ analysis: parsed.analysis });
       }
       // Safety strip: the react-to-it footer belongs to the UI, never to the draft text

@@ -70,9 +70,11 @@ export default function LMS({ userData, onUpdateUserData, onGoToDashboard, onLog
   const [delegating, setDelegating] = useState<string | null>(null);
   const [delegateOpen, setDelegateOpen] = useState<string | null>(null);
   const [pendingDrafts, setPendingDrafts] = useState<Record<string, { userDraft: string; aiDraft: string }>>({});
-  // Mode B: variant cards to pick from · Mode C: read-only analysis (never touches her field)
+  // Mode B: variant cards to pick from · Mode C: "mentor's read" (verdict/reason/gap +
+  // collapsed for/against) — never touches her field (SPEC_DELEGATE_C_REWORK).
   const [pendingVariants, setPendingVariants] = useState<Record<string, { userDraft: string; variants: { label: string; text: string }[] }>>({});
-  const [analysisByLesson, setAnalysisByLesson] = useState<Record<string, { for: string[]; against: string[]; recommendation: string }>>({});
+  const [analysisByLesson, setAnalysisByLesson] = useState<Record<string, { verdict: string; reason: string; gap: string; for: string[]; against: string[] }>>({});
+  const [analysisDetailOpen, setAnalysisDetailOpen] = useState(false);   // Mode C for/against toggle
   const [clarifyByLesson, setClarifyByLesson] = useState<Record<string, string>>({});
   // 🟢 m2l6 Market Research (test mode)
   const [researchReport, setResearchReport] = useState<MarketResearchReport | null>(null);
@@ -306,13 +308,14 @@ My motivation & 12-week goal: …`;
       }),
     })
       .then(checkRes).then((r) => r.json())
-      .then((data: { aiDraft?: string; variants?: { label: string; text: string }[]; analysis?: { for: string[]; against: string[]; recommendation: string }; question?: string }) => {
+      .then((data: { aiDraft?: string; variants?: { label: string; text: string }[]; analysis?: { verdict: string; reason: string; gap: string; for: string[]; against: string[] }; question?: string }) => {
         if (data.question) {
           // §2.1 no-fabrication: the AI needs one answer from her before drafting
           setClarifyByLesson((p) => ({ ...p, [lessonId]: data.question! }));
         } else if (dMode === 'C' && data.analysis) {
-          // Mode C: analysis panel only — her decision field is NEVER pre-filled
+          // Mode C: the read only — her decision field is NEVER pre-filled
           setAnalysisByLesson((p) => ({ ...p, [lessonId]: data.analysis! }));
+          setAnalysisDetailOpen(false);
         } else if (dMode === 'B' && data.variants) {
           setPendingVariants((p) => ({ ...p, [lessonId]: { userDraft: userText, variants: data.variants! } }));
           setDelegateOpen(lessonId);
@@ -1005,30 +1008,61 @@ My motivation & 12-week goal: …`;
                     </div>
                   )}
 
-                  {/* Mode C (RULES §2.2): read-only AI analysis ABOVE her field — the decision field is never pre-filled */}
+                  {/* Mode C (SPEC_DELEGATE_C_REWORK): "Mentor's read → your call". Compact read
+                      (verdict/reason/gap) + collapsed for/against; her field below is NEVER pre-filled. */}
                   {showInput && dMode === 'C' && activeLesson.delegatable !== false && (
                     analysis ? (
-                      <div className="bg-surface border border-brand-200 rounded-card p-5 mb-4 animate-fade-in">
-                        <p className="text-xs font-bold text-brand-700 uppercase tracking-widest mb-3">🧠 AI case file — for your decision</p>
-                        <div className="grid md:grid-cols-2 gap-3 mb-3">
-                          <div className="bg-accent-50 border border-accent-100 rounded-control p-3">
-                            <p className="text-[10px] font-bold text-accent-800 uppercase tracking-wider mb-1.5">For</p>
-                            <ul className="space-y-1">
-                              {analysis.for.map((x, i) => <li key={i} className="text-xs text-ink-soft leading-relaxed">▲ {x}</li>)}
-                            </ul>
+                      <div className="mb-4 animate-fade-in">
+                        <div className="bg-surface border border-brand-200 rounded-card p-5">
+                          <p className="text-xs font-bold text-brand-700 uppercase tracking-widest mb-3">🧠 Mentor's read</p>
+                          <div className="flex flex-col gap-2.5">
+                            <div className="flex gap-3">
+                              <span className="text-[10px] font-bold text-brand-700 uppercase tracking-wider w-16 flex-shrink-0 pt-0.5">Verdict</span>
+                              <p className="text-sm font-semibold text-ink leading-snug">{analysis.verdict}</p>
+                            </div>
+                            <div className="flex gap-3">
+                              <span className="text-[10px] font-bold text-ink-mute uppercase tracking-wider w-16 flex-shrink-0 pt-0.5">Why</span>
+                              <p className="text-sm text-ink-soft leading-snug">{analysis.reason}</p>
+                            </div>
+                            <div className="flex gap-3">
+                              <span className="text-[10px] font-bold text-ink-mute uppercase tracking-wider w-16 flex-shrink-0 pt-0.5">The gap</span>
+                              <p className="text-sm text-ink-soft leading-snug">{analysis.gap}</p>
+                            </div>
                           </div>
-                          <div className="bg-amber-50 border border-amber-100 rounded-control p-3">
-                            <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wider mb-1.5">Against</p>
-                            <ul className="space-y-1">
-                              {analysis.against.map((x, i) => <li key={i} className="text-xs text-ink-soft leading-relaxed">△ {x}</li>)}
-                            </ul>
-                          </div>
+                          {(analysis.for.length > 0 || analysis.against.length > 0) && (
+                            <div className="mt-3 pt-3 border-t border-hairline">
+                              <button
+                                onClick={() => setAnalysisDetailOpen((o) => !o)}
+                                className="flex items-center gap-1.5 text-xs font-semibold text-brand hover:text-brand-700 transition"
+                              >
+                                <span className={`inline-block text-[10px] transition-transform ${analysisDetailOpen ? 'rotate-90' : ''}`}>▸</span>
+                                {analysisDetailOpen ? 'Hide' : 'See'} the full for / against
+                              </button>
+                              {analysisDetailOpen && (
+                                <div className="mt-3 flex flex-col gap-3 animate-fade-in">
+                                  {analysis.for.length > 0 && (
+                                    <div>
+                                      <p className="text-[10px] font-bold text-accent-800 uppercase tracking-wider mb-1">For</p>
+                                      <ul className="space-y-1">
+                                        {analysis.for.map((x, i) => <li key={i} className="text-xs text-ink-soft leading-relaxed flex gap-1.5"><span className="text-accent-600 flex-shrink-0">▲</span><span>{x}</span></li>)}
+                                      </ul>
+                                    </div>
+                                  )}
+                                  {analysis.against.length > 0 && (
+                                    <div>
+                                      <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wider mb-1">Against</p>
+                                      <ul className="space-y-1">
+                                        {analysis.against.map((x, i) => <li key={i} className="text-xs text-ink-soft leading-relaxed flex gap-1.5"><span className="text-amber-500 flex-shrink-0">△</span><span>{x}</span></li>)}
+                                      </ul>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
-                        <div className="bg-brand-50 border border-brand-100 rounded-control px-4 py-3 mb-2">
-                          <p className="text-[10px] font-bold text-brand-700 uppercase tracking-wider mb-1">Recommendation</p>
-                          <p className="text-sm text-ink leading-relaxed">{analysis.recommendation}</p>
-                        </div>
-                        <p className="text-[11px] text-ink-mute">This is analysis, not a decision. The field below is yours — the AI never fills it.</p>
+                        <p className="text-[11px] text-ink-mute text-center mt-2">This is analysis, not your decision.</p>
+                        <p className="text-xs font-bold text-ink uppercase tracking-widest mt-4">Now your call ↓</p>
                       </div>
                     ) : (
                       <button
@@ -1036,7 +1070,7 @@ My motivation & 12-week goal: …`;
                         disabled={delegating !== null}
                         className="w-full mb-4 flex items-center justify-center gap-2 border-[1.5px] border-brand text-brand text-sm font-semibold py-2.5 rounded-pill hover:bg-brand-50 disabled:opacity-50 transition-all duration-150"
                       >
-                        {delegating === activeLessonId ? 'Analyzing your Brain…' : '🧠 Get the AI case file (for & against)'}
+                        {delegating === activeLessonId ? 'Reading your Brain…' : "🧠 Get the mentor's read"}
                       </button>
                     )
                   )}

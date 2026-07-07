@@ -738,6 +738,7 @@ You'll estimate LTV and CAC roughly in the exercises — "roughly" is the operat
         title: 'Your business model',
         body: 'Choose and justify your revenue model — how you make money and why it fits how your customer buys.',
         inputPrompt: 'Name your business model (subscription / transaction / freemium / other) and defend it in writing: why THIS model fits your customer\'s buying behavior better than the alternatives.',
+        inputPlaceholder: 'My model is [subscription / transaction / freemium / other] because…',
       },
       {
         id: 'm5l5',
@@ -747,6 +748,7 @@ You'll estimate LTV and CAC roughly in the exercises — "roughly" is the operat
         title: 'Unit economics v1',
         body: 'Calculate the fundamentals: what a customer costs to acquire (CAC), what she generates over her lifetime (LTV), and what that ratio tells you. The mentor will flag your shakiest assumptions.',
         inputPrompt: 'Estimate your LTV (lifetime revenue per customer) and CAC (cost to acquire one customer). Show your assumptions. What is the LTV:CAC ratio, and what does it tell you about your model\'s health?',
+        inputPlaceholder: 'My LTV is about … and CAC about … , so the ratio is … , which tells me…',
       },
       {
         id: 'm5l6',
