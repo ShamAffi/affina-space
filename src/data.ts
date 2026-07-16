@@ -18,6 +18,7 @@ export const BRAIN_ENTRY_TYPES: Record<string, string> = {
   m4l6: 'use_case',
   m4l7: 'product_spec',
   m4l8: 'value_advantage',
+  m4l8b: 'core_advantage',
   m4l9: 'micro_commitment',
   m5l4: 'business_model',
   m5l5: 'unit_economics',
@@ -625,12 +626,24 @@ This exercise is short on the page and heavy in what it does downstream: this ex
         delegateMode: 'B', // RULES §2.3: phrasing variants; numbers only from her data
         type: 'structured',
         kind: 'exercise',
-        title: 'Quantified value & your core advantage',
-        body: 'Translate your value proposition into concrete before/after numbers that matter to your customer — then name the one thing you do best that\'s hard to copy.',
-        inputPrompt: 'Two parts. (1) Before your product: her situation in measurable terms → After: what changes and by how much. (2) Your core advantage: the one thing you do best for her, and why it\'s hard to replicate.',
+        title: 'Quantify your value',
+        body: 'Translate your value proposition into concrete before/after numbers that matter to your customer — hours, euros, frequency, stress. Numbers she\'d recognize as her own.',
+        inputPrompt: 'Before your product: her situation in measurable terms → After: what changes, and by how much. Use real figures from your interviews or research — not invented ones.',
         inputPlaceholder: `Before: …
 After: …
-Core advantage & why it's hard to copy: …`,
+Where these numbers come from: …`,
+      },
+      {
+        id: 'm4l8b',
+        delegateMode: 'B',
+        type: 'structured',
+        kind: 'exercise',
+        title: 'Your core advantage',
+        body: 'Now name the one thing you do best for her that\'s genuinely hard to copy — access, lived expertise, a data loop, relationships. Not a feature (features get copied) — something structural.',
+        inputPrompt: 'Your core advantage: the one thing you do best for her, and why it\'s hard to replicate. Then connect it — how does that advantage make the before→after change above possible?',
+        inputPlaceholder: `My core advantage: …
+Why it's hard to copy: …
+How it powers the value above: …`,
       },
       {
         id: 'm4l9',

@@ -326,6 +326,7 @@ PERSONA: ${byType['persona'] || '(none)'}
 MARKET / TAM: ${byType['competitive_landscape'] || byType['market_research'] || '(none)'}
 PROBLEM-SOLUTION CHECK: ${byType['problem_solution_check'] || '(none)'}
 QUANTIFIED VALUE: ${byType['value_advantage'] || byType['quantified_value'] || '(none)'}
+CORE ADVANTAGE / MOAT: ${byType['core_advantage'] || '(none)'}
 MICRO-COMMITMENT / DEMAND: ${byType['micro_commitment'] || '(none)'}
 
 Write her Founder's Case — calibrate the numbers and the third stat to her ambition above.` }],

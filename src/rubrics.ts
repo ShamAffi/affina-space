@@ -299,18 +299,24 @@ BRAIN: product_spec; Snapshot → Product.`,
 
   // Your value, in numbers — and why it's hard to copy (REWRITE)  [M0-M4]
   m4l8: `CRITERIA
-- Before → After in numbers (35%): hours, euros, frequency, stress-proxy — measurable.
-- Sourced (25%): numbers trace to interviews/research, not invented. "She told me she
+- Before → After in numbers (55%): hours, euros, frequency, stress-proxy — measurable.
+- Sourced (45%): numbers trace to interviews/research, not invented. "She told me she
   spends 5h/week" beats "we estimate 5h".
-- Real core (25%): the advantage is genuinely hard to copy (access, lived expertise,
-  data loop, relationships). 
-- Link (15%): the core is what MAKES the before→after possible.
 
 AUTO-FLAGS
 - Fake precision ("saves exactly 7.3 hours") with no source → ask for the source.
+BRAIN: value_advantage; Snapshot → Product.`,
+
+  // 🟢 Your core advantage — split out from the old combined m4l8 (two separate blocks)
+  m4l8b: `CRITERIA
+- Real core (60%): the advantage is genuinely hard to copy (access, lived expertise,
+  data loop, relationships) — something structural, not a feature.
+- Link (40%): the core is what MAKES the before→after value possible.
+
+AUTO-FLAGS
 - Core = "quality / passion / we care more" → cap at 55; features and care get copied,
   ask what structurally can't be.
-BRAIN: quantified_value; Snapshot → Product + Risk flags if core is weak.`,
+BRAIN: core_advantage; Snapshot → Product + Risk flags if core is weak.`,
 
   // 🟡 Ask for a micro-commitment — field task  [M0-M4]
   m4l9: `CRITERIA
