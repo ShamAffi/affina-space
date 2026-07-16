@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { memo, type ReactNode } from 'react';
 
 // Lecture-body mini-markup (CONTENT_M0-M4_LECTURES_V2.md "Formatting legend"):
 //   **Para** alone on its line  → subheading (bold, brand accent, larger, spaced)
@@ -51,7 +51,9 @@ function renderInline(text: string, budget: { highlights: number }): ReactNode[]
   });
 }
 
-export default function LessonBody({ body }: { body: string }) {
+// memo'd (audit F45): the lecture body is stable per lesson, so this skips the markup
+// re-parse on every keystroke in the exercise textarea (which re-renders the parent LMS).
+function LessonBody({ body }: { body: string }) {
   const blocks = parseLessonBlocks(body);
   const budget = { highlights: 0 };
 
@@ -81,3 +83,5 @@ export default function LessonBody({ body }: { body: string }) {
     </div>
   );
 }
+
+export default memo(LessonBody);

@@ -192,17 +192,24 @@ Return JSON:
 
 // Program v2 (§3.2): field-block tasks are auto-created when the user reaches
 // a module containing a 🟡 block. "Reached" = module unlocked (previous module complete).
-async function syncProgramTasks(db: Db, userId: number) {
-  const completed = await db.query.completedLessons.findMany({
-    where: eq(completedLessons.userId, userId),
-  });
+// audit F46 — accepts already-fetched rows (GET fetches tasks + completedLessons in one
+// parallel pass) so this doesn't re-query them, and RETURNS the number of tasks created so
+// the caller only re-fetches the list when something actually changed.
+async function syncProgramTasks(
+  db: Db,
+  userId: number,
+  preloaded?: { existing: typeof tasks.$inferSelect[]; completed: typeof completedLessons.$inferSelect[] },
+): Promise<number> {
+  const completed = preloaded?.completed
+    ?? await db.query.completedLessons.findMany({ where: eq(completedLessons.userId, userId) });
   const done = new Set(completed.map((c) => c.lessonId));
 
-  const existing = await db.query.tasks.findMany({
-    where: and(eq(tasks.userId, userId), eq(tasks.source, 'program')),
-  });
-  const have = new Set(existing.map((t) => t.sourceRef));
+  const existingProgram = (preloaded?.existing
+    ?? await db.query.tasks.findMany({ where: and(eq(tasks.userId, userId), eq(tasks.source, 'program')) })
+  ).filter((t) => t.source === 'program');
+  const have = new Set(existingProgram.map((t) => t.sourceRef));
 
+  let created = 0;
   for (let i = 0; i < MODULES.length; i++) {
     const unlocked = i === 0 || MODULES[i - 1].lessons.every((l) => done.has(l.id));
     if (!unlocked) continue;
@@ -218,8 +225,10 @@ async function syncProgramTasks(db: Db, userId: number) {
         status: 'todo',
         linkedEntryType: BRAIN_ENTRY_TYPES[lesson.id] ?? null,
       });
+      created++;
     }
   }
+  return created;
 }
 
 export default withAuth('GET,POST,OPTIONS', async (req, res, { email, db }) => {
@@ -228,11 +237,16 @@ export default withAuth('GET,POST,OPTIONS', async (req, res, { email, db }) => {
     const user = await db.query.users.findFirst({ where: eq(users.email, email) });
     if (!user) return res.status(200).json({ tasks: [] });
 
+    // audit F46 — one parallel fetch reused by the sync; re-query only if it inserted anything.
+    const [rows0, completed] = await Promise.all([
+      db.query.tasks.findMany({ where: eq(tasks.userId, user.id) }),
+      db.query.completedLessons.findMany({ where: eq(completedLessons.userId, user.id) }),
+    ]);
+    let created = 0;
     try {
-      await syncProgramTasks(db, user.id);
+      created = await syncProgramTasks(db, user.id, { existing: rows0, completed });
     } catch { /* sync failure must not break the task list */ }
-
-    const rows = await db.query.tasks.findMany({ where: eq(tasks.userId, user.id) });
+    const rows = created > 0 ? await db.query.tasks.findMany({ where: eq(tasks.userId, user.id) }) : rows0;
 
     // Sort: active (todo/submitted) first, then by updatedAt desc
     const order = { todo: 0, submitted: 1, reviewed: 2, done: 3 } as Record<string, number>;

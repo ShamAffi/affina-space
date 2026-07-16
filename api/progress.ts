@@ -22,11 +22,18 @@ type Metric = { name: string; value: number; delta: number };
 // SPEC_TRACTION_WIDGET — deterministic Business-block source: the latest check-in's
 // numbers/keyResults + the date of the most recent REAL business update (check-in
 // with a win/milestone or a real metric, or an achievements row).
-async function buildTraction(db: ReturnType<typeof getDb>, userId: number) {
-  const [cis, achs] = await Promise.all([
-    db.query.checkIns.findMany({ where: eq(checkIns.userId, userId) }),
-    db.query.achievements.findMany({ where: eq(achievements.userId, userId) }),
-  ]);
+async function buildTraction(
+  db: ReturnType<typeof getDb>,
+  userId: number,
+  preloaded?: { checkIns: typeof checkIns.$inferSelect[]; achievements: typeof achievements.$inferSelect[] },
+) {
+  // audit F44 — accept already-fetched rows so the launch path doesn't query checkIns twice.
+  const [cis, achs] = preloaded
+    ? [preloaded.checkIns, preloaded.achievements]
+    : await Promise.all([
+        db.query.checkIns.findMany({ where: eq(checkIns.userId, userId) }),
+        db.query.achievements.findMany({ where: eq(achievements.userId, userId) }),
+      ]);
   const sorted = [...cis].sort((a, b) => b.weekOf.localeCompare(a.weekOf));
   const latest = sorted[0] ?? null;
   const latestCheckIn = latest
@@ -140,11 +147,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // launch phase — Launch Readiness v2 (§7): seed + lessons + exercises + field + checkpoints + traction
-    const [brain, userTasks, userCheckIns] = await Promise.all([
+    // launch phase — Launch Readiness v2 (§7): seed + lessons + exercises + field + checkpoints + traction.
+    // audit F44 — one parallel fetch for everything (incl. achievements), reused by buildTraction below.
+    const [brain, userTasks, userCheckIns, userAchievements] = await Promise.all([
       db.query.brainEntries.findMany({ where: eq(brainEntries.userId, user.id) }),
       db.query.tasks.findMany({ where: eq(tasks.userId, user.id) }),
       db.query.checkIns.findMany({ where: eq(checkIns.userId, user.id) }),
+      db.query.achievements.findMany({ where: eq(achievements.userId, user.id) }),
     ]);
 
     const doneSet = new Set(completedIds);
@@ -167,7 +176,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       checkInMetrics,
     });
 
-    const traction = await buildTraction(db, user.id);
+    const traction = await buildTraction(db, user.id, { checkIns: userCheckIns, achievements: userAchievements });
     return res.status(200).json({
       phase: 'launch',
       launch: { readiness, seed: onboardingSeed(user.score ?? 0), breakdown },

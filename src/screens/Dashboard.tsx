@@ -62,8 +62,9 @@ export default function Dashboard({ userData, onUpdateUserData, onGoToLMS, onGoT
       })
       .catch(() => {});
 
-    // Brain entries: for exercisesCount stat
-    fetch('/api/brain')
+    // Brain entries: only the scored-count stat is needed → lean meta shape (audit F48),
+    // so we don't download every entry's full content just to count aiScore != null.
+    fetch('/api/brain?meta=1')
       .then((r) => r.json())
       .then((data) => setBrainEntries(Array.isArray(data) ? data : []))
       .catch(() => {});

@@ -198,8 +198,10 @@ Produce the ${prev ? 'updated' : 'first'} Startup Snapshot. Source: ${source}.`;
 
 export default withAuth('GET,POST,OPTIONS', async (req, res, { email, db }) => {
   // GET /api/brain — brain entries (array). With ?with=snapshot → { entries, snapshot }.
+  // With ?meta=1 → lean rows (no content/feedback) for the Dashboard counter (audit F48).
   if (req.method === 'GET') {
     const withSnapshot = req.query.with === 'snapshot';
+    const metaOnly = req.query.meta === '1';
 
     const user = await db.query.users.findFirst({ where: eq(users.email, email) });
     if (!user) return res.status(200).json(withSnapshot ? { entries: [], snapshot: null } : []);
@@ -207,6 +209,7 @@ export default withAuth('GET,POST,OPTIONS', async (req, res, { email, db }) => {
     const entries = await db.query.brainEntries.findMany({
       where: eq(brainEntries.userId, user.id),
       orderBy: (t, { desc }) => [desc(t.updatedAt)],
+      ...(metaOnly ? { columns: { id: true, lessonId: true, entryType: true, aiScore: true, updatedAt: true } } : {}),
     });
     if (withSnapshot) {
       return res.status(200).json({ entries, snapshot: user.snapshot ?? null });
