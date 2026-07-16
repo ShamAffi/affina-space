@@ -3,8 +3,10 @@ import ConsentLine from './ConsentLine';
 
 interface Props {
   email: string;
-  // Relocates the pending row to the new address (goes through the §2a ownership check).
-  // Resolves { blocked } if the new email belongs to a verified account / is in use.
+  // Re-captures the onboarding intake+report onto the new address (§2a ownership check).
+  // Post-F06 there is NO cross-email relocate: the old pending row is abandoned to expire and
+  // the client re-sends the full data under the new email. Resolves { blocked } only when the
+  // new email already belongs to a VERIFIED account (the caller then offers sign-in).
   onChangeEmail: (newEmail: string) => Promise<{ blocked?: boolean; reason?: string }>;
   // Sends the magic link (auth request-link). Resolves true on success.
   onSendLink: (email: string) => Promise<boolean>;
@@ -31,9 +33,8 @@ export default function ConfirmEmail({ email, onChangeEmail, onSendLink }: Props
     const r = await onChangeEmail(next);
     setSaving(false);
     if (r.blocked) {
-      setError(r.reason === 'in_use'
-        ? 'That email is already in use — try another.'
-        : 'That email already has an account. Sign in instead, or use another.');
+      // Server blocks change-email only when the new address is a VERIFIED account.
+      setError('That email already has an account. Sign in instead, or use another.');
       return;
     }
     setCurrent(next);

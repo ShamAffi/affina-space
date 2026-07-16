@@ -9,9 +9,11 @@ interface Props {
   onSignIn: () => void;   // → /login (magic-link); typing an email no longer authenticates
 }
 
-// Step 2 (SPEC_ONBOARDING_FUNNEL §1) — email capture BEFORE the report, framed as value:
-// "we'll email you your report". On submit we create the pending user (starts the recovery
-// clock) and move on to generate the report.
+// Step 2 (SPEC_ONBOARDING_FUNNEL §1) — email capture BEFORE the report. Framing is
+// "see your report HERE" (it opens on the next screen), not "we'll email it to you" — the
+// goal is to keep the founder moving into the platform, not send her off to her inbox. The
+// email is captured to SAVE the report to her account + start the recovery clock. On submit
+// we create the pending user and move on to generate the report.
 export default function EmailCapture({ initialEmail, onSubmit, onSignIn }: Props) {
   const [email, setEmail] = useState(initialEmail);
   const [submitting, setSubmitting] = useState(false);
@@ -47,8 +49,8 @@ export default function EmailCapture({ initialEmail, onSubmit, onSignIn }: Props
             <span className="w-1.5 h-1.5 rounded-pill bg-brand-600" />
             Your report is almost ready
           </div>
-          <h1 className="text-2xl font-extrabold text-ink mb-2">Where should we send your report?</h1>
-          <p className="text-sm text-ink-soft mb-6">We'll build your personalized report and email you a copy — so it's always saved and you can pick up any time.</p>
+          <h1 className="text-2xl font-extrabold text-ink mb-2">See your personalized report</h1>
+          <p className="text-sm text-ink-soft mb-6">It opens on the next screen. Add your email and we'll save it to your account, so you can pick up any time — on any device.</p>
 
           <input
             type="email"
@@ -85,7 +87,7 @@ export default function EmailCapture({ initialEmail, onSubmit, onSignIn }: Props
               disabled={!valid || submitting}
               className="w-full bg-brand hover:bg-brand-700 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed text-white text-base font-semibold py-4 rounded-pill transition-all duration-150 mb-4"
             >
-              {submitting ? 'Building your report…' : 'Show me my report →'}
+              {submitting ? 'Building your report…' : 'Get my report →'}
             </button>
           )}
 

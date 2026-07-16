@@ -105,11 +105,12 @@ export async function patchUserToDB(fields: Partial<UserData>): Promise<void> {
 // Email capture (SPEC_ONBOARDING_FUNNEL §2/§2a) — creates the PENDING user + emailCapturedAt
 // (starts the finish-sequence clock) and persists the intake. Returns the server's ownership
 // verdict: `blocked` when the email belongs to a VERIFIED account (caller offers sign-in).
-// `previousEmail` triggers the change-email relocate path. Network failure → proceed
+// Change-email just calls this again with the new email: the full intake+report is re-sent
+// (userPayload), so the new pending row carries everything — post-F06 there is no server-side
+// relocate, the old pending row is simply abandoned to expire. Network failure → proceed
 // optimistically (ok:true) so the funnel isn't hard-blocked by a transient blip.
 export async function captureEmail(
   data: UserData,
-  previousEmail?: string,
 ): Promise<{ ok: boolean; blocked?: boolean; reason?: string }> {
   if (!data.email) return { ok: false };
   try {
@@ -119,7 +120,6 @@ export async function captureEmail(
       body: JSON.stringify({
         ...userPayload(data),
         emailCapture: true,
-        ...(previousEmail ? { previousEmail } : {}),
         // Analytics stitch (SPEC_ANALYTICS §4.1) — joins the pre-signup trail to this user.
         anonId: getAnonId(),
         touches: getTouches(),

@@ -143,8 +143,9 @@ export default function Onboarding({ userData, update, onSignIn }: Props) {
         />
       );
 
-    // Step 6 — confirm email → magic link. Change-email relocates the pending row (§2a).
-    // Clicking the link (verify-link) sets verifiedAt and lands in the program.
+    // Step 6 — confirm email → magic link. Change-email re-captures the full intake under the
+    // new address (§2a; no relocate — the old pending row is abandoned). Clicking the link
+    // (verify-link) sets verifiedAt and lands in the program.
     case 'confirm_email':
       return (
         <ConfirmEmail
@@ -152,7 +153,7 @@ export default function Onboarding({ userData, update, onSignIn }: Props) {
           onChangeEmail={async (newEmail) => {
             const prev = userData.email;
             const u = update({ email: newEmail, verified: false });
-            const r = await captureEmail(u, prev);
+            const r = await captureEmail(u);
             if (r.blocked) update({ email: prev }); // revert local email if the new one is taken
             return r;
           }}
