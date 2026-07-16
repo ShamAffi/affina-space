@@ -5,6 +5,7 @@ import { withAuth } from '../src/server/handler.js';
 import { requireEntitlement } from '../src/server/entitlement.js';
 import { captureError } from '../src/server/observability.js';
 import { clamp, LIMITS } from '../src/server/limits.js';
+import { extractLlmJson } from '../src/server/llmjson.js';
 import type { Db } from '../src/server/db.js';
 import { eq, and } from 'drizzle-orm';
 import { users, lessonInputs, completedLessons, brainEntries } from '../src/db/schema.js';
@@ -142,17 +143,22 @@ ${brainDump || '(no entries yet — build the snapshot from the profile alone)'}
 
 Produce the ${prev ? 'updated' : 'first'} Startup Snapshot. Source: ${source}.`;
 
+  let stopReason: string | undefined;
+  let rawLen = 0;
   try {
     const msg = await callClaude({
       model: MODELS.standard,
-      max_tokens: 1800,
+      max_tokens: 2600, // headroom (audit): 1800 truncated multi-section snapshots mid-JSON → intermittent 502
       system: SNAPSHOT_SYSTEM,
       messages: [{ role: 'user', content: userMessage }],
     }, { endpoint: 'brain', mode: 'snapshot', email: user.email });
-    const raw = msg.content[0].type === 'text' ? msg.content[0].text : '';
-    const match = raw.match(/\{[\s\S]*\}/);
-    if (!match) throw new Error('no JSON');
-    const parsed = SnapshotSchema.parse(JSON.parse(match[0]));
+    stopReason = msg.stop_reason ?? undefined;
+    const raw = msg.content[0]?.type === 'text' ? msg.content[0].text : '';
+    rawLen = raw.length;
+    // extractLlmJson salvages a truncated object into a shorter VALID snapshot (vs throwing → 502).
+    const data = extractLlmJson(raw);
+    if (!data) throw new Error('no JSON');
+    const parsed = SnapshotSchema.parse(data);
     // A structurally-empty snapshot is a failure (keep the null path) — but any non-zero
     // count is accepted (a 5- or 15-section response no longer 502s); cap at 12 for display.
     if (parsed.sections.length === 0) throw new Error('empty snapshot');
@@ -193,7 +199,8 @@ Produce the ${prev ? 'updated' : 'first'} Startup Snapshot. Source: ${source}.`;
       });
     }
     return snap;
-  } catch {
+  } catch (err) {
+    captureError(err, { endpoint: 'brain', mode: 'snapshot', email: user.email, stopReason, rawLen });
     return null;
   }
 }
@@ -365,17 +372,22 @@ PRIOR RESEARCH INPUTS: ${byType['research_inputs'] || '(none)'}${answersBlock}
 
 Produce the test-mode report — or the clarifying questions if critical inputs are missing.`;
 
+      let stopReason: string | undefined;
+      let rawLen = 0;
       try {
         const msg = await callClaude({
           model: MODELS.standard,
-          max_tokens: 2800,
+          max_tokens: 3400, // headroom (audit): a verbose 9-section report truncated at 2800 → intermittent 502
           system: RESEARCH_SYSTEM,
           messages: [{ role: 'user', content: userMessage }],
         }, { endpoint: 'brain', mode: 'market-research', email: user.email });
-        const raw = msg.content[0].type === 'text' ? msg.content[0].text : '';
-        const match = raw.match(/\{[\s\S]*\}/);
-        if (!match) throw new Error('no JSON');
-        const parsed = JSON.parse(match[0]);
+        stopReason = msg.stop_reason ?? undefined;
+        const raw = msg.content[0]?.type === 'text' ? msg.content[0].text : '';
+        rawLen = raw.length;
+        // extractLlmJson salvages a truncated report (stop_reason 'max_tokens') into a
+        // shorter-but-valid one instead of throwing → no more intermittent 502s.
+        const parsed = extractLlmJson(raw) as { questions?: unknown } | null;
+        if (!parsed) throw new Error('no JSON');
 
         if (parsed.questions) {
           const qs = ResearchQuestionsSchema.parse(parsed);
@@ -437,8 +449,10 @@ Produce the test-mode report — or the clarifying questions if critical inputs 
 
         return res.status(200).json({ report: full });
       } catch (err) {
-        captureError(err, { endpoint: 'brain', mode: 'market-research', email: user.email });
-        return res.status(502).json({ error: 'ai_unavailable' });
+        captureError(err, { endpoint: 'brain', mode: 'market-research', email: user.email, stopReason, rawLen });
+        // 503 (not 502): 'overloaded' is transient — the client should invite a retry, and the
+        // retry loop in callClaude already rode through the bursty case before we got here.
+        return res.status(503).json({ error: 'ai_unavailable', retryable: true });
       }
     }
 
