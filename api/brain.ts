@@ -346,8 +346,11 @@ Write her Founder's Case — calibrate the numbers and the third stat to her amb
       }
     }
 
-    // 🟢 m2l6 — Market Research, test mode (§1.1–§1.7). answers = replies to clarifying questions.
+    // 🟢 m2l6 — Market Research: a PAID done-for-you service behind the same subscription as the
+    // M4 paywall (SPEC). The client shows the unlock CTA; the server independently enforces it —
+    // 402 so the client can route to checkout (distinct from 401 login / 403 forbidden).
     if (action === 'market-research') {
+      if (!user.subscribed) return res.status(402).json({ error: 'subscription_required' });
       const { answers } = req.body as { answers?: Record<string, string> };
       const entries = await db.query.brainEntries.findMany({ where: eq(brainEntries.userId, user.id) });
       const byType: Record<string, string> = {};

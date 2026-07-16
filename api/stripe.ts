@@ -50,20 +50,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const email = requireAuth(req, res);
   if (!email) return;
   const action = req.query.action;
-  if (action === 'checkout') return handleCheckout(email, res);
+  if (action === 'checkout') return handleCheckout(email, res, typeof req.query.next === 'string' ? req.query.next : undefined);
   if (action === 'portal') return handlePortal(email, res);
   return res.status(400).json({ error: 'unknown action (expected checkout|portal)' });
 }
 
-// POST /api/stripe?action=checkout — Checkout Session (subscription, quarterly first term).
-async function handleCheckout(email: string, res: VercelResponse) {
+// Restrict `next` to a safe in-app path (single leading slash, no scheme/host/query) so the
+// return URL can never become an open redirect. Used to send an m2l6 buyer back to the research.
+function safeReturnPath(p: string | undefined): string | undefined {
+  if (!p || !p.startsWith('/') || p.startsWith('//')) return undefined;
+  return /^\/[A-Za-z0-9/_-]*$/.test(p) ? p : undefined;
+}
+
+// POST /api/stripe?action=checkout[&next=/path] — Checkout Session (subscription, quarterly first term).
+async function handleCheckout(email: string, res: VercelResponse, next?: string) {
   if (!process.env.STRIPE_SECRET_KEY || !priceQuarterly()) {
     return res.status(503).json({ error: 'stripe_not_configured' });
   }
   const db = getDb();
   const user = await db.query.users.findFirst({ where: eq(users.email, email) });
   if (!user) return res.status(404).json({ error: 'user not found' });
+  // Already subscribed (e.g. bought at m2l6, later reached the M4 paywall) — never open a 2nd sub.
+  if (user.subscribed) return res.status(409).json({ error: 'already_subscribed' });
 
+  const ret = safeReturnPath(next); // e.g. /learning/launch/m2l6 for the Market Research entry point
   try {
     const session = await stripe().checkout.sessions.create({
       mode: 'subscription',
@@ -71,8 +81,9 @@ async function handleCheckout(email: string, res: VercelResponse) {
       // Map the payment → user for the webhook. Reuse the customer if we have one.
       client_reference_id: String(user.id),
       ...(user.stripeCustomerId ? { customer: user.stripeCustomerId } : { customer_email: email }),
-      success_url: `${appUrl()}/unlock/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${appUrl()}/unlock`,
+      // On success, PaymentSuccess polls for `subscribed` then routes to `next` (default → S1).
+      success_url: `${appUrl()}/unlock/success?session_id={CHECKOUT_SESSION_ID}${ret ? `&next=${encodeURIComponent(ret)}` : ''}`,
+      cancel_url: ret ? `${appUrl()}${ret}` : `${appUrl()}/unlock`,
       allow_promotion_codes: true,
     });
     return res.status(200).json({ url: session.url });

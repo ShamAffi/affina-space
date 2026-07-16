@@ -375,7 +375,7 @@ You don't need a forty-tab spreadsheet for this. You need a napkin, three honest
         type: 'text',
         kind: 'premium',
         title: 'Order your personal Market Research',
-        body: `Want the full picture without weeks of desk work? Our done-for-you Market Research covers: market size and trends for your exact niche, a competitor map, gap analysis, and "where your window is." Delivered as a document straight into your Brain. Ordering opens soon.`,
+        body: `Want the full picture without weeks of desk work? Our done-for-you Market Research covers: market size and trends for your exact niche, a competitor map, gap analysis, and "where your window is." Delivered as a document straight into your Brain — part of your program subscription.`,
       },
       {
         id: 'm2l7',

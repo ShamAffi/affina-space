@@ -220,7 +220,7 @@ function AppRoutes() {
       {/* SPEC_PAYWALL + SPEC_STRIPE — full-page overlay gating M5–M12 (→ Stripe Checkout) */}
       <Route
         path="/unlock"
-        element={authed ? <Paywall onDismiss={() => navigate('/dashboard')} phone={userData.phone} /> : toLanding}
+        element={authed ? (userData.subscribed ? <Navigate to="/start-session" replace /> : <Paywall onDismiss={() => navigate('/dashboard')} phone={userData.phone} />) : toLanding}
       />
       {/* Stripe success return — the webhook flips `subscribed`; this polls for it then continues */}
       <Route
@@ -228,7 +228,8 @@ function AppRoutes() {
         element={authed ? (
           <PaymentSuccess
             // Reached ONLY after the poll read subscribed=true from the server (webhook = truth).
-            onConfirmed={() => { update({ subscribed: true }); navigate('/start-session'); }}
+            // `next` (set for the m2l6 entry point) routes back to the research; default → S1.
+            onConfirmed={(next) => { update({ subscribed: true }); navigate(next || '/start-session'); }}
             // Slow webhook: never grant locally (audit F37). Re-read the server truth and go
             // to the dashboard — access self-unlocks on the next load once the webhook lands.
             onDefer={async () => {
@@ -432,9 +433,15 @@ function Verify({ onVerified }: { onVerified: (email: string, isNew: boolean, ne
 // SPEC_STRIPE §3/§4 — Stripe redirects here after payment. `subscribed` is set by the
 // webhook (the source of truth), never the redirect — so poll the server for it, then
 // continue into the program. The redirect alone never grants access.
-function PaymentSuccess({ onConfirmed, onDefer }: { onConfirmed: () => void; onDefer: () => void }) {
+function PaymentSuccess({ onConfirmed, onDefer }: { onConfirmed: (next?: string) => void; onDefer: () => void }) {
   const [slow, setSlow] = useState(false);
   const ran = useRef(false);
+  // Post-payment destination (the m2l6 entry sets ?next=/learning/launch/m2l6); only a safe
+  // in-app path is honored — mirrors the server's own sanitize so a crafted URL can't redirect out.
+  const nextParam = (() => {
+    const p = new URLSearchParams(window.location.search).get('next');
+    return p && p.startsWith('/') && !p.startsWith('//') && /^\/[A-Za-z0-9/_-]*$/.test(p) ? p : undefined;
+  })();
 
   useEffect(() => {
     if (ran.current) return;
@@ -446,14 +453,14 @@ function PaymentSuccess({ onConfirmed, onDefer }: { onConfirmed: () => void; onD
       tries++;
       try {
         const r = await fetch('/api/user'); // session cookie
-        if (r.ok) { const d = await r.json(); if (d.subscribed) { onConfirmed(); return; } }
+        if (r.ok) { const d = await r.json(); if (d.subscribed) { onConfirmed(nextParam); return; } }
       } catch { /* keep polling */ }
       if (tries >= 12) { setSlow(true); return; } // ~18s
       setTimeout(poll, 1500);
     };
     poll();
     return () => { alive = false; };
-  }, [onConfirmed]);
+  }, [onConfirmed, nextParam]);
 
   return (
     <div className="min-h-screen bg-canvas flex flex-col items-center justify-center px-5 text-center">

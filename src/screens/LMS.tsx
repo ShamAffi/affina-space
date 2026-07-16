@@ -85,6 +85,7 @@ export default function LMS({ userData, onUpdateUserData, onGoToDashboard, onLog
   const [researchLoading, setResearchLoading] = useState(false);
   const [researchOpen, setResearchOpen] = useState(false);
   const [researchError, setResearchError] = useState('');
+  const [researchCheckoutWorking, setResearchCheckoutWorking] = useState(false);
   // M0 redesign: после квиза Step 4 снапшот стартует сам (§2 "Generating your Snapshot…")
   const [autoSnapshot, setAutoSnapshot] = useState(false);
 
@@ -310,6 +311,22 @@ My motivation & 12-week goal: …`;
       })
       .catch((e) => setResearchError(isRateLimit(e) ? RATE_LIMIT_MESSAGE : isSessionExpired(e) ? '' : 'Something went wrong — try again.'))
       .finally(() => setResearchLoading(false));
+  }
+
+  // m2l6 is a PAID done-for-you service — start the SAME subscription as the M4 paywall, then
+  // return to THIS lesson (?next = current path) so she can run the research she just paid for.
+  async function unlockResearch() {
+    setResearchCheckoutWorking(true);
+    setResearchError('');
+    try {
+      const r = await fetch(`/api/stripe?action=checkout&next=${encodeURIComponent(window.location.pathname)}`, { method: 'POST' });
+      const d = await r.json().catch(() => ({}));
+      if (d.url) { window.location.href = d.url; return; }
+      throw new Error('no url');
+    } catch {
+      setResearchCheckoutWorking(false);
+      setResearchError('Could not start checkout — please try again.');
+    }
   }
 
   // §4 Delegate — RULES §2.2 modes: A one draft (gate: ≥1 attempt) · B variants (gate: ≥1 attempt)
@@ -633,7 +650,21 @@ My motivation & 12-week goal: …`;
                   <li>· "Where your window is" — delivered into your Brain & Snapshot</li>
                 </ul>
 
-                {researchLoading ? (
+                {!userData.subscribed ? (
+                  <>
+                    <p className="text-sm text-accent-800 leading-relaxed mb-3">
+                      Your personal Market Research is part of your subscription. Unlock it — and the full program (M5–M12) — to run it now.
+                    </p>
+                    <p className="text-xs font-bold text-accent-800 mb-3">€360 for your first 3 months, then €1,200/year · cancel anytime</p>
+                    <button
+                      onClick={unlockResearch}
+                      disabled={researchCheckoutWorking}
+                      className="bg-accent hover:opacity-90 active:scale-95 disabled:opacity-50 text-white text-sm font-semibold px-5 py-2.5 rounded-pill transition"
+                    >
+                      {researchCheckoutWorking ? 'Starting checkout…' : '✦ Unlock my Market Research →'}
+                    </button>
+                  </>
+                ) : researchLoading ? (
                   <div className="flex items-center gap-3 py-2">
                     <div className="w-8 h-8 rounded-pill bg-accent animate-orb-pulse" />
                     <p className="text-xs font-semibold text-accent-800">Researching your market… ~1 minute</p>
@@ -681,9 +712,9 @@ My motivation & 12-week goal: …`;
                       onClick={() => handleGenerateResearch()}
                       className="bg-accent hover:opacity-90 text-white text-sm font-semibold px-5 py-2.5 rounded-pill transition active:scale-95"
                     >
-                      ✦ Generate my research — free in test mode
+                      ✦ Generate my Market Research →
                     </button>
-                    <p className="text-[10px] text-accent-800/60 mt-2">Test mode: model estimates only, no live web data — clearly labeled in the report.</p>
+                    <p className="text-[10px] text-accent-800/60 mt-2">Built from your Brain + bottom-up market modeling — no live web data yet, and labeled as estimates in the report.</p>
                   </>
                 )}
                 {researchError && <p className="text-xs text-red-500 mt-2">{researchError}</p>}
