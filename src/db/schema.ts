@@ -130,6 +130,18 @@ export const delegations = pgTable('delegations', {
   createdAt: timestamp('created_at').defaultNow(),
 });
 
+// Mentor requests (SPEC_MENTOR_REQUEST §2) — replaces the mailto booking. Each row is a
+// founder asking for a session with the topic on her mind; the future admin panel reads
+// this table. Until then Shamil works from the alert email + Neon queries.
+export const mentorRequests = pgTable('mentor_requests', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').references(() => users.id, { onDelete: 'cascade' }),
+  session: text('session').notNull(),        // 'S1' | 'S2' | 'S3'
+  topic: text('topic').notNull(),            // her words, ≤500 chars
+  status: text('status').notNull().default('new'),  // 'new' | 'scheduled' | 'done'
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+});
+
 // Content tables — editable via Neon dashboard
 export const modulesContent = pgTable('modules_content', {
   id: text('id').primaryKey(),

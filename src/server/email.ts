@@ -68,6 +68,15 @@ const LIFECYCLE_NOTE = "You're getting this because you're building your startup
 const SESSION_LABEL: Record<string, string> = { S1: 'Start', S2: 'Mid', S3: 'Final' };
 export function sessionLabel(id: string): string { return SESSION_LABEL[id] ?? 'Start'; }
 
+// Ops alerts go to ADMIN_EMAIL (default sk@affina.space, decided 2026-07-06) — one inbox
+// for all alpha sales/ops signals (mentor requests + hot-lead phone numbers).
+export const adminEmail = () => process.env.ADMIN_EMAIL || 'sk@affina.space';
+
+// Escape user-supplied text before it enters email HTML (a founder's topic / project).
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 // ── 1. Magic link (§2.1) ──────────────────────────────────────────────────────
 export function magicLinkEmail(to: string, link: string): Mail {
   return {
@@ -263,5 +272,68 @@ export function reportReadyEmail(to: string, link: string): Mail {
       <p style="margin:0;">${button(link, 'Open my report &amp; continue')}</p>
       ${sign}
     `, LIFECYCLE_NOTE),
+  };
+}
+
+// ── Ops alerts → ADMIN_EMAIL (internal; not user-facing) ──────────────────────────
+
+// Mentor request (SPEC_MENTOR_REQUEST §4). Her topic verbatim so Shamil can prep.
+export function mentorRequestAlertEmail(d: {
+  name?: string | null; project?: string | null; email: string; phone?: string | null;
+  session: string; topic: string; module?: string | null; subscribed?: boolean;
+}): Mail {
+  const label = sessionLabel(d.session);
+  return {
+    to: adminEmail(),
+    subject: `🧑‍🏫 Mentor request: ${(d.name?.trim() || d.email)} (${label})`,
+    html: wrap(`
+      <p style="${P}"><strong>${escapeHtml(d.name?.trim() || '—')}</strong> requested a <strong>${label}</strong> mentor session.</p>
+      <p style="${P}margin:0 0 8px 0;"><strong>Topic:</strong></p>
+      <p style="${P}background:#F4F4F5;border-radius:10px;padding:12px 14px;"><em>${escapeHtml(d.topic)}</em></p>
+      ${bullets([
+        `Project: ${escapeHtml(d.project?.trim() || '—')}`,
+        `Email: ${escapeHtml(d.email)}`,
+        `Phone: ${escapeHtml(d.phone?.trim() || '—')}`,
+        `Module: ${escapeHtml(d.module || '—')}`,
+        `Subscribed: ${d.subscribed ? 'yes' : 'no'}`,
+      ])}
+      <p style="font-size:13px;color:#71717a;margin:0;">Reply to coordinate a time — no calendar in alpha.</p>
+    `),
+  };
+}
+
+// Hot-lead phone number (SPEC_PHONE_CAPTURE §4). Fires on every phone save.
+export function hotLeadAlertEmail(d: {
+  name?: string | null; project?: string | null; email: string; phone: string;
+  source: string; module?: string | null; verified?: boolean; subscribed?: boolean;
+}): Mail {
+  return {
+    to: adminEmail(),
+    subject: `📞 New lead: ${(d.name?.trim() || d.email)} (${d.source})`,
+    html: wrap(`
+      <p style="${P}"><strong>${escapeHtml(d.name?.trim() || '—')}</strong> left a phone number (<strong>${escapeHtml(d.source)}</strong>).</p>
+      ${bullets([
+        `Phone: <strong>${escapeHtml(d.phone)}</strong>`,
+        `Project: ${escapeHtml(d.project?.trim() || '—')}`,
+        `Email: ${escapeHtml(d.email)}`,
+        `Module: ${escapeHtml(d.module || '—')}`,
+        `Status: ${d.verified ? 'verified' : 'pending'}${d.subscribed ? ' · subscribed' : ''}`,
+      ])}
+      <p style="font-size:13px;color:#71717a;margin:0;">Reach out while she's warm.</p>
+    `),
+  };
+}
+
+// Guide delivery (SPEC_PHONE_CAPTURE §2.3) — user-facing, durable copy of the lead magnet.
+export function guideEmail(to: string, guideUrl: string): Mail {
+  return {
+    to,
+    subject: 'Your AI-First Founder\'s Guide 🎁',
+    html: wrap(`
+      <p style="${P}">Here it is — your copy to keep 🎁</p>
+      <p style="${P}">The AI-First Founder's Guide: how to build your business with AI doing the heavy lifting — the playbook we use inside Affina.</p>
+      <p style="margin:0 0 18px 0;">${button(guideUrl, 'Open the guide')}</p>
+      ${sign}
+    `),
   };
 }

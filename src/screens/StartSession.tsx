@@ -1,14 +1,15 @@
 import { useState } from 'react';
+import MentorRequestForm from '../components/MentorRequestForm';
 
-// SPEC_PAYWALL §4 — full-page S1 mentor-booking step (not a modal). Required step
-// between payment and M5: both CTAs advance to M5; booking is optional and never
-// blocks continuing. Marks S1 state in the existing mentorSessions model.
+// SPEC_PAYWALL §4 — full-page S1 mentor step (not a modal). Required step between payment
+// and M5: continuing is optional and never blocks. SPEC_MENTOR_REQUEST §1 — the topic form
+// replaces the old mailto; sending it records the request + flips S1 to booked server-side.
 interface Props {
-  onContinue: () => void;   // → Module 5 (both CTAs call this)
+  onContinue: () => void;   // → Module 5
 }
 
 // PATCH via the session cookie (Auth Phase B) — no email in the body.
-async function markS1(patch: { booked?: boolean; seen?: boolean }) {
+async function markS1(patch: { seen?: boolean }) {
   try {
     await fetch('/api/user', {
       method: 'PATCH',
@@ -20,16 +21,11 @@ async function markS1(patch: { booked?: boolean; seen?: boolean }) {
 
 export default function StartSession({ onContinue }: Props) {
   const [advancing, setAdvancing] = useState(false);
+  const [sent, setSent] = useState(false);
 
-  async function book() {
-    setAdvancing(true);
-    await markS1({ booked: true, seen: true });
-    window.location.href = `mailto:sk@affina.space?subject=Book my Start session (S1)`;
-    onContinue();
-  }
   async function later() {
     setAdvancing(true);
-    await markS1({ seen: true });   // seen but not booked → Dashboard nudge still applies
+    await markS1({ seen: true });   // seen (nudge logic); a sent request already booked S1 server-side
     onContinue();
   }
 
@@ -47,30 +43,24 @@ export default function StartSession({ onContinue }: Props) {
         </h1>
 
         <div className="bg-surface border border-hairline rounded-card p-6 shadow-sm mb-6">
-          <p className="text-base text-ink leading-relaxed">
+          <p className="text-base text-ink leading-relaxed mb-5">
             Your Start session is a 1:1 with a founder who's done this. We'll talk through your 12-week goal,
             look at your Snapshot together, and set your rhythm — the fastest way to make sure you're pointed
             at the right thing before Module 5.
           </p>
+          <MentorRequestForm session="S1" onSent={() => setSent(true)} />
         </div>
 
         <button
-          onClick={book}
-          disabled={advancing}
-          className="w-full bg-brand hover:bg-brand-700 active:scale-95 disabled:opacity-60 text-white text-base font-semibold py-4 rounded-pill transition-all duration-150"
-        >
-          Book my Start session
-        </button>
-        <button
           onClick={later}
           disabled={advancing}
-          className="w-full mt-3 border border-hairline text-ink-soft hover:text-ink hover:bg-inset text-base font-semibold py-3.5 rounded-pill transition-all duration-150"
+          className="w-full border border-hairline text-ink-soft hover:text-ink hover:bg-inset text-base font-semibold py-3.5 rounded-pill transition-all duration-150"
         >
-          I'll book later — continue to Module 5 →
+          {sent ? 'Continue to Module 5 →' : "I'll book later — continue to Module 5 →"}
         </button>
 
         <p className="text-xs text-ink-mute text-center mt-5 leading-relaxed">
-          You don't have to wait for the session to keep going — book it, then dive straight into Module 5.
+          You don't have to wait for the session to keep going — send your request, then dive straight into Module 5.
         </p>
       </div>
     </div>

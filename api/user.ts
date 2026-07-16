@@ -4,10 +4,12 @@ import { requireAuth } from '../src/server/requireAuth.js';
 import { checkRateLimit } from '../src/server/ratelimit.js';
 import { getDb } from '../src/server/db.js';
 import { clampInt } from '../src/server/limits.js';
+import { captureError } from '../src/server/observability.js';
 import { eq } from 'drizzle-orm';
-import { users, lessonInputs, completedLessons, brainEntries, tasks, checkIns, achievements, delegations } from '../src/db/schema.js';
+import { users, lessonInputs, completedLessons, brainEntries, tasks, checkIns, achievements, delegations, mentorRequests } from '../src/db/schema.js';
+import { MODULES } from '../src/data.js';
 import { GROWTH_SEED_XP } from '../src/server/progressUtils.js';
-import { mentorBookedEmail } from '../src/server/email.js';
+import { sendEmail, mentorBookedEmail, mentorRequestAlertEmail } from '../src/server/email.js';
 import { sendOnce } from '../src/server/emailLog.js';
 
 // Auth Phase B (SPEC_AUTH_PHASE_B): GET + PATCH derive identity from the session cookie
@@ -171,18 +173,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     // NOTE: `subscribed` is NOT accepted here — it's driven ONLY by the Stripe webhook
     // (SPEC_STRIPE §3), never from the browser. The paywall now redirects to Checkout.
-    const { name, projectName, idea, customer, businessModel, stage, goal, country, city, timezone, mentorSessions } = req.body ?? {};
+    const { name, projectName, idea, customer, businessModel, stage, goal, country, city, timezone, mentorSessions, mentorRequest } = req.body ?? {};
     const existingUser = await db.query.users.findFirst({ where: eq(users.email, email) });
+    if (!existingUser) return res.status(404).json({ error: 'user not found' });
     const patchFields: Record<string, unknown> = { updatedAt: new Date() };
     for (const [k, v] of Object.entries({ name, projectName, idea, customer, businessModel, stage, goal, country, city, timezone })) {
       if (v !== undefined) patchFields[k] = v;
     }
+
+    // Mentor request (SPEC_MENTOR_REQUEST §3) — validate; then fold into mentorSessions as a
+    // booked flip so the existing #4 confirmation email + nudge-suppression run unchanged
+    // (do NOT add a second user-facing email). The row + admin alert are added after the write.
+    let mentorReq: { session: 'S1' | 'S2' | 'S3'; topic: string } | null = null;
+    if (mentorRequest !== undefined) {
+      const s = mentorRequest?.session;
+      const topic = String(mentorRequest?.topic ?? '').trim().slice(0, 500);
+      if ((s === 'S1' || s === 'S2' || s === 'S3') && topic) mentorReq = { session: s, topic };
+      else return res.status(400).json({ error: 'invalid mentorRequest (session S1/S2/S3, topic 1-500 chars)' });
+    }
+
     // Merge mentorSessions (partial patch per session) — never clobber other sessions.
+    const sessionsIn: Record<string, unknown> = {
+      ...(mentorSessions && typeof mentorSessions === 'object' ? mentorSessions as Record<string, unknown> : {}),
+      ...(mentorReq ? { [mentorReq.session]: { ...(((mentorSessions as Record<string, unknown>)?.[mentorReq.session]) as object ?? {}), booked: true } } : {}),
+    };
     const newlyBooked: string[] = [];
-    if (mentorSessions !== undefined) {
-      const prev = (existingUser?.mentorSessions ?? {}) as Record<string, unknown>;
+    if (Object.keys(sessionsIn).length > 0) {
+      const prev = (existingUser.mentorSessions ?? {}) as Record<string, unknown>;
       const merged: Record<string, unknown> = { ...prev };
-      for (const [k, v] of Object.entries(mentorSessions as Record<string, unknown>)) {
+      for (const [k, v] of Object.entries(sessionsIn)) {
         // audit F07 — only the 3 real sessions exist; ignoring unknown keys bounds the
         // email fan-out to ≤3 per request (a hostile client can't invent S4…S999).
         if (k !== 'S1' && k !== 'S2' && k !== 'S3') continue;
@@ -208,10 +227,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // §2.4 — mentor-session-booked email when a session's `booked` flips true. sendOnce
     // dedups by (user, 'mentor_booked', sid) so a false→true→false→true toggle can't
     // re-send (audit F07); combined with the ≤3-key bound + rate limit, fan-out is capped.
-    if (existingUser) {
-      for (const sid of newlyBooked) {
-        await sendOnce(existingUser.id, 'mentor_booked', sid, mentorBookedEmail(email, sid));
+    for (const sid of newlyBooked) {
+      await sendOnce(existingUser.id, 'mentor_booked', sid, mentorBookedEmail(email, sid));
+    }
+
+    // Mentor request row (feeds the future admin panel) + admin alert (SPEC_MENTOR_REQUEST §3.4/§4).
+    if (mentorReq) {
+      try {
+        await db.insert(mentorRequests).values({ userId: existingUser.id, session: mentorReq.session, topic: mentorReq.topic });
+      } catch (err) {
+        captureError(err, { endpoint: 'user', mode: 'mentor-request-insert', email });
       }
+      // Best-effort "current module" for the alert (furthest module with any completion).
+      let moduleLabel: string | undefined;
+      try {
+        const done = await db.query.completedLessons.findMany({ where: eq(completedLessons.userId, existingUser.id) });
+        const doneSet = new Set(done.map((c) => c.lessonId));
+        let furthest = 0;
+        for (const m of MODULES) if (m.lessons.some((l) => doneSet.has(l.id))) furthest = Math.max(furthest, m.order);
+        moduleLabel = `M${furthest}`;
+      } catch { /* best-effort */ }
+      void sendEmail(mentorRequestAlertEmail({
+        name: existingUser.name, project: existingUser.projectName, email,
+        phone: (existingUser as { phone?: string | null }).phone ?? null,
+        session: mentorReq.session, topic: mentorReq.topic,
+        module: moduleLabel, subscribed: !!existingUser.subscribed,
+      }));
     }
     return res.status(200).json({ ok: true });
   }

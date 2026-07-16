@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { MentorSessionId, StartupSnapshot } from '../types';
+import MentorRequestForm from './MentorRequestForm';
 
 // §6.5 — mentor session block (v2: booking is a placeholder; completion is manual)
 const SESSION_META: Record<MentorSessionId, { title: string; when: string; purpose: string; agenda: string[] }> = {
@@ -126,13 +127,7 @@ export default function MentorSessionModal({ session, email, completed, onClose,
         </div>
 
         <div className="px-6 pb-6 pt-4 border-t border-hairline flex flex-col gap-3">
-          <button
-            onClick={() => { window.location.href = `mailto:sk@affina.space?subject=Book mentor session ${session}`; }}
-            className="w-full bg-brand hover:bg-brand-700 active:scale-95 text-white text-sm font-semibold py-3 rounded-pill transition-all duration-150"
-          >
-            Book a session →
-          </button>
-          <p className="text-[11px] text-ink-mute text-center -mt-1">Calendar booking is coming — for now this opens an email request.</p>
+          <MentorRequestForm session={session} />
           <label className="flex items-center gap-2 justify-center text-xs text-ink-soft cursor-pointer select-none">
             <input type="checkbox" checked={completed} disabled={saving} onChange={toggleCompleted} className="accent-[#7150EA]" />
             Session completed <span className="text-ink-mute">(set manually in v2)</span>
