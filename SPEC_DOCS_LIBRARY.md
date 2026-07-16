@@ -75,6 +75,35 @@ future admin panel.
 Self-serve upload (Vercel Blob + admin UI) · in-app rendered docs
 (`kind:'page'`) · per-doc access tiers · download counters server-side.
 
+## AMENDMENT (2026-07-16) — hide the lead-magnet card in Resources until the
+## phone is given (decided by Shamil; keeps the popup exchange honest)
+
+Problem found in live testing: the Resources section listed the guide for every
+logged-in user — so the phone popup offered something she could already grab
+for free in-app. Fix: a per-doc display gate.
+
+- **`Doc.gate?: 'phone'`** — new optional field in the registry. Set it on the
+  guide entry. Docs without `gate` behave as before (future docs aren't all
+  lead magnets).
+- **Programs.tsx Resources:** render a `gate:'phone'` doc's card ONLY when the
+  user has a phone on file (`userData.phone`). Otherwise the card is hidden
+  entirely — no teaser/locked state in v1.
+- **Unlock = phone from ANY source** (`guide` popup or `paywall` offer) — she
+  gave a number somewhere, the exchange is honored everywhere.
+- If gating leaves ZERO visible docs, hide the whole Resources section
+  (header included) — the `DOCS.length` check becomes a visible-docs check.
+- **This is a display gate, not security** — deliberate: the file URL stays
+  public (emails, broadcasts, shares keep working; SPEC_DOCS_LIBRARY §1
+  rationale unchanged).
+
+Amendment acceptance:
+- [ ] Fresh user, no phone → no guide card in Resources (and no empty
+      "Resources" header when it's the only doc).
+- [ ] Phone given via the M1 popup OR the paywall offer → guide card appears.
+- [ ] Direct file URL still opens logged-out (public, unchanged).
+- [ ] Ungated future docs render for everyone (add a temp second entry to test,
+      or unit-check the filter).
+
 ## §8 — Acceptance
 - [ ] `public/downloads/` + registry in `src/docs.ts`; guide entry present
       (placeholder PDF ok until Shamil's file arrives).

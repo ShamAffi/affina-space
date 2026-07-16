@@ -64,7 +64,42 @@ var, **default `sk@affina.space`** — confirmed receiving mailbox, decided
 - Analytics (when SPEC_ANALYTICS ships): `mentor_request_submitted {session}` —
   add to the taxonomy alongside `mentor_book_clicked`.
 
-## §6 — Out of scope
+## AMENDMENT (2026-07-16) — mentor sessions are a PAID feature: gate on
+## `subscribed`, unpaid click opens the paywall (decided by Shamil)
+
+Found in live testing: with M4 complete but unpaid, the Dashboard "session due"
+card opened the request modal and the request went through. Mentor sessions are
+part of the paid value stack — gate them. Decision: do NOT hide the card —
+keep it visible as a value teaser; an unpaid click opens the paywall instead.
+
+**Frontend:**
+- Dashboard "session due" card: visibility logic unchanged (due = trigger
+  module complete & not booked/completed). Click behavior branches:
+  `subscribed → open MentorSessionModal` · `not subscribed → navigate to the
+  paywall (/unlock)`.
+- Same branch EVERYWHERE `MentorSessionModal` opens (`Dashboard.tsx`,
+  `LMS.tsx`) — no unpaid path reaches the request form.
+- `/start-session` (S1 page): add a route guard — `!subscribed` → redirect to
+  `/unlock` (defense in depth against direct URL entry).
+- If the API ever returns 403 `subscription_required` (below), the frontend
+  treats it as "open the paywall", not a generic error.
+
+**Backend (the real enforcement — UI gates are bypassable):**
+- `api/user.ts` PATCH: reject `mentorRequest` when the session user is not
+  `subscribed` → **403 `{error:'subscription_required'}`**. No row, no emails.
+- Gate `mentorSessions` writes (booked/later flips) the same way — nothing
+  unpaid legitimately writes them.
+- If the earlier security-audit commit already added an entitlement check here,
+  verify it matches this exact behavior and keep one implementation.
+
+Amendment acceptance:
+- [ ] Unpaid + M4 complete: card visible → click opens the PAYWALL (no modal).
+- [ ] Unpaid direct PATCH `mentorRequest` (curl, valid session) → 403
+      `subscription_required`; no `mentor_requests` row, no alert email.
+- [ ] Unpaid direct visit to `/start-session` → redirected to `/unlock`.
+- [ ] Paid user: click → modal → request works end-to-end as before (row +
+      admin alert + booked flip + confirmation email).
+- [ ] S2/S3 behave identically to S1 under the gate.
 Admin panel UI (future — the table is ready for it) · real calendar/scheduling ·
 reminders to Shamil about unanswered requests.
 
