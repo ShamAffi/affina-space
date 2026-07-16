@@ -9,6 +9,8 @@ export type Doc = {
   title: string;
   description: string;   // one-liner for cards
   kind: 'file';          // reserved: 'page' (in-app rendered docs, later)
+  gate?: 'phone';        // DISPLAY gate (amendment 2026-07-16): show the card only once the user
+                         // has a phone on file (any source). File URL stays public — not security.
 };
 
 export const DOCS: Doc[] = [
@@ -17,6 +19,7 @@ export const DOCS: Doc[] = [
     title: "The AI-First Founder's Guide",
     description: 'How to build your business with AI doing the heavy lifting.',
     kind: 'file',
+    gate: 'phone',       // lead magnet — hidden in Resources until she gives a number
   },
 ];
 

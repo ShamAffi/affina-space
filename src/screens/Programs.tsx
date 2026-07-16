@@ -8,10 +8,15 @@ import { DOCS, openDoc } from '../docs';
 interface Props {
   onGoToLMS: () => void;
   onBack: () => void;
+  phone?: string | null;   // amendment 2026-07-16: gates lead-magnet docs (gate:'phone') in Resources
 }
 
-export default function Programs({ onGoToLMS, onBack }: Props) {
+export default function Programs({ onGoToLMS, onBack, phone }: Props) {
   const [preview, setPreview] = useState<Program | null>(null);
+  // Display gate (SPEC_DOCS_LIBRARY amendment): a gate:'phone' doc shows only once she's given a
+  // number (any source — guide popup or paywall). Ungated docs always show. Zero visible → the
+  // whole Resources section (header included) hides.
+  const visibleDocs = DOCS.filter((d) => d.gate !== 'phone' || !!phone);
 
   return (
     <div className="min-h-screen bg-canvas">
@@ -55,13 +60,13 @@ export default function Programs({ onGoToLMS, onBack }: Props) {
           })}
         </div>
 
-        {/* Resources — the DOCS library (SPEC_DOCS_LIBRARY §3) */}
-        {DOCS.length > 0 && (
+        {/* Resources — the DOCS library (SPEC_DOCS_LIBRARY §3 + amendment: gated docs hidden until phone) */}
+        {visibleDocs.length > 0 && (
           <div className="mt-14">
             <h2 className="font-display text-2xl font-medium tracking-tight text-ink mb-1">Resources</h2>
             <p className="text-sm text-ink-soft mb-6">Free guides and playbooks to keep.</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {DOCS.map((d) => (
+              {visibleDocs.map((d) => (
                 <button
                   key={d.slug}
                   onClick={() => openDoc(d.slug)}

@@ -1317,9 +1317,10 @@ My motivation & 12-week goal: …`;
           session={openSession}
           email={userData.email}
           completed={!!sessionsState[openSession]?.completed}
+          booked={!!sessionsState[openSession]?.booked}
           onClose={() => setOpenSession(null)}
           onCompletedChange={(completed) =>
-            setSessionsState((st) => ({ ...st, [openSession]: { completed } }))
+            setSessionsState((st) => ({ ...st, [openSession]: { ...st[openSession], completed } }))
           }
         />
       )}
@@ -2190,7 +2191,7 @@ function FoundersCaseBlock({ email, onContinue }: { email: string; onContinue: (
       <div className="bg-surface border border-hairline rounded-card p-5 shadow-sm">
         <p className="text-[10px] font-bold text-accent-700 uppercase tracking-widest mb-3">The Proof — what you've already done</p>
         <ul className="flex flex-col gap-2.5">
-          {data.proof.map((b, i) => (
+          {(data.proof ?? []).map((b, i) => (
             <li key={i} className="flex gap-2.5 text-sm text-ink leading-relaxed">
               <span className="mt-0.5 flex-shrink-0 w-5 h-5 rounded-pill bg-accent-50 flex items-center justify-center">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#119C74" strokeWidth="2.5"><polyline points="20 6 9 17 4 12" /></svg>

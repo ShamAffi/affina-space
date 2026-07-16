@@ -57,7 +57,11 @@ export default function StartSession({ onContinue }: Props) {
         <button
           onClick={later}
           disabled={advancing}
-          className="w-full border border-hairline text-ink-soft hover:text-ink hover:bg-inset text-base font-semibold py-3.5 rounded-pill transition-all duration-150"
+          className={`w-full text-base font-semibold py-3.5 rounded-pill transition-all duration-150 ${
+            sent
+              ? 'bg-brand hover:bg-brand-700 active:scale-95 text-white'   // request sent → this is the clear next step
+              : 'border border-hairline text-ink-soft hover:text-ink hover:bg-inset'
+          }`}
         >
           {sent ? 'Continue to Module 5 →' : "I'll book later — continue to Module 5 →"}
         </button>

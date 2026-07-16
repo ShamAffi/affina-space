@@ -252,13 +252,29 @@ export default withAuth('GET,POST,OPTIONS', async (req, res, { email, db }) => {
     // 🏛 m4l10 "The Founder's Case" (SPEC_PAYWALL §0) — pre-paywall milestone reveal.
     // Vision + Proof (real Brain data) + Potential (napkin math, optimistic, NOT a forecast).
     if (action === 'founders-case') {
+      // Tolerant to LLM looseness (CLAUDE.md pattern): an off-count proof/stats array must not
+      // THROW the pre-paywall Founder's Case into a silent 502 (audit F26/F52). Defined up here
+      // so the cache path re-validates through it too.
+      const CaseSchema = z.object({
+        vision: z.coerce.string().catch(''),
+        proof: z.array(z.coerce.string()).catch([]),
+        potential: z.object({
+          stats: z.array(z.object({
+            label: z.coerce.string().catch(''),
+            hero: z.coerce.string().catch(''),
+            support: z.coerce.string().catch(''),
+          })).catch([]),
+        }).catch({ stats: [] }),
+      });
       const entries = await db.query.brainEntries.findMany({ where: eq(brainEntries.userId, user.id) });
       const cached = entries.find((e) => e.entryType === 'founders_case');
       if (cached && req.body.refresh !== true) {
-        // Only serve cache in the NEW stats shape — old-format entries fall through to regen.
+        // Re-validate the cache through CaseSchema so what we return is ALWAYS well-formed — an
+        // older cached entry could lack `proof`, and the frontend's data.proof.map() then crashed
+        // the whole app into the error boundary. Serve only when it carries real stats; else regen.
         try {
-          const c = JSON.parse(cached.content);
-          if (Array.isArray(c?.potential?.stats)) return res.status(200).json({ case: c });
+          const c = CaseSchema.parse(JSON.parse(cached.content));
+          if (c.potential.stats.length > 0) return res.status(200).json({ case: c });
         } catch { /* regen */ }
       }
       const byType: Record<string, string> = {};
@@ -275,19 +291,6 @@ export default withAuth('GET,POST,OPTIONS', async (req, res, { email, db }) => {
 
       // Potential = 2–3 clean stats, each {label (small grey), hero (bold number), support (plain line)}.
       // No box-math, no jargon, no formula line — the AI already delivers presentation-ready copy.
-      // Tolerant to LLM looseness (CLAUDE.md pattern): an off-count proof/stats array
-      // must not THROW the pre-paywall Founder's Case into a silent 502 (audit F26/F52).
-      const CaseSchema = z.object({
-        vision: z.coerce.string().catch(''),
-        proof: z.array(z.coerce.string()).catch([]),
-        potential: z.object({
-          stats: z.array(z.object({
-            label: z.coerce.string().catch(''),
-            hero: z.coerce.string().catch(''),
-            support: z.coerce.string().catch(''),
-          })).catch([]),
-        }).catch({ stats: [] }),
-      });
       try {
         const msg = await callClaude({
           model: MODELS.standard,
@@ -327,10 +330,8 @@ MICRO-COMMITMENT / DEMAND: ${byType['micro_commitment'] || '(none)'}
 
 Write her Founder's Case — calibrate the numbers and the third stat to her ambition above.` }],
         }, { endpoint: 'brain', mode: 'founders-case', email: user.email });
-        const raw = msg.content[0].type === 'text' ? msg.content[0].text : '';
-        const match = raw.match(/\{[\s\S]*\}/);
-        if (!match) throw new Error('no JSON');
-        const parsed = CaseSchema.parse(JSON.parse(match[0]));
+        const raw = msg.content[0]?.type === 'text' ? msg.content[0].text : '';
+        const parsed = CaseSchema.parse(extractLlmJson(raw) ?? {});
         if (cached) {
           await db.update(brainEntries).set({ content: JSON.stringify(parsed), updatedAt: new Date() }).where(eq(brainEntries.id, cached.id));
         } else {

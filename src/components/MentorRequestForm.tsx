@@ -8,9 +8,10 @@ import { track } from '../lib/analytics';
 interface Props {
   session: 'S1' | 'S2' | 'S3';
   onSent?: () => void; // parent marks the session booked locally / stops nudges
+  alreadyBooked?: boolean; // a request is already on file (prior visit) — show the sent state, not the form
 }
 
-export default function MentorRequestForm({ session, onSent }: Props) {
+export default function MentorRequestForm({ session, onSent, alreadyBooked }: Props) {
   const [topic, setTopic] = useState('');
   const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   const trimmed = topic.trim();
@@ -33,11 +34,16 @@ export default function MentorRequestForm({ session, onSent }: Props) {
     }
   }
 
-  if (status === 'sent') {
+  // Show the sent state after a fresh submit OR when a request is already on file (return visit) —
+  // so coming back to a booked session never re-opens an empty form (SPEC_MENTOR_REQUEST).
+  if (status === 'sent' || alreadyBooked) {
     return (
       <div className="rounded-control bg-accent-50 border border-accent-100 px-4 py-4 text-center">
-        <p className="text-sm font-semibold text-accent-800">Request sent 🎉</p>
-        <p className="text-xs text-ink-soft mt-1">We'll reach out within 24–48h to set a time.</p>
+        <p className="text-sm font-semibold text-accent-800">Your request is in 🎉</p>
+        <p className="text-xs text-ink-soft mt-1 leading-relaxed">
+          We'll reach out within 24–48h to set a time. Haven't heard back within 24 hours?{' '}
+          <a href="mailto:hello@affina.space" className="text-brand font-semibold hover:underline">hello@affina.space</a>
+        </p>
       </div>
     );
   }

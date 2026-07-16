@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import ConsentLine from '../screens/ConsentLine';
 import { track } from '../lib/analytics';
+import { COUNTRIES, flag, defaultIso } from '../lib/countries';
 
 // Phone lead capture (SPEC_PHONE_CAPTURE) — two placements share this modal:
 //   'guide'   — after Module 1 completion; free guide in exchange for a number.
@@ -33,10 +34,15 @@ const COPY = {
 } as const;
 
 export default function PhoneLeadModal({ variant, guideUrl, onClose, onSubmitted }: Props) {
+  const [iso, setIso] = useState(defaultIso());
   const [phone, setPhone] = useState('');
   const [status, setStatus] = useState<'form' | 'sending' | 'delivered' | 'error'>('form');
   const copy = COPY[variant];
-  const valid = phone.trim().replace(/[^\d+]/g, '').length >= 6;
+  const dial = COUNTRIES.find((c) => c.iso === iso)?.dial ?? '';
+  // The country picker supplies the code, so validate only the local part (people kept
+  // omitting the code entirely — now it's always prepended from the selected country).
+  const valid = phone.replace(/\D/g, '').length >= 6;
+  const fullNumber = `+${dial} ${phone.trim()}`.trim();
 
   useEffect(() => { track('guide_offer_shown', { source: variant }); }, [variant]);
 
@@ -47,11 +53,11 @@ export default function PhoneLeadModal({ variant, guideUrl, onClose, onSubmitted
       const r = await fetch('/api/user', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: { number: phone.trim(), source: variant } }),
+        body: JSON.stringify({ phone: { number: fullNumber, source: variant } }),
       });
       if (!r.ok) throw new Error('failed');
       track('phone_submitted', { source: variant });
-      onSubmitted?.(phone.trim());
+      onSubmitted?.(fullNumber);
       setStatus('delivered');
     } catch {
       setStatus('error');
@@ -95,13 +101,26 @@ export default function PhoneLeadModal({ variant, guideUrl, onClose, onSubmitted
             {copy.price && (
               <p className="text-sm font-bold text-ink mb-4"><span className="line-through text-ink-mute">€49</span> Free for alpha founders</p>
             )}
-            <input
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+34 600 000 000 · WhatsApp is fine"
-              className="w-full rounded-control border border-hairline focus:border-brand-400 focus:ring-2 focus:ring-brand-100 outline-none px-4 py-3 text-sm text-ink placeholder-ink-mute transition mb-2"
-            />
+            <select
+              value={iso}
+              onChange={(e) => setIso(e.target.value)}
+              aria-label="Country"
+              className="w-full rounded-control border border-hairline focus:border-brand-400 focus:ring-2 focus:ring-brand-100 outline-none px-3 py-3 text-sm text-ink bg-surface transition mb-2"
+            >
+              {COUNTRIES.map((c) => (
+                <option key={c.iso} value={c.iso}>{flag(c.iso)}  {c.name} (+{c.dial})</option>
+              ))}
+            </select>
+            <div className="flex items-stretch gap-2 mb-2">
+              <span className="inline-flex items-center px-3 rounded-control border border-hairline bg-inset text-sm font-semibold text-ink-soft shrink-0">+{dial}</span>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="600 000 000 · WhatsApp is fine"
+                className="flex-1 min-w-0 rounded-control border border-hairline focus:border-brand-400 focus:ring-2 focus:ring-brand-100 outline-none px-4 py-3 text-sm text-ink placeholder-ink-mute transition"
+              />
+            </div>
             <button
               onClick={submit}
               disabled={!valid || status === 'sending'}

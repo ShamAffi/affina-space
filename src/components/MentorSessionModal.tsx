@@ -41,11 +41,12 @@ interface Props {
   session: MentorSessionId;
   email: string;
   completed: boolean;
+  booked?: boolean;   // a request is already on file → show the sent state, not the form
   onClose: () => void;
   onCompletedChange: (completed: boolean) => void;
 }
 
-export default function MentorSessionModal({ session, email, completed, onClose, onCompletedChange }: Props) {
+export default function MentorSessionModal({ session, email, completed, booked, onClose, onCompletedChange }: Props) {
   const meta = SESSION_META[session];
   const [snapshotBullets, setSnapshotBullets] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
@@ -130,7 +131,7 @@ export default function MentorSessionModal({ session, email, completed, onClose,
         </div>
 
         <div className="px-6 pb-6 pt-4 border-t border-hairline flex flex-col gap-3">
-          <MentorRequestForm session={session} />
+          <MentorRequestForm session={session} alreadyBooked={booked} />
           <label className="flex items-center gap-2 justify-center text-xs text-ink-soft cursor-pointer select-none">
             <input type="checkbox" checked={completed} disabled={saving} onChange={toggleCompleted} className="accent-[#7150EA]" />
             Session completed <span className="text-ink-mute">(set manually in v2)</span>
