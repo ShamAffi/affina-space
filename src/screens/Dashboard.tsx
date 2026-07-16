@@ -27,6 +27,7 @@ interface Props {
   userData: UserData;
   onUpdateUserData: (updates: Partial<UserData>) => void;
   onGoToLMS: (lessonId?: string) => void;
+  onGoToPrograms: () => void;
   onGoToTasks: () => void;
   onGoToTask: (task: Task) => void;
   onGoToPulse: () => void;
@@ -34,7 +35,7 @@ interface Props {
   onLogout: () => void;
 }
 
-export default function Dashboard({ userData, onUpdateUserData, onGoToLMS, onGoToTasks, onGoToTask, onGoToPulse, onGoToPaywall, onLogout }: Props) {
+export default function Dashboard({ userData, onUpdateUserData, onGoToLMS, onGoToPrograms, onGoToTasks, onGoToTask, onGoToPulse, onGoToPaywall, onLogout }: Props) {
   const [progressData, setProgressData] = useState<ProgressResponse | null>(null);
   const [brainEntries, setBrainEntries] = useState<BrainEntry[]>([]);
   const [taskList, setTaskList] = useState<Task[]>([]);
@@ -267,7 +268,7 @@ export default function Dashboard({ userData, onUpdateUserData, onGoToLMS, onGoT
             </div>
 
             <button
-              onClick={() => onGoToLMS()}
+              onClick={onGoToPrograms}
               className="mt-4 w-full text-xs font-semibold text-brand hover:text-brand-700 py-2 text-center transition-colors"
             >
               View all lessons →

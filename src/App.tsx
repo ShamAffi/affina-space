@@ -14,6 +14,7 @@ import TaskDetail from './screens/TaskDetail';
 import MetricPulse from './screens/MetricPulse';
 import Paywall from './screens/Paywall';
 import StartSession from './screens/StartSession';
+import Programs from './screens/Programs';
 import ReportPage from './screens/ReportPage';
 import WelcomeZone from './screens/WelcomeZone';
 
@@ -175,6 +176,7 @@ function AppRoutes() {
             userData={userData}
             onUpdateUserData={update}
             onGoToLMS={(id) => navigate(id ? `/learning/${COURSE_SLUG}/${id}` : '/learning')}
+            onGoToPrograms={() => navigate('/programs')}
             onGoToTasks={() => navigate('/tasks')}
             onGoToTask={(task) => navigate('/tasks', { state: { task } })}
             onGoToPulse={() => navigate('/traction')}
@@ -185,6 +187,9 @@ function AppRoutes() {
       />
 
       <Route path="/learning/*" element={authed ? <LMSRoute userData={userData} update={update} logout={logout} onGoToPaywall={() => navigate('/unlock')} /> : toLanding} />
+
+      {/* Programs catalog (SPEC_PROGRAMS_PAGE) — Dashboard "View all lessons" lands here */}
+      <Route path="/programs" element={authed ? <Programs onGoToLMS={() => navigate('/learning')} onBack={() => navigate('/dashboard')} /> : toLanding} />
 
       <Route path="/tasks" element={authed ? <TasksRoute email={userData.email} /> : toLanding} />
 
