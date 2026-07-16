@@ -1310,10 +1310,10 @@ function NorthStarExercise({ lessonId, alreadySubmitted, onComplete, onSaveInput
 
   useEffect(() => {
     if (status !== 'suggesting') return;
-    fetch('/api/northstar', {
+    fetch('/api/ai', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'suggest' }),
+      body: JSON.stringify({ mode: 'northstar', action: 'suggest' }),
     })
       .then((r) => r.json())
       .then((data: NorthStarSuggestion) => {
@@ -1331,10 +1331,10 @@ function NorthStarExercise({ lessonId, alreadySubmitted, onComplete, onSaveInput
     setStatus('committing');
     setError('');
     try {
-      const r = await fetch('/api/northstar', {
+      const r = await fetch('/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'commit', key, label, unit, rationale }),
+        body: JSON.stringify({ mode: 'northstar', action: 'commit', key, label, unit, rationale }),
       });
       if (!r.ok) throw new Error('commit failed');
       const data = await r.json();

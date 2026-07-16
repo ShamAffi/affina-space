@@ -1,18 +1,13 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { applyCors } from '../src/server/http.js';
 import { requireAuth } from '../src/server/requireAuth.js';
-import { neon } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-http';
+import { getDb } from '../src/server/db.js';
+import { safeEqual } from '../src/server/env.js';
 import { eq } from 'drizzle-orm';
 import { users, lessonInputs, completedLessons, brainEntries, tasks, checkIns, achievements } from '../src/db/schema.js';
 import { computeLaunchReadiness, computeGrowth, GROWTH_SEED_XP, onboardingSeed } from '../src/server/progressUtils.js';
 import { MODULES } from '../src/data.js';
 import { blockKind } from '../src/types.js';
-
-function getDb() {
-  const sql = neon(process.env.DATABASE_URL!);
-  return drizzle(sql, { schema: { users, lessonInputs, completedLessons, brainEntries, tasks, checkIns, achievements } });
-}
 
 // Theory lesson ids + checkpoint modules (M4/M9) resolved once from the program map
 const THEORY_IDS = new Set(
@@ -63,7 +58,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // on a specified user's row, so it legitimately takes the target email in the body (§7).
   if (req.method === 'POST') {
     const secret = req.headers['x-mentor-secret'];
-    if (!secret || secret !== process.env.MENTOR_SECRET) {
+    // Constant-time compare (audit F15); safeEqual returns false when MENTOR_SECRET is unset → fail closed.
+    if (!safeEqual(typeof secret === 'string' ? secret : '', process.env.MENTOR_SECRET)) {
       return res.status(403).json({ error: 'forbidden' });
     }
     const { email } = req.body ?? {};

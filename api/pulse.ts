@@ -2,11 +2,9 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { callClaude } from '../src/server/anthropic.js';
 import { MODELS } from '../src/server/models.js';
 import { z } from 'zod';
-import { applyCors } from '../src/server/http.js';
-import { requireAuth } from '../src/server/requireAuth.js';
-import { checkRateLimit } from '../src/server/ratelimit.js';
-import { neon } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-http';
+import { withAuth } from '../src/server/handler.js';
+import { clamp, LIMITS } from '../src/server/limits.js';
+import type { Db } from '../src/server/db.js';
 import { eq, desc, and, ne, inArray } from 'drizzle-orm';
 import { users, checkIns, completedLessons, brainEntries, tasks } from '../src/db/schema.js';
 import { MODULES } from '../src/data.js';
@@ -14,12 +12,6 @@ import { MODULES } from '../src/data.js';
 // Consolidated Pulse endpoint (SPEC_RESEND_AUTH §1b) — merged from the former
 // api/pulse/{index,draft,commit}.ts to reclaim 2 Vercel-function slots (Hobby 12-fn cap).
 // Same behaviors: GET list · POST {action:'draft'} AI draft · POST {action:'commit'} save.
-
-function getDb() {
-  const sql = neon(process.env.DATABASE_URL!);
-  return drizzle(sql, { schema: { users, checkIns, completedLessons, brainEntries, tasks } });
-}
-type Db = ReturnType<typeof getDb>;
 
 function getWeekOf(date: Date): string {
   const d = new Date(date);
@@ -37,38 +29,52 @@ function titlesAreSimilar(a: string, b: string): boolean {
   return overlap >= Math.min(3, Math.ceil(norm(a).length * 0.5));
 }
 
+const MetricSchema = z.object({
+  name: z.coerce.string().catch(''),
+  value: z.coerce.number().catch(0),
+  delta: z.coerce.number().catch(0),
+});
+
+// Tolerant to LLM looseness (CLAUDE.md pattern, audit F52): an off-count keyResults/
+// tasks array or a stringy number must not THROW the check-in draft into a silent 502.
+// Accept any shape + coerce; the arrays are sliced to their caps after parse.
 const DraftSchema = z.object({
-  headline: z.string(),
+  headline: z.coerce.string().catch(''),
   keyResults: z.array(z.object({
-    type: z.enum(['win', 'setback', 'milestone']),
-    text: z.string(),
-    metric: z.string().optional(),
-  })).min(1).max(5),
-  metrics: z.array(z.object({
-    name: z.string(),
-    value: z.number(),
-    delta: z.number(),
-  })),
-  sentiment: z.enum(['energized', 'steady', 'struggling']),
-  mentorNote: z.string(),
+    type: z.enum(['win', 'setback', 'milestone']).catch('win'),
+    text: z.coerce.string().catch(''),
+    metric: z.coerce.string().optional().catch(undefined),
+  })).catch([]),
+  metrics: z.array(MetricSchema).catch([]),
+  sentiment: z.enum(['energized', 'steady', 'struggling']).catch('steady'),
+  mentorNote: z.coerce.string().catch(''),
   tasks: z.array(z.object({
-    title: z.string(),
-    instruction: z.string(),
-    priority: z.number().int(),
-  })).min(0).max(3),
+    title: z.coerce.string().catch(''),
+    instruction: z.coerce.string().catch(''),
+    priority: z.coerce.number().int().catch(60),
+  })).catch([]),
 });
 
 const ActivitySchema = z.array(z.object({
-  key: z.string(),
-  label: z.string(),
-  count: z.number(),
-})).max(8);
+  key: z.coerce.string().catch(''),
+  label: z.coerce.string().catch(''),
+  count: z.coerce.number().catch(0),
+})).catch([]);
 
 // §3.4(b) — facts from the check-in that belong in the Startup Snapshot
 const SnapshotFactsSchema = z.array(z.object({
-  section: z.string(),
-  fact: z.string(),
-})).max(6);
+  section: z.coerce.string().catch(''),
+  fact: z.coerce.string().catch(''),
+})).catch([]);
+
+// The commit path (handleCommit) receives the draft back from the client and writes it
+// into check_ins / tasks / users. It is NOT trusted (audit F09/F53): validate every field
+// through the same tolerant schema before any DB write so a malformed/hostile blob can
+// neither corrupt jsonb nor 500 the endpoint. momentumCard is validated by parseMomentumCard.
+const CommitDraftSchema = DraftSchema.extend({
+  activity: ActivitySchema,
+  snapshotFacts: SnapshotFactsSchema,
+});
 
 // Tolerant to common LLM looseness: numbers-as-strings (z.coerce), missing
 // delta (defaulted), odd period labels (.catch). A card with real traction must
@@ -142,8 +148,9 @@ Respond ONLY with valid JSON matching the structure exactly.`;
 
 // POST {action:'draft'} — AI check-in draft (was api/pulse/draft.ts). email = session.
 async function handleDraft(db: Db, email: string, req: VercelRequest, res: VercelResponse) {
-  const { rawText } = req.body ?? {};
-  if (!rawText?.trim()) return res.status(400).json({ error: 'rawText required' });
+  // Length cap (audit F11) — rawText is the founder's weekly update, AI-analysed.
+  const rawText = clamp(req.body?.rawText, LIMITS.longText);
+  if (!rawText.trim()) return res.status(400).json({ error: 'rawText required' });
 
   const user = await db.query.users.findFirst({ where: eq(users.email, email) });
   if (!user) return res.status(404).json({ error: 'user not found' });
@@ -266,13 +273,14 @@ Return JSON:
     if (!match) throw new Error('no JSON');
     const parsed = JSON.parse(match[0]);
     const draft = DraftSchema.parse(parsed);
+    // Tolerant schema never throws on count; clamp to the caps the prompt asks for.
+    draft.keyResults = draft.keyResults.slice(0, 5);
+    draft.tasks = draft.tasks.slice(0, 3);
 
     // Momentum + activity parsed leniently — a malformed card must not break the check-in.
-    let activity: z.infer<typeof ActivitySchema> = [];
-    try { activity = ActivitySchema.parse(parsed.activity); } catch { /* keep [] */ }
+    const activity = ActivitySchema.parse(parsed.activity ?? []).slice(0, 8);
     const momentumCard = parseMomentumCard(parsed.momentumCard);
-    let snapshotFacts: z.infer<typeof SnapshotFactsSchema> = [];
-    try { snapshotFacts = SnapshotFactsSchema.parse(parsed.snapshotFacts); } catch { /* keep [] */ }
+    const snapshotFacts = SnapshotFactsSchema.parse(parsed.snapshotFacts ?? []).slice(0, 6);
 
     return res.status(200).json({ ...draft, activity, momentumCard, snapshotFacts });
   } catch {
@@ -282,14 +290,28 @@ Return JSON:
 
 // POST {action:'commit'} — save the check-in (was api/pulse/commit.ts). email = session.
 async function handleCommit(db: Db, email: string, req: VercelRequest, res: VercelResponse) {
-  const { rawText, confirmedMetrics, draft } = req.body ?? {};
+  const { confirmedMetrics, draft } = req.body ?? {};
+  // Cap rawText but preserve the "keep existing on re-commit" semantics (undefined = untouched).
+  const rawText = req.body?.rawText !== undefined ? clamp(req.body.rawText, LIMITS.longText) : undefined;
   if (!draft) return res.status(400).json({ error: 'draft required' });
+
+  // Validate the client-returned draft before ANY DB write (audit F09/F53) — tolerant
+  // schema, so a malformed/hostile blob degrades to safe defaults instead of corrupting
+  // jsonb or 500ing. momentumCard is validated separately by parseMomentumCard.
+  const d = CommitDraftSchema.parse(draft);
+  d.keyResults = d.keyResults.slice(0, 5);
+  d.tasks = d.tasks.slice(0, 3);
+  d.activity = d.activity.slice(0, 8);
+  d.snapshotFacts = d.snapshotFacts.slice(0, 6);
+  const momentumCard = parseMomentumCard((draft as { momentumCard?: unknown }).momentumCard);
 
   const user = await db.query.users.findFirst({ where: eq(users.email, email) });
   if (!user) return res.status(404).json({ error: 'user not found' });
 
   const weekOf = getWeekOf(new Date());
-  const finalMetrics = confirmedMetrics ?? draft.metrics ?? [];
+  const finalMetrics = confirmedMetrics !== undefined
+    ? z.array(MetricSchema).catch([]).parse(confirmedMetrics)
+    : d.metrics;
 
   // 1. Upsert check_in (same week = update, not duplicate)
   const existing = await db.query.checkIns.findFirst({
@@ -299,12 +321,12 @@ async function handleCommit(db: Db, email: string, req: VercelRequest, res: Verc
   if (existing) {
     await db.update(checkIns).set({
       rawText: rawText ?? existing.rawText,
-      headline: draft.headline,
-      keyResults: draft.keyResults,
+      headline: d.headline,
+      keyResults: d.keyResults,
       metrics: finalMetrics,
-      activity: draft.activity ?? [],
-      sentiment: draft.sentiment,
-      mentorNote: draft.mentorNote,
+      activity: d.activity,
+      sentiment: d.sentiment,
+      mentorNote: d.mentorNote,
     }).where(eq(checkIns.id, existing.id));
     checkInId = existing.id;
   } else {
@@ -312,12 +334,12 @@ async function handleCommit(db: Db, email: string, req: VercelRequest, res: Verc
       userId: user.id,
       weekOf,
       rawText: rawText ?? '',
-      headline: draft.headline,
-      keyResults: draft.keyResults,
+      headline: d.headline,
+      keyResults: d.keyResults,
       metrics: finalMetrics,
-      activity: draft.activity ?? [],
-      sentiment: draft.sentiment,
-      mentorNote: draft.mentorNote,
+      activity: d.activity,
+      sentiment: d.sentiment,
+      mentorNote: d.mentorNote,
     }).returning({ id: checkIns.id });
     checkInId = created.id;
   }
@@ -328,7 +350,7 @@ async function handleCommit(db: Db, email: string, req: VercelRequest, res: Verc
   });
 
   const createdTasks: number[] = [];
-  for (const t of (draft.tasks ?? []).slice(0, 3)) {
+  for (const t of d.tasks) {
     const isDup = openTasks.some((ot) => titlesAreSimilar(t.title, ot.title));
     if (!isDup) {
       const [created] = await db.insert(tasks).values({
@@ -390,7 +412,7 @@ async function handleCommit(db: Db, email: string, req: VercelRequest, res: Verc
   // Each fact lands in its section as a dated line; version bumps; previous version → history (cap 5).
   type Snap = { version: number; generatedAt: string; source: string; sections: { title: string; content: string }[] };
   let snapshotPatch: { snapshot?: Snap; snapshotHistory?: Snap[] } = {};
-  const facts = (draft.snapshotFacts ?? []) as { section: string; fact: string }[];
+  const facts = d.snapshotFacts;
   const prevSnap = user.snapshot as Snap | null;
   if (prevSnap && facts.length > 0) {
     const sections = prevSnap.sections.map((s) => ({ ...s }));
@@ -420,7 +442,7 @@ async function handleCommit(db: Db, email: string, req: VercelRequest, res: Verc
   await db.update(users).set({
     pulseStreak: newStreak,
     lastCheckInAt: now,
-    momentumCard: draft.momentumCard ?? null,
+    momentumCard,
     ...snapshotPatch,
     updatedAt: now,
   }).where(eq(users.id, user.id));
@@ -430,25 +452,11 @@ async function handleCommit(db: Db, email: string, req: VercelRequest, res: Verc
     createdTasks,
     streak: newStreak,
     weekOf,
-    momentumCard: draft.momentumCard ?? null,
+    momentumCard,
   });
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (applyCors(req, res, 'GET,POST,OPTIONS')) return;
-
-  // Auth Phase B (§2) — identity from the session cookie; client email ignored.
-  const email = requireAuth(req, res);
-  if (!email) return;
-
-  const rl = await checkRateLimit(req, { email }); // §6 — limiter keys on the session email
-  if (!rl.ok) {
-    if (rl.retryAfter) res.setHeader('Retry-After', String(rl.retryAfter));
-    return res.status(429).json({ error: 'rate_limited', retryAfter: rl.retryAfter });
-  }
-
-  const db = getDb();
-
+export default withAuth('GET,POST,OPTIONS', async (req, res, { email, db }) => {
   // GET /api/pulse — the session user's check-ins.
   if (req.method === 'GET') {
     const user = await db.query.users.findFirst({ where: eq(users.email, email) });
@@ -466,4 +474,4 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (action === 'draft') return handleDraft(db, email, req, res);
   if (action === 'commit') return handleCommit(db, email, req, res);
   return res.status(400).json({ error: 'unknown action (expected draft|commit)' });
-}
+});

@@ -4,17 +4,22 @@ import { MODELS } from '../src/server/models.js';
 import { z } from 'zod';
 import { applyCors } from '../src/server/http.js';
 import { checkRateLimit } from '../src/server/ratelimit.js';
+import { clamp, LIMITS } from '../src/server/limits.js';
 
-const ScoreSchema = z.object({
-  score: z.number().int().min(0).max(100),
-  summary: z.string(),
+// Tolerant to LLM looseness (CLAUDE.md pattern): an off-count `steps` array or a
+// stringy/out-of-range score must not THROW the founder's real onboarding analysis
+// away to the generic FALLBACK. Accept any shape + coerce; clamp on return.
+// Exported for unit tests (audit P5) — Vercel ignores named exports on handler files.
+export const ScoreSchema = z.object({
+  score: z.coerce.number().int().catch(60),
+  summary: z.coerce.string().catch(''),
   steps: z.array(z.object({
-    title: z.string(),
-    body: z.string(),
-  })).min(3).max(3),
-  strength: z.string(),
-  threat: z.string(),
-  firstFocus: z.string(),
+    title: z.coerce.string().catch(''),
+    body: z.coerce.string().catch(''),
+  })).catch([]),
+  strength: z.coerce.string().catch(''),
+  threat: z.coerce.string().catch(''),
+  firstFocus: z.coerce.string().catch(''),
 });
 
 function computePercentile(score: number): number {
@@ -67,8 +72,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   if (req.method !== 'POST') return res.status(405).json({ error: 'method not allowed' });
 
-  const { idea, customer, businessModel, stage, goal } = req.body;
-  if (!idea?.trim()) return res.status(200).json(FALLBACK);
+  // Length caps (audit F21) — pre-auth, no session, so keep the tightest bound.
+  const idea = clamp(req.body?.idea, LIMITS.preAuthField);
+  const customer = clamp(req.body?.customer, LIMITS.preAuthField);
+  const businessModel = clamp(req.body?.businessModel, LIMITS.preAuthField);
+  const stage = clamp(req.body?.stage, LIMITS.preAuthField);
+  const goal = clamp(req.body?.goal, LIMITS.preAuthField);
+  if (!idea.trim()) return res.status(200).json(FALLBACK);
 
   const userMessage = `Founder's onboarding answers:
 - Business idea: "${idea}"
@@ -103,9 +113,14 @@ Return JSON with exactly this structure:
     const match = raw.match(/\{[\s\S]*\}/);
     if (!match) throw new Error('no JSON');
     const parsed = ScoreSchema.parse(JSON.parse(match[0]));
+    // A structurally-empty parse (model returned garbage) → keep the graceful fallback.
+    if (!parsed.summary && parsed.steps.length === 0) return res.status(200).json(FALLBACK);
+    const score = Math.max(0, Math.min(100, parsed.score));
     return res.status(200).json({
       ...parsed,
-      percentileAheadOf: computePercentile(parsed.score),
+      score,
+      steps: parsed.steps.slice(0, 3),
+      percentileAheadOf: computePercentile(score),
     });
   } catch {
     return res.status(200).json(FALLBACK);

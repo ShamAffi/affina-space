@@ -1,20 +1,17 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { callClaude } from '../../src/server/anthropic.js';
 import { MODELS } from '../../src/server/models.js';
-import { applyCors } from '../../src/server/http.js';
-import { requireAuth } from '../../src/server/requireAuth.js';
-import { checkRateLimit } from '../../src/server/ratelimit.js';
-import { neon } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-http';
+import { z } from 'zod';
+import { withAuth } from '../../src/server/handler.js';
+import { requireEntitlement } from '../../src/server/entitlement.js';
+import { clamp, LIMITS } from '../../src/server/limits.js';
+import type { Db } from '../../src/server/db.js';
 import { eq, and } from 'drizzle-orm';
 import { users, tasks, completedLessons, brainEntries } from '../../src/db/schema.js';
 import { MODULES, BRAIN_ENTRY_TYPES } from '../../src/data.js';
 import { blockKind } from '../../src/types.js';
-
-function getDb() {
-  const sql = neon(process.env.DATABASE_URL!);
-  return drizzle(sql, { schema: { users, tasks, completedLessons, brainEntries } });
-}
+import { RUBRICS, GLOBAL_RUBRIC_RULES } from '../../src/rubrics.js';
+import { FIELD_POINTS, LAYER_LABELS } from '../../src/server/progressUtils.js';
 
 // §4b Mission Briefing — generated from the Brain when the founder opens a field task
 const BRIEFING_SYSTEM = `You are Affina — the founder's AI mentor, writing a MISSION BRIEFING for a real-world task she is about to do.
@@ -27,9 +24,175 @@ DONE WHEN — the concrete artifact/criterion that means the mission is complete
 
 Rules: use HER data (persona names, her product, her price). Be specific and practical, warm but direct. No markdown symbols except the headers. Max ~180 words total.`;
 
+// ── Task submission review (was api/tasks/submit.ts — folded here to reclaim a Vercel
+// function slot, audit P8; behaviour identical, reached via POST { action: 'submit' }). ──
+// Tolerant to LLM looseness (CLAUDE.md pattern): an off-count highlights/improvements
+// array or a stringy score must not THROW a real review into the 502 fallback.
+const TaskReviewSchema = z.object({
+  score: z.coerce.number().int().catch(60),
+  verdict: z.enum(['strong', 'good', 'needs_work']).catch('good'),
+  highlights: z.array(z.coerce.string()).catch([]),
+  improvements: z.array(z.coerce.string()).catch([]),
+  nextStep: z.coerce.string().catch(''),
+  debrief: z.object({
+    meaning: z.coerce.string().catch(''),
+    adjust: z.coerce.string().catch(''),
+  }).nullable().catch(null).optional(),
+});
+
+const REVIEW_SYSTEM_PROMPT = `You are Affina — a warm but honest startup mentor reviewing a founder's real-world task completion.
+Be specific: reference what they actually wrote. Keep each bullet to 1-2 sentences.
+Score guide: 90+ = excellent execution, 70-89 = good with minor gaps, 50-69 = partial, below 50 = needs significant improvement.
+Respond ONLY with valid JSON, no other text.
+
+GLOBAL RUBRIC RULES (always in force — fabrication protocol and celebration
+protocol matter most on field missions):
+${GLOBAL_RUBRIC_RULES}`;
+
+async function handleSubmit(db: Db, email: string, req: VercelRequest, res: VercelResponse) {
+  const { taskId, submissionData } = req.body;
+  // Length cap (audit F11) — submissionText is AI-reviewed; bound it before the prompt.
+  const submissionText = clamp(req.body?.submissionText, LIMITS.longText);
+  if (!taskId || !submissionText.trim()) {
+    return res.status(400).json({ error: 'taskId and submissionText required' });
+  }
+
+  const user = await db.query.users.findFirst({ where: eq(users.email, email) });
+  if (!user) return res.status(404).json({ error: 'user not found' });
+
+  // §4 ownership — the task must belong to the session user (scoped by userId).
+  const task = await db.query.tasks.findFirst({
+    where: and(eq(tasks.id, Number(taskId)), eq(tasks.userId, user.id)),
+  });
+  if (!task) return res.status(404).json({ error: 'task not found' });
+
+  // Server-side paywall (audit P1) — a field mission on a paid module (M5–M12) can only
+  // be submitted/AI-reviewed by a subscriber. Self/ad-hoc + free-module missions pass.
+  if (!requireEntitlement(res, task.sourceRef, user.subscribed)) return;
+
+  // Mark as submitted (submissionData = structured field-task artifact, §3.2)
+  await db.update(tasks)
+    .set({
+      submissionText: submissionText.trim(),
+      submissionData: submissionData ?? null,
+      status: 'submitted',
+      updatedAt: new Date(),
+    })
+    .where(eq(tasks.id, task.id));
+
+  const isFieldMission = task.source === 'program';
+  let review: z.infer<typeof TaskReviewSchema>;
+  try {
+    const debriefPart = isFieldMission
+      ? `,
+  "debrief": {
+    "meaning": "<2-3 sentences: what what-she-heard/did actually MEANS for her startup — the honest interpretation of the field results>",
+    "adjust": "<1-2 sentences: what to correct in her hypothesis, script, or approach based on this>"
+  }`
+      : '';
+    const missionRubric = task.sourceRef && RUBRICS[task.sourceRef]
+      ? `\nSCORING RUBRIC FOR THIS MISSION (overrides the generic score guide):\n${RUBRICS[task.sourceRef]}\n`
+      : '';
+    const userMessage = `Task: "${task.title}"
+Full instruction: ${task.instruction}
+Founder's submission: "${submissionText.trim()}"
+${missionRubric}${isFieldMission ? '\nThis was a REAL-WORLD field mission — include a debrief interpreting the results.\n' : ''}
+Return JSON:
+{
+  "score": <0-100>,
+  "verdict": <"strong" if ≥80, "good" if 55-79, "needs_work" if <55>,
+  "highlights": [<2-3 specific things they did well>],
+  "improvements": [<0-2 gaps to strengthen — omit if score≥90>],
+  "nextStep": "<one concrete follow-up action>"${debriefPart}
+}`;
+
+    const message = await callClaude({
+      model: MODELS.standard,
+      max_tokens: 800,
+      system: REVIEW_SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: userMessage }],
+    }, { endpoint: 'tasks', mode: 'submit', email });
+    const raw = message.content[0].type === 'text' ? message.content[0].text : '';
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error('no JSON');
+    review = TaskReviewSchema.parse(JSON.parse(match[0]));
+    review.score = Math.max(0, Math.min(100, review.score));
+    review.highlights = review.highlights.slice(0, 3);
+    review.improvements = review.improvements.slice(0, 3);
+  } catch {
+    const [updated] = await db.update(tasks)
+      .set({ status: 'submitted', updatedAt: new Date() })
+      .where(eq(tasks.id, task.id))
+      .returning();
+    return res.status(200).json({ task: updated, reviewError: 'ai_unavailable' });
+  }
+
+  const finalStatus = review.score >= 50 ? 'done' : 'reviewed';
+
+  const [updated] = await db.update(tasks)
+    .set({ aiReview: JSON.stringify(review), status: finalStatus, updatedAt: new Date() })
+    .where(eq(tasks.id, task.id))
+    .returning();
+
+  // §7: a program field mission reaching done for the FIRST time earns its readiness points.
+  if (finalStatus === 'done' && task.source === 'program' && task.sourceRef && task.status !== 'done') {
+    try {
+      const delta = FIELD_POINTS[task.sourceRef] ?? 2;
+      const label = LAYER_LABELS[task.linkedEntryType ?? ''] ?? 'field mission';
+      await db.update(users).set({
+        lastReadinessGain: { delta, sourceLabel: label },
+        updatedAt: new Date(),
+      }).where(eq(users.id, user.id));
+    } catch { /* gain line must never block the submit */ }
+  }
+
+  // score ≥ 50 → save to brain_entries so it appears in Documents
+  if (review.score >= 50) {
+    const brainLessonId = `task_${task.id}`;
+    const mappedFeedback = {
+      score: review.score,
+      verdict: review.verdict === 'strong' ? 'strong' : review.verdict === 'good' ? 'ok' : 'can_be_stronger',
+      good: review.highlights,
+      missing: review.improvements,
+      nextStep: review.nextStep,
+      realWorldTask: null,
+    };
+
+    const existingBrain = await db.query.brainEntries.findFirst({
+      where: and(eq(brainEntries.userId, user.id), eq(brainEntries.lessonId, brainLessonId)),
+    });
+
+    if (existingBrain) {
+      await db.update(brainEntries)
+        .set({
+          content: submissionText.trim(),
+          processedByAi: true,
+          aiScore: review.score,
+          aiFeedback: JSON.stringify(mappedFeedback),
+          updatedAt: new Date(),
+        })
+        .where(eq(brainEntries.id, existingBrain.id));
+    } else {
+      await db.insert(brainEntries).values({
+        userId: user.id,
+        lessonId: brainLessonId,
+        lessonTitle: task.title,
+        prompt: task.instruction,
+        content: submissionText.trim(),
+        entryType: (task.source === 'program' && task.linkedEntryType) ? task.linkedEntryType : 'task_result',
+        processedByAi: true,
+        aiScore: review.score,
+        aiFeedback: JSON.stringify(mappedFeedback),
+      });
+    }
+  }
+
+  return res.status(200).json({ task: updated });
+}
+
 // Program v2 (§3.2): field-block tasks are auto-created when the user reaches
 // a module containing a 🟡 block. "Reached" = module unlocked (previous module complete).
-async function syncProgramTasks(db: ReturnType<typeof getDb>, userId: number) {
+async function syncProgramTasks(db: Db, userId: number) {
   const completed = await db.query.completedLessons.findMany({
     where: eq(completedLessons.userId, userId),
   });
@@ -59,21 +222,7 @@ async function syncProgramTasks(db: ReturnType<typeof getDb>, userId: number) {
   }
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (applyCors(req, res, 'GET,POST,OPTIONS')) return;
-
-  // Auth Phase B (§2) — identity from the session cookie; client email ignored.
-  const email = requireAuth(req, res);
-  if (!email) return;
-
-  const rl = await checkRateLimit(req, { email }); // §6 — limiter keys on the session email
-  if (!rl.ok) {
-    if (rl.retryAfter) res.setHeader('Retry-After', String(rl.retryAfter));
-    return res.status(429).json({ error: 'rate_limited', retryAfter: rl.retryAfter });
-  }
-
-  const db = getDb();
-
+export default withAuth('GET,POST,OPTIONS', async (req, res, { email, db }) => {
   // GET /api/tasks — the session user's tasks.
   if (req.method === 'GET') {
     const user = await db.query.users.findFirst({ where: eq(users.email, email) });
@@ -96,8 +245,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({ tasks: rows });
   }
 
-  // POST /api/tasks — create self-task | action 'briefing'
+  // POST /api/tasks — create self-task | action 'briefing' | action 'submit'
   if (req.method === 'POST') {
+    // Task submission + AI review (was api/tasks/submit.ts, folded here — audit P8).
+    if (req.body.action === 'submit') return handleSubmit(db, email, req, res);
+
     // §4b — generate & cache the Mission Briefing for a program field task
     if (req.body.action === 'briefing') {
       const { taskId } = req.body;
@@ -109,6 +261,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         where: and(eq(tasks.id, Number(taskId)), eq(tasks.userId, user.id)),
       });
       if (!task) return res.status(404).json({ error: 'task not found' });
+      // Server-side paywall (audit P1) — briefings are an AI call on a paid-module
+      // mission; a non-subscriber can't spend tokens on M5–M12 content.
+      if (!requireEntitlement(res, task.sourceRef, user.subscribed)) return;
       if (task.briefing) return res.status(200).json({ briefing: task.briefing });
 
       const entries = await db.query.brainEntries.findMany({ where: eq(brainEntries.userId, user.id) });
@@ -158,4 +313,4 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   return res.status(405).json({ error: 'method not allowed' });
-}
+});

@@ -4,11 +4,13 @@ import { MODELS } from '../src/server/models.js';
 import { z } from 'zod';
 import { applyCors } from '../src/server/http.js';
 import { requireAuth } from '../src/server/requireAuth.js';
+import { isPaidLesson, requireEntitlement } from '../src/server/entitlement.js';
+import { clamp, LIMITS } from '../src/server/limits.js';
 import { checkRateLimit } from '../src/server/ratelimit.js';
-import { neon } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-http';
-import { eq, and } from 'drizzle-orm';
-import { users, brainEntries, tasks, delegations } from '../src/db/schema.js';
+import { getDb, type Db } from '../src/server/db.js';
+import { captureError } from '../src/server/observability.js';
+import { eq, and, desc } from 'drizzle-orm';
+import { users, brainEntries, tasks, delegations, checkIns } from '../src/db/schema.js';
 import { computeExercisePoints, LAYER_LABELS } from '../src/server/progressUtils.js';
 import { RUBRICS, GLOBAL_RUBRIC_RULES, NO_SCORE_LESSONS } from '../src/rubrics.js';
 
@@ -50,11 +52,6 @@ const CompareSchema = z.object({
 
 export type CompareResult = z.infer<typeof CompareSchema>;
 
-function getDb() {
-  const sql = neon(process.env.DATABASE_URL!);
-  return drizzle(sql, { schema: { users, brainEntries, tasks, delegations } });
-}
-
 const DELEGATE_SYSTEM = `You are Affina — the founder's AI mentor, drafting ON BEHALF of the founder, from her own data only.
 
 SOURCE RULE: build the draft exclusively from her Brain — intake, Snapshot, prior
@@ -91,8 +88,13 @@ Respond ONLY with valid JSON:
 No paragraphs. No disclaimers, no meta-labels, no 'this is a recommendation' preamble in
 any field — the UI shows the 'analysis, not your decision' note.`;
 
+// Tolerant like FeedbackSchema (CLAUDE.md): a 1- or 4-variant response must not THROW
+// into a silent 502 (audit F25/F52). Accept any count + coerce; we clamp to 3 after parse.
 const DelegateVariantsSchema = z.object({
-  variants: z.array(z.object({ label: z.string(), text: z.string() })).min(2).max(3),
+  variants: z.array(z.object({
+    label: z.coerce.string().catch(''),
+    text: z.coerce.string().catch(''),
+  })).catch([]),
 });
 // Mode C "mentor's read" (SPEC_DELEGATE_C_REWORK §2): verdict/reason/gap replace the old
 // buried recommendation; for/against are the collapsed detail. Tolerant (coerce/.catch, no
@@ -141,6 +143,198 @@ Rules:
 - Give one concrete next step the founder can take in the next 7 days.
 - Respond ONLY with valid JSON, no other text.`;
 
+// ── North Star (was api/northstar/index.ts — folded here to reclaim a Vercel function
+// slot, audit P8; behaviour identical, reached via POST { mode: 'northstar', action }). ──
+// Tolerant (coerce/.catch, no strict counts) so an off-count response never 502s.
+const SuggestionSchema = z.object({
+  candidates: z.array(z.object({
+    key: z.coerce.string().catch(''),
+    label: z.coerce.string().catch(''),
+    unit: z.enum(['people', '$', '%', 'count']).catch('count'),
+    why: z.coerce.string().catch(''),
+    howToMeasure: z.coerce.string().catch(''),
+    currentValue: z.coerce.number().optional().catch(undefined),
+  })).catch([]),
+  recommended: z.coerce.string().catch(''),
+});
+const CommitEvalSchema = z.object({
+  score: z.coerce.number().int().catch(60),
+  verdict: z.enum(['strong', 'ok', 'needs_work']).catch('ok'),
+  mentorNote: z.coerce.string().catch(''),
+  isVanity: z.coerce.boolean().catch(false),
+  betterAlternative: z.coerce.string().optional().catch(undefined),
+});
+const NS_SUGGEST_SYSTEM = `You are Affina — a warm startup mentor for early-stage female founders.
+Given a founder's Brain context (value proposition, business model, use case, persona) and any metrics they've already tracked in weekly check-ins, suggest 1–2 North Star metric candidates.
+
+Rules:
+- Suggest leading metrics that reflect delivered customer value, NOT vanity metrics (not downloads, followers, app opens)
+- At early stage: proxy signals (activations, weekly completed sessions, paying users) are better than revenue alone
+- Each candidate must be measurable at the founder's current stage
+- key: machine-readable slug (snake_case), label: human-readable, unit: 'people'|'$'|'%'|'count'
+- why: 1 sentence on how it reflects real value to her customer
+- howToMeasure: 1 sentence on how to track it right now
+- recommended: the key of the strongest candidate
+- If any metric appears in their check-in history, include currentValue
+Respond ONLY with valid JSON.`;
+const NS_COMMIT_SYSTEM = `You are Affina — a warm startup mentor for early-stage female founders.
+Evaluate a founder's chosen North Star metric against these criteria:
+1. Reflects delivered customer value (not vanity/activity)
+2. Measurable at her current stage
+3. Preferably leading (predicts future health, not just records past)
+4. Aligned with her business model
+
+Scoring: 80–100 strong, 60–79 ok, 0–59 needs work.
+If the metric is vanity (downloads, followers, page views without engagement), isVanity=true and gently suggest a better alternative.
+mentorNote: 1–2 warm, honest sentences. Acknowledge what's good; if needs_work, guide specifically toward a better choice.
+Respond ONLY with valid JSON.`;
+
+async function handleNorthstar(db: Db, email: string, req: VercelRequest, res: VercelResponse) {
+  const { action } = req.body ?? {};
+  if (action !== 'suggest' && action !== 'commit') return res.status(400).json({ error: 'action must be suggest or commit' });
+
+  const user = await db.query.users.findFirst({ where: eq(users.email, email) });
+  if (!user) return res.status(404).json({ error: 'user not found' });
+
+  // Server-side paywall (audit P1) — the North Star exercise IS lesson m5l6 (paid module M5).
+  if (!requireEntitlement(res, 'm5l6', user.subscribed)) return;
+
+  if (action === 'suggest') {
+    const brain = await db.query.brainEntries.findMany({ where: eq(brainEntries.userId, user.id) });
+    const recentCheckIns = await db.query.checkIns.findMany({
+      where: eq(checkIns.userId, user.id),
+      orderBy: [desc(checkIns.weekOf)],
+      limit: 3,
+    });
+    const brainMap: Record<string, string> = {};
+    for (const e of brain) brainMap[e.entryType] = e.content;
+
+    const existingMetrics: Record<string, number[]> = {};
+    for (const ci of recentCheckIns) {
+      if (!Array.isArray(ci.metrics)) continue;
+      for (const m of ci.metrics as { name: string; value: number }[]) {
+        if (!existingMetrics[m.name]) existingMetrics[m.name] = [];
+        existingMetrics[m.name].push(m.value);
+      }
+    }
+    const metricsContext = Object.entries(existingMetrics)
+      .map(([name, vals]) => `${name}: latest ${vals[0]}`)
+      .join(', ') || 'none tracked yet';
+
+    const userMessage = `Founder: ${user.name || 'unnamed'}
+Project: ${user.projectName || 'startup'} — ${user.idea || 'not described'}
+Stage: ${user.stage || 'early'}
+
+Brain layers:
+- Value proposition: ${brainMap['value_proposition'] || 'not written yet'}
+- Business model: ${brainMap['business_model'] || 'not written yet'}
+- Use case: ${brainMap['use_case'] || 'not written yet'}
+- Target persona: ${brainMap['persona'] || 'not written yet'}
+
+Already tracking in check-ins: ${metricsContext}
+
+Suggest 1–2 North Star metric candidates for this founder. Respond ONLY with valid JSON:
+{ "candidates": [ { "key": "...", "label": "...", "unit": "people|$|%|count", "why": "...", "howToMeasure": "...", "currentValue": 0 } ], "recommended": "<key>" }`;
+
+    try {
+      const msg = await callClaude({
+        model: MODELS.standard, max_tokens: 800, system: NS_SUGGEST_SYSTEM,
+        messages: [{ role: 'user', content: userMessage }],
+      }, { endpoint: 'northstar', mode: 'suggest', email });
+      const raw = msg.content[0].type === 'text' ? msg.content[0].text : '';
+      const match = raw.match(/\{[\s\S]*\}/);
+      if (!match) throw new Error('no JSON');
+      const parsed = SuggestionSchema.parse(JSON.parse(match[0]));
+      parsed.candidates = parsed.candidates.slice(0, 2);
+      if (parsed.candidates.length === 0) throw new Error('no candidates');
+      return res.status(200).json(parsed);
+    } catch {
+      return res.status(502).json({ error: 'ai_unavailable' });
+    }
+  }
+
+  // ── COMMIT ── validate types, not just presence (audit F08): a non-string key gets
+  // stored in users.northStar and later `ns.key.toLowerCase()` in pulse would 500 every
+  // future check-in draft — a permanent, self-inflicted break. Reject bad input with 400.
+  const commitInput = z.object({
+    key: z.string().trim().min(1).max(120),
+    label: z.string().trim().min(1).max(200),
+    unit: z.string().trim().min(1).max(40),
+    rationale: z.string().max(4000).optional(),
+  }).safeParse(req.body ?? {});
+  if (!commitInput.success) return res.status(400).json({ error: 'key, label, unit must be non-empty strings' });
+  const { key, label, unit, rationale } = commitInput.data;
+
+  const brain = await db.query.brainEntries.findMany({ where: eq(brainEntries.userId, user.id) });
+  const brainMap: Record<string, string> = {};
+  for (const e of brain) brainMap[e.entryType] = e.content;
+
+  const commitMessage = `Founder: ${user.name || 'unnamed'}
+Project: ${user.projectName || 'startup'} — ${user.idea || 'not described'}
+Business model: ${brainMap['business_model'] || 'not described'}
+Value proposition: ${brainMap['value_proposition'] || 'not described'}
+Use case: ${brainMap['use_case'] || 'not described'}
+
+Chosen North Star metric:
+- Key: ${key}
+- Label: ${label}
+- Unit: ${unit}
+- Founder's rationale: ${rationale || '(none provided)'}
+
+Evaluate this metric. Return JSON: { "score": 75, "verdict": "ok", "mentorNote": "...", "isVanity": false, "betterAlternative": "only if isVanity" }`;
+
+  try {
+    const msg = await callClaude({
+      model: MODELS.standard, max_tokens: 400, system: NS_COMMIT_SYSTEM,
+      messages: [{ role: 'user', content: commitMessage }],
+    }, { endpoint: 'northstar', mode: 'commit', email });
+    const raw = msg.content[0].type === 'text' ? msg.content[0].text : '';
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error('no JSON');
+    const evaluation = CommitEvalSchema.parse(JSON.parse(match[0]));
+    evaluation.score = Math.max(0, Math.min(100, evaluation.score));
+
+    const northStarValue = { key, label, unit };
+    const brainContent = `North Star: ${label} (${unit})\nRationale: ${rationale || '(none)'}`;
+
+    const existing = brain.find((e) => e.entryType === 'north_star');
+    if (existing) {
+      await db.update(brainEntries).set({
+        content: brainContent, aiScore: evaluation.score, aiFeedback: JSON.stringify(evaluation),
+        processedByAi: true, updatedAt: new Date(),
+      }).where(eq(brainEntries.id, existing.id));
+    } else {
+      await db.insert(brainEntries).values({
+        userId: user.id, lessonId: 'm5l6', lessonTitle: 'Choose your North Star + year goal',
+        prompt: 'Why did you choose this metric as your North Star?', content: brainContent,
+        entryType: 'north_star', aiScore: evaluation.score, aiFeedback: JSON.stringify(evaluation), processedByAi: true,
+      });
+    }
+
+    // Readiness gain from setting/strengthening the North Star (§7 exercise points).
+    const baseRows = brain
+      .filter((e) => e.entryType !== 'north_star')
+      .map((e) => ({ entryType: e.entryType, aiScore: e.aiScore ?? null }));
+    const after = computeExercisePoints([...baseRows, { entryType: 'north_star', aiScore: evaluation.score }]);
+    const before = computeExercisePoints(
+      existing ? [...baseRows, { entryType: 'north_star', aiScore: existing.aiScore ?? null }] : baseRows);
+    const gainDelta = after - before;
+
+    await db.update(users).set({
+      northStar: northStarValue,
+      ...(gainDelta > 0 ? { lastReadinessGain: { delta: gainDelta, sourceLabel: LAYER_LABELS['north_star'] } } : {}),
+      updatedAt: new Date(),
+    }).where(eq(users.id, user.id));
+
+    return res.status(200).json({
+      score: evaluation.score, verdict: evaluation.verdict, mentorNote: evaluation.mentorNote,
+      isVanity: evaluation.isVanity, betterAlternative: evaluation.betterAlternative ?? null,
+    });
+  } catch {
+    return res.status(502).json({ error: 'ai_unavailable' });
+  }
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (applyCors(req, res, 'POST,OPTIONS')) return;
   if (req.method !== 'POST') return res.status(405).json({ error: 'method not allowed' });
@@ -161,6 +355,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (rl.retryAfter) res.setHeader('Retry-After', String(rl.retryAfter));
     return res.status(429).json({ error: 'rate_limited', retryAfter: rl.retryAfter });
   }
+
+  // Server-side paywall (audit P1) — feedback/compare/delegate scoped to a paid-module
+  // (M5–M12) lesson require an active subscription; the client gate is not trusted.
+  // Only hits the DB when the target lesson is actually gated, so free-lesson and
+  // no-lesson calls (extract-interview, psc-*, generate-name) pay nothing extra.
+  if (!preAuth && isPaidLesson(req.body?.lessonId)) {
+    const u = await getDb().query.users.findFirst({
+      where: eq(users.email, email),
+      columns: { subscribed: true },
+    });
+    if (!requireEntitlement(res, req.body.lessonId, u?.subscribed)) return;
+  }
+
+  // North Star exercise (folded from api/northstar — audit P8). Authed; does its own m5l6 gate.
+  if (req.body.mode === 'northstar') return handleNorthstar(getDb(), email, req, res);
 
   // Interview transcript extraction (SPEC_INTERVIEW_LOG_TRANSCRIPT §5).
   // NOT a Delegate mode (§6): this only RESTRUCTURES her own pasted real data into
@@ -248,8 +457,9 @@ Draft her For (confirms) and Against (contradicts/surprised) from this.` }],
   }
 
   if (req.body.mode === 'psc-conclusion') {
-    const { forText, againstText } = req.body;
-    if (!forText?.trim() && !againstText?.trim()) return res.status(400).json({ error: 'for/against required' });
+    const forText = clamp(req.body?.forText, LIMITS.answer);
+    const againstText = clamp(req.body?.againstText, LIMITS.answer);
+    if (!forText.trim() && !againstText.trim()) return res.status(400).json({ error: 'for/against required' });
     const Schema = z.object({ conclusion: z.coerce.string().catch('') });
     try {
       const msg = await callClaude({
@@ -270,8 +480,13 @@ Draft her For (confirms) and Against (contradicts/surprised) from this.` }],
 
   // Generate project name mode — cheap Haiku call, no lesson context required
   if (req.body.mode === 'generate-name') {
-    const { idea, customer, businessModel, stage, avoid } = req.body;
-    if (!idea?.trim()) return res.status(200).json({ name: '' });
+    // Length caps (audit F21) — pre-auth, no session, tightest bound.
+    const idea = clamp(req.body?.idea, LIMITS.preAuthField);
+    const customer = clamp(req.body?.customer, LIMITS.preAuthField);
+    const businessModel = clamp(req.body?.businessModel, LIMITS.preAuthField);
+    const stage = clamp(req.body?.stage, LIMITS.preAuthField);
+    const { avoid } = req.body;
+    if (!idea.trim()) return res.status(200).json({ name: '' });
     const avoidList: string[] = Array.isArray(avoid) ? avoid.filter(Boolean) : [];
     const avoidLine = avoidList.length
       ? `\nAlready suggested — return something clearly DIFFERENT in sound and root: ${avoidList.join(', ')}.`
@@ -301,7 +516,9 @@ Stage: ${stage || 'early'}${avoidLine}`,
 
   // §4 Delegate — "Let AI mentor draft this for me" (after ≥1 user attempt; logged for the credit model)
   if (req.body.mode === 'delegate') {
-    const { lessonId, lessonTitle, prompt, delegateMode } = req.body;
+    const { lessonId, delegateMode } = req.body;
+    const lessonTitle = clamp(req.body?.lessonTitle, LIMITS.shortField);
+    const prompt = clamp(req.body?.prompt, LIMITS.answer);
     if (!lessonId) return res.status(400).json({ error: 'lessonId required' });
     const dMode: 'A' | 'B' | 'C' = delegateMode === 'B' || delegateMode === 'C' ? delegateMode : 'A';
 
@@ -348,7 +565,9 @@ Stage: ${stage || 'early'}${avoidLine}`,
         }
         if (dMode === 'B') {
           const parsed = DelegateVariantsSchema.parse(JSON.parse(match[0]));
-          return res.status(200).json({ variants: parsed.variants });
+          // No fabrication to reach a count: if the model gave nothing usable, ask instead of 502.
+          if (parsed.variants.length === 0) return res.status(200).json({ question: raw.slice(0, 600) });
+          return res.status(200).json({ variants: parsed.variants.slice(0, 3) });
         }
         const parsed = DelegateAnalysisSchema.parse(JSON.parse(match[0]));
         // ≤3 one-line bullets each (schema stays tolerant so an off-count never 502s).
@@ -365,11 +584,15 @@ Stage: ${stage || 'early'}${avoidLine}`,
     }
   }
 
-  const { lessonId, lessonTitle, prompt, answer, aiMode, context } = req.body;
+  const { lessonId, aiMode, context } = req.body;
+  // Length caps (audit F11/F24) — bound every user-controlled string before the prompt.
+  const lessonTitle = clamp(req.body?.lessonTitle, LIMITS.shortField);
+  const prompt = clamp(req.body?.prompt, LIMITS.answer);
+  const answer = clamp(req.body?.answer, LIMITS.answer);
   const contextBlock = context?.idea
-    ? `\n\nFounder context (use this to personalize feedback — reference their actual project and address them by name):\n- Name: ${context.name || 'not provided'}\n- Idea: ${context.idea}\n- Target customer: ${context.customer || 'not specified'}\n- Stage: ${context.stage || 'not specified'}`
+    ? `\n\nFounder context (use this to personalize feedback — reference their actual project and address them by name):\n- Name: ${clamp(context.name, LIMITS.shortField) || 'not provided'}\n- Idea: ${clamp(context.idea, LIMITS.shortField)}\n- Target customer: ${clamp(context.customer, LIMITS.shortField) || 'not specified'}\n- Stage: ${clamp(context.stage, LIMITS.shortField) || 'not specified'}`
     : '';
-  if (!lessonId || !answer?.trim()) {
+  if (!lessonId || !answer.trim()) {
     return res.status(400).json({ error: 'lessonId and answer are required' });
   }
 
@@ -464,7 +687,7 @@ Return JSON with exactly this structure:
       result = parsed;
     }
   } catch (err) {
-    console.error('[ai] feedback/compare failed:', err instanceof Error ? err.message : err);
+    captureError(err, { endpoint: 'ai', mode: 'feedback-compare', email });
     return res.status(502).json({ error: 'ai_unavailable' });
   }
 

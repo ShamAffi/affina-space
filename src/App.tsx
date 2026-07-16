@@ -188,7 +188,19 @@ function AppRoutes() {
       <Route
         path="/unlock/success"
         element={authed ? (
-          <PaymentSuccess onConfirmed={() => { update({ subscribed: true }); navigate('/start-session'); }} />
+          <PaymentSuccess
+            // Reached ONLY after the poll read subscribed=true from the server (webhook = truth).
+            onConfirmed={() => { update({ subscribed: true }); navigate('/start-session'); }}
+            // Slow webhook: never grant locally (audit F37). Re-read the server truth and go
+            // to the dashboard — access self-unlocks on the next load once the webhook lands.
+            onDefer={async () => {
+              try {
+                const r = await fetch('/api/user');
+                if (r.ok) { const d = await r.json(); update({ subscribed: !!d.subscribed }); }
+              } catch { /* fall through to dashboard regardless */ }
+              navigate('/dashboard');
+            }}
+          />
         ) : toLanding}
       />
       {/* Post-paywall S1 booking — required step, both CTAs advance to M5 */}
@@ -380,7 +392,7 @@ function Verify({ onVerified }: { onVerified: (email: string, isNew: boolean, ne
 // SPEC_STRIPE §3/§4 — Stripe redirects here after payment. `subscribed` is set by the
 // webhook (the source of truth), never the redirect — so poll the server for it, then
 // continue into the program. The redirect alone never grants access.
-function PaymentSuccess({ onConfirmed }: { onConfirmed: () => void }) {
+function PaymentSuccess({ onConfirmed, onDefer }: { onConfirmed: () => void; onDefer: () => void }) {
   const [slow, setSlow] = useState(false);
   const ran = useRef(false);
 
@@ -410,8 +422,8 @@ function PaymentSuccess({ onConfirmed }: { onConfirmed: () => void }) {
       <h1 className="mt-4 text-2xl font-extrabold text-ink mb-2">Payment received</h1>
       {slow ? (
         <p className="text-sm text-ink-soft max-w-sm">
-          You're all set — it's taking a moment to sync.{' '}
-          <button onClick={onConfirmed} className="text-brand font-semibold underline">Continue to the program →</button>
+          Payment received — your access unlocks automatically the moment it settles (usually under a minute).{' '}
+          <button onClick={onDefer} className="text-brand font-semibold underline">Go to your dashboard →</button>
         </p>
       ) : (
         <>

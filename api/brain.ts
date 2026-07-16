@@ -1,20 +1,14 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { callClaude } from '../src/server/anthropic.js';
 import { MODELS } from '../src/server/models.js';
 import { z } from 'zod';
-import { applyCors } from '../src/server/http.js';
-import { requireAuth } from '../src/server/requireAuth.js';
-import { checkRateLimit } from '../src/server/ratelimit.js';
-import { neon } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-http';
+import { withAuth } from '../src/server/handler.js';
+import { requireEntitlement } from '../src/server/entitlement.js';
+import { captureError } from '../src/server/observability.js';
+import { clamp, LIMITS } from '../src/server/limits.js';
+import type { Db } from '../src/server/db.js';
 import { eq, and } from 'drizzle-orm';
 import { users, lessonInputs, completedLessons, brainEntries } from '../src/db/schema.js';
 import { BRAIN_ENTRY_TYPES, MODULES } from '../src/data.js';
-
-function getDb() {
-  const sql = neon(process.env.DATABASE_URL!);
-  return drizzle(sql, { schema: { users, lessonInputs, completedLessons, brainEntries } });
-}
 
 function getLessonMeta(lessonId: string): { title: string; prompt: string } | null {
   for (const mod of MODULES) {
@@ -38,11 +32,14 @@ const SNAPSHOT_SECTIONS = [
   'Next focus',
 ] as const;
 
+// Tolerant to LLM looseness (CLAUDE.md pattern): an off-count sections array must not
+// THROW the wow-moment snapshot into a silent 502 (audit F26/F52). Accept any count +
+// coerce; generateSnapshot guards a fully-empty parse and caps the count on build.
 const SnapshotSchema = z.object({
   sections: z.array(z.object({
-    title: z.string(),
-    content: z.string(),
-  })).min(8).max(12),
+    title: z.coerce.string().catch(''),
+    content: z.coerce.string().catch(''),
+  })).catch([]),
 });
 
 const SNAPSHOT_SYSTEM = `You are Affina — an honest startup mentor for early-stage female founders.
@@ -63,23 +60,28 @@ type Snap = { version: number; generatedAt: string; source: string; sections: { 
 
 // ─── Market Research m2l6 (RULES_DONE_FOR_YOU §1) — test mode, model estimates only ──
 // Tolerant to common LLM looseness: numeric values, missing optionals, odd confidence labels.
+// Tolerant to LLM looseness (CLAUDE.md pattern, audit F26/F52): off-count keyNumbers/
+// sections must not THROW the report into a silent 502 — accept any count + coerce.
 const ResearchReportSchema = z.object({
-  headlineVerdict: z.string(),
+  headlineVerdict: z.coerce.string().catch(''),
   keyNumbers: z.array(z.object({
-    label: z.coerce.string(),
-    value: z.coerce.string(),
+    label: z.coerce.string().catch(''),
+    value: z.coerce.string().catch(''),
     logic: z.coerce.string().catch(''),
-  })).min(1).max(5),
+  })).catch([]),
   sections: z.array(z.object({
-    title: z.string(),
+    title: z.coerce.string().catch(''),
     confidence: z.enum(['high', 'medium', 'low']).catch('medium'),
-    body: z.string(),
+    body: z.coerce.string().catch(''),
     whatThisMeans: z.coerce.string().catch(''),
     warning: z.string().nullable().catch(null),
-  })).min(7).max(10),
+  })).catch([]),
 });
 const ResearchQuestionsSchema = z.object({
-  questions: z.array(z.object({ id: z.string(), q: z.string() })).min(1).max(5),
+  questions: z.array(z.object({
+    id: z.coerce.string().catch(''),
+    q: z.coerce.string().catch(''),
+  })).catch([]),
 });
 
 const RESEARCH_SYSTEM = `You are Affina's research analyst producing a MARKET RESEARCH report for a first-time female founder — TEST MODE: you have NO live web access. Every external figure is a clearly-labeled estimate.
@@ -113,7 +115,7 @@ Section 7 openings must tie to HER edge from the Snapshot, each with a first ste
 
 
 async function generateSnapshot(
-  db: ReturnType<typeof getDb>,
+  db: Db,
   user: typeof users.$inferSelect,
   source: string,
   moduleScope?: string,
@@ -151,12 +153,15 @@ Produce the ${prev ? 'updated' : 'first'} Startup Snapshot. Source: ${source}.`;
     const match = raw.match(/\{[\s\S]*\}/);
     if (!match) throw new Error('no JSON');
     const parsed = SnapshotSchema.parse(JSON.parse(match[0]));
+    // A structurally-empty snapshot is a failure (keep the null path) — but any non-zero
+    // count is accepted (a 5- or 15-section response no longer 502s); cap at 12 for display.
+    if (parsed.sections.length === 0) throw new Error('empty snapshot');
 
     const snap: Snap = {
       version: (prev?.version ?? 0) + 1,
       generatedAt: new Date().toISOString(),
       source,
-      sections: parsed.sections,
+      sections: parsed.sections.slice(0, 12),
     };
 
     // Persist: users.snapshot (+ history capped at 5) and the unique brain entry
@@ -191,21 +196,7 @@ Produce the ${prev ? 'updated' : 'first'} Startup Snapshot. Source: ${source}.`;
   }
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (applyCors(req, res, 'GET,POST,OPTIONS')) return;
-
-  // Auth Phase B (§2) — identity from the session cookie; client email ignored.
-  const email = requireAuth(req, res);
-  if (!email) return;
-
-  const rl = await checkRateLimit(req, { email }); // §6 — limiter keys on the session email
-  if (!rl.ok) {
-    if (rl.retryAfter) res.setHeader('Retry-After', String(rl.retryAfter));
-    return res.status(429).json({ error: 'rate_limited', retryAfter: rl.retryAfter });
-  }
-
-  const db = getDb();
-
+export default withAuth('GET,POST,OPTIONS', async (req, res, { email, db }) => {
   // GET /api/brain — brain entries (array). With ?with=snapshot → { entries, snapshot }.
   if (req.method === 'GET') {
     const withSnapshot = req.query.with === 'snapshot';
@@ -225,10 +216,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // POST /api/brain — save-input | toggle-complete | generate-snapshot (session user).
   if (req.method === 'POST') {
-    const { action, lessonId, content, userDraft, aiDraft } = req.body;
+    const { action, lessonId } = req.body;
+    // Length caps (audit F11) — content is stored AND later fed into snapshot/case prompts.
+    const content = clamp(req.body?.content, LIMITS.longText);
+    const userDraft = req.body?.userDraft !== undefined ? clamp(req.body.userDraft, LIMITS.answer) : undefined;
+    const aiDraft = req.body?.aiDraft !== undefined ? clamp(req.body.aiDraft, LIMITS.answer) : undefined;
 
     const user = await db.query.users.findFirst({ where: eq(users.email, email) });
     if (!user) return res.status(404).json({ error: 'user not found' });
+
+    // Server-side paywall (audit P1) — writing to a paid-module (M5–M12) lesson
+    // (save-input, toggle-complete) requires a subscription. Free-module actions
+    // (generate-snapshot, founders-case, market-research) carry no paid lessonId.
+    if (!requireEntitlement(res, lessonId, user.subscribed)) return;
 
     // ⚙️ M0.5 / explicit regeneration — the wow moment (§6.1)
     if (action === 'generate-snapshot') {
@@ -263,16 +263,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // Potential = 2–3 clean stats, each {label (small grey), hero (bold number), support (plain line)}.
       // No box-math, no jargon, no formula line — the AI already delivers presentation-ready copy.
+      // Tolerant to LLM looseness (CLAUDE.md pattern): an off-count proof/stats array
+      // must not THROW the pre-paywall Founder's Case into a silent 502 (audit F26/F52).
       const CaseSchema = z.object({
-        vision: z.coerce.string(),
-        proof: z.array(z.coerce.string()).min(1).max(6),
+        vision: z.coerce.string().catch(''),
+        proof: z.array(z.coerce.string()).catch([]),
         potential: z.object({
           stats: z.array(z.object({
-            label: z.coerce.string(),
-            hero: z.coerce.string(),
+            label: z.coerce.string().catch(''),
+            hero: z.coerce.string().catch(''),
             support: z.coerce.string().catch(''),
-          })).min(2).max(3),
-        }),
+          })).catch([]),
+        }).catch({ stats: [] }),
       });
       try {
         const msg = await callClaude({
@@ -341,7 +343,7 @@ Write her Founder's Case — calibrate the numbers and the third stat to her amb
       const snap = (user.snapshot ?? null) as Snap | null;
 
       const answersBlock = answers && Object.keys(answers).length
-        ? `\nHER ANSWERS TO YOUR CLARIFYING QUESTIONS:\n${Object.entries(answers).map(([k, v]) => `- ${k}: ${v}`).join('\n')}`
+        ? `\nHER ANSWERS TO YOUR CLARIFYING QUESTIONS:\n${Object.entries(answers).map(([k, v]) => `- ${clamp(k, LIMITS.shortField)}: ${clamp(v, LIMITS.answer)}`).join('\n')}`
         : '';
 
       const userMessage = `PROJECT: ${user.projectName || 'unnamed'} — ${user.idea || 'not set'}
@@ -380,7 +382,7 @@ Produce the test-mode report — or the clarifying questions if critical inputs 
 
         // §1.2a — clarifying answers enrich the Brain (reused on re-runs)
         if (answers && Object.keys(answers).length) {
-          const text = Object.entries(answers).map(([k, v]) => `${k}: ${v}`).join('\n');
+          const text = Object.entries(answers).map(([k, v]) => `${clamp(k, LIMITS.shortField)}: ${clamp(v, LIMITS.answer)}`).join('\n');
           const prior = entries.find((e) => e.entryType === 'research_inputs');
           if (prior) {
             await db.update(brainEntries)
@@ -430,7 +432,7 @@ Produce the test-mode report — or the clarifying questions if critical inputs 
 
         return res.status(200).json({ report: full });
       } catch (err) {
-        console.error('market-research error', err instanceof Error ? err.message : JSON.stringify(err).slice(0, 800));
+        captureError(err, { endpoint: 'brain', mode: 'market-research', email: user.email });
         return res.status(502).json({ error: 'ai_unavailable' });
       }
     }
@@ -518,4 +520,4 @@ Produce the test-mode report — or the clarifying questions if critical inputs 
   }
 
   return res.status(405).json({ error: 'method not allowed' });
-}
+});

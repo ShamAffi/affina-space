@@ -2,24 +2,19 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { applyCors } from '../src/server/http.js';
 import { requireAuth } from '../src/server/requireAuth.js';
 import { checkRateLimit } from '../src/server/ratelimit.js';
-import { neon } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-http';
+import { getDb } from '../src/server/db.js';
+import { clampInt } from '../src/server/limits.js';
 import { eq } from 'drizzle-orm';
 import { users, lessonInputs, completedLessons, brainEntries, tasks, checkIns, achievements, delegations } from '../src/db/schema.js';
 import { GROWTH_SEED_XP } from '../src/server/progressUtils.js';
-import { sendEmail, mentorBookedEmail } from '../src/server/email.js';
-import { logEmail } from '../src/server/emailLog.js';
+import { mentorBookedEmail } from '../src/server/email.js';
+import { sendOnce } from '../src/server/emailLog.js';
 
 // Auth Phase B (SPEC_AUTH_PHASE_B): GET + PATCH derive identity from the session cookie
 // (requireAuth) — the client email param is ignored. POST is the PRE-AUTH onboarding
 // surface (§7): no session, IP rate-limited, and it may ONLY create/update a PENDING row
 // (verifiedAt IS NULL) — it refuses to touch a verified account. Post-verify profile
 // edits go through PATCH.
-
-function getDb() {
-  const sql = neon(process.env.DATABASE_URL!);
-  return drizzle(sql, { schema: { users, lessonInputs, completedLessons, brainEntries, tasks, checkIns, achievements, delegations } });
-}
 
 // Re-onboarding with an existing email (freshStart) must not inherit the previous
 // life of that account: wipe all child rows and reset derived state, otherwise old
@@ -84,7 +79,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // verified account (a pre-auth caller must never overwrite / read a real user's data).
   // IP rate-limited. Post-verify profile edits go through PATCH (session-guarded).
   //   emailCapture=true (SPEC_ONBOARDING_FUNNEL §2a): email-capture / change-email — blocks
-  //     on a verified account, reuses/relocates a pending row, sets emailCapturedAt.
+  //     on a verified account, else creates/reuses the pending row FOR `email` only, sets
+  //     emailCapturedAt. (No cross-email relocate — see F06 note below.)
   //   plain sync: name/project/report onto the pending row during onboarding.
   if (req.method === 'POST') {
     const rl = await checkRateLimit(req); // pre-auth → IP-based only (no session email)
@@ -96,7 +92,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const body = req.body ?? {};
     const email = String(body.email ?? '').trim().toLowerCase();
     if (!email) return res.status(400).json({ error: 'email required' });
-    const { name, projectName, idea, customer, businessModel, stage, goal, score, country, city, timezone, onboardingReport, emailCapture, previousEmail } = body;
+    const { name, projectName, idea, customer, businessModel, stage, goal, country, city, timezone, onboardingReport, emailCapture } = body;
+    // audit F14 — never trust the client-supplied onboarding score; clamp to [0,100].
+    // It's a display/motivation number (from the pre-auth /api/score compute), never an
+    // entitlement, so clamping — not recomputing — is the proportionate fix.
+    const score = clampInt(body.score, 0, 100);
 
     // Profile fields written on every path. drizzle .set()/.values() skips `undefined`,
     // so an omitted field (e.g. name at capture time) never clobbers an existing value.
@@ -109,25 +109,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     };
 
     // ── EMAIL CAPTURE (§2a) — verification = ownership; block only on verified ────────
+    // audit F06: the previousEmail "relocate" branch was REMOVED. It let an anonymous
+    // caller move ANY pending row (keyed by a client-supplied previousEmail) onto an
+    // address the caller controls, then verify it and steal the victim's onboarding data
+    // (and deny the victim their signup). A pre-auth caller may now only ever touch the
+    // row for the email it is capturing — never a row keyed by some other address, and
+    // never a verified one. Change-email simply captures onto the new address; the client
+    // re-sends the full onboarding data, and the old pending row is left to expire.
     if (emailCapture === true) {
       const capturedAt = new Date();
       const target = await db.query.users.findFirst({ where: eq(users.email, email) });
+      // The one intentional signal the funnel UX needs (EmailCapture/ConfirmEmail show
+      // "you already have an account — sign in"). Bounded by the IP rate limit above.
       if (target?.verifiedAt) return res.status(200).json({ blocked: true, reason: 'already_registered' });
-
-      // Change-email: relocate the current pending row to the new address (child rows key
-      // on userId, so they follow automatically). Same three-way check on the target email.
-      const from = String(previousEmail ?? '').trim().toLowerCase();
-      if (from && from !== email) {
-        const prevRow = await db.query.users.findFirst({ where: eq(users.email, from) });
-        if (prevRow && !prevRow.verifiedAt) {
-          if (target && target.id !== prevRow.id) return res.status(200).json({ blocked: true, reason: 'in_use' });
-          await db.update(users)
-            .set({ email, ...profile, onboardingReport, emailCapturedAt: capturedAt, updatedAt: capturedAt })
-            .where(eq(users.id, prevRow.id));
-          return res.status(200).json({ id: prevRow.id, reused: true, moved: true });
-        }
-        // no pending source row → fall through and capture fresh on the new email
-      }
 
       if (target) {
         // Reuse the pending row: overwrite intake/report with this run, refresh the clock.
@@ -135,30 +129,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         await db.update(users)
           .set({ ...profile, ...derivedReset, onboardingReport, emailCapturedAt: capturedAt, updatedAt: capturedAt })
           .where(eq(users.id, target.id));
-        return res.status(200).json({ id: target.id, reused: true });
+      } else {
+        await db.insert(users).values({ email, ...profile, onboardingReport, emailCapturedAt: capturedAt });
       }
-      const [created] = await db.insert(users)
-        .values({ email, ...profile, onboardingReport, emailCapturedAt: capturedAt })
-        .returning({ id: users.id });
-      return res.status(201).json({ id: created.id, created: true });
+      // Uniform success shape (no id / reused / created leak) — the only distinguishable
+      // response is the verified-account block above, which the UX requires.
+      return res.status(200).json({ ok: true });
     }
 
-    // Plain onboarding sync — refuse a VERIFIED row (§7: pre-auth touches pending only).
+    // Plain onboarding sync (syncUserToDB — fire-and-forget; the client ignores the body).
+    // Refuse a VERIFIED row (§7: pre-auth touches pending only). audit F14: return a
+    // UNIFORM response for verified / pending / new, so this path is not an email-
+    // registration enumeration oracle (a prober can't tell the three cases apart).
     const existing = await db.query.users.findFirst({ where: eq(users.email, email) });
     if (existing?.verifiedAt) {
-      return res.status(200).json({ blocked: true, reason: 'already_registered' });
+      return res.status(200).json({ ok: true }); // silently no-op — never touch a verified row, never reveal it
     }
     if (existing) {
       await db.update(users)
         .set({ ...profile, onboardingReport, updatedAt: new Date() })
         .where(eq(users.id, existing.id));
-      return res.status(200).json({ id: existing.id });
+    } else {
+      // Welcome fires on magic-link verification (api/auth.ts verify-link), not here.
+      await db.insert(users).values({ email, ...profile, onboardingReport });
     }
-    const [created] = await db.insert(users)
-      .values({ email, ...profile, onboardingReport })
-      .returning({ id: users.id });
-    // Welcome fires on magic-link verification (api/auth.ts verify-link), not here.
-    return res.status(201).json({ id: created.id });
+    return res.status(200).json({ ok: true });
   }
 
   // PATCH /api/user — post-auth profile/account edits. Identity from the SESSION cookie;
@@ -167,6 +162,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'PATCH') {
     const email = requireAuth(req, res);
     if (!email) return;
+    // Rate limit (audit F07) — PATCH can trigger mentor-booked emails; without this a
+    // session could fan out unbounded Resend sends by toggling mentorSessions keys.
+    const rl = await checkRateLimit(req, { email });
+    if (!rl.ok) {
+      if (rl.retryAfter) res.setHeader('Retry-After', String(rl.retryAfter));
+      return res.status(429).json({ error: 'rate_limited', retryAfter: rl.retryAfter });
+    }
     // NOTE: `subscribed` is NOT accepted here — it's driven ONLY by the Stripe webhook
     // (SPEC_STRIPE §3), never from the browser. The paywall now redirects to Checkout.
     const { name, projectName, idea, customer, businessModel, stage, goal, country, city, timezone, mentorSessions } = req.body ?? {};
@@ -181,6 +183,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const prev = (existingUser?.mentorSessions ?? {}) as Record<string, unknown>;
       const merged: Record<string, unknown> = { ...prev };
       for (const [k, v] of Object.entries(mentorSessions as Record<string, unknown>)) {
+        // audit F07 — only the 3 real sessions exist; ignoring unknown keys bounds the
+        // email fan-out to ≤3 per request (a hostile client can't invent S4…S999).
+        if (k !== 'S1' && k !== 'S2' && k !== 'S3') continue;
         const before = prev[k] as { booked?: boolean } | undefined;
         const after = v as { booked?: boolean };
         if (after?.booked === true && before?.booked !== true) newlyBooked.push(k);
@@ -200,10 +205,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     await db.update(users).set(patchFields).where(eq(users.email, email));
-    // §2.4 — mentor-session-booked email when a session's `booked` flips true (once per session)
-    for (const sid of newlyBooked) {
-      await sendEmail(mentorBookedEmail(email, sid));
-      if (existingUser) await logEmail(existingUser.id, 'mentor_booked', sid);
+    // §2.4 — mentor-session-booked email when a session's `booked` flips true. sendOnce
+    // dedups by (user, 'mentor_booked', sid) so a false→true→false→true toggle can't
+    // re-send (audit F07); combined with the ≤3-key bound + rate limit, fan-out is capped.
+    if (existingUser) {
+      for (const sid of newlyBooked) {
+        await sendOnce(existingUser.id, 'mentor_booked', sid, mentorBookedEmail(email, sid));
+      }
     }
     return res.status(200).json({ ok: true });
   }

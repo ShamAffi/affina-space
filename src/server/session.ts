@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { requireSecret } from './env.js';
 
 // Passwordless session (SPEC_RESEND_AUTH §6): a signed, httpOnly cookie — no session
 // table. Cookie = base64url(email|exp) + '.' + HMAC-SHA256(payload, SESSION_SECRET).
@@ -10,9 +11,14 @@ const COOKIE = 'affina_session';
 const MAX_AGE_DAYS = 30;
 const MAX_AGE_SEC = MAX_AGE_DAYS * 24 * 60 * 60;
 
+// Read once at module load and FAIL CLOSED (audit F10): the whole identity model rests
+// on this HMAC key, so a missing/blank secret must crash the auth functions loudly, not
+// silently sign every cookie with an empty (publicly-known) key. session.ts is imported
+// only by the server (auth.ts + requireAuth), never the browser bundle.
+const SESSION_SECRET = requireSecret('SESSION_SECRET', 32);
+
 function sign(payload: string): string {
-  const secret = process.env.SESSION_SECRET || '';
-  return crypto.createHmac('sha256', secret).update(payload).digest('base64url');
+  return crypto.createHmac('sha256', SESSION_SECRET).update(payload).digest('base64url');
 }
 
 export function issueSession(res: VercelResponse, email: string): void {

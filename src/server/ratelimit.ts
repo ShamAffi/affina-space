@@ -98,3 +98,49 @@ export async function checkRateLimit(
     return { ok: true };
   }
 }
+
+/**
+ * Per-DESTINATION-email throttle for outbound magic-link emails (audit F02). The IP
+ * limiter alone doesn't stop inbox-bombing: an attacker rotating IPs could still send
+ * many "sign in" emails to ONE victim and burn the Resend quota / harm sender
+ * reputation. This caps sends TO a given address regardless of who requests them.
+ *
+ * Same fixed-window mechanism as checkRateLimit, on `maillink:<email>:hour|day` keys.
+ * Returns false when a window is exceeded. Fails OPEN on any error — the IP limit and
+ * the always-200 anti-enumeration response are the backstops, and a DB blip must never
+ * block a real founder's login. Every attempt counts toward the window (throttled ones
+ * included), so a burst can't slip extra sends through.
+ */
+export async function checkEmailSendLimit(
+  email: string,
+  limits: { perHour: number; perDay: number },
+): Promise<boolean> {
+  const url = process.env.DATABASE_URL;
+  if (!url) return true; // no DB (e.g. local) → fail open
+  const e = email.trim().toLowerCase();
+  if (!e) return true;
+  try {
+    const sql = neon(url);
+    const keys = [`maillink:${e}:hour`, `maillink:${e}:day`];
+    const values = keys.map((_, i) => `($${i + 1}, now(), 1)`).join(', ');
+    const text = `
+      INSERT INTO rate_limits (key, window_start, count)
+      VALUES ${values}
+      ON CONFLICT (key) DO UPDATE SET
+        count = CASE WHEN rate_limits.window_start <= now() - (CASE WHEN rate_limits.key LIKE '%:hour' THEN interval '1 hour' ELSE interval '1 day' END)
+                     THEN 1 ELSE rate_limits.count + 1 END,
+        window_start = CASE WHEN rate_limits.window_start <= now() - (CASE WHEN rate_limits.key LIKE '%:hour' THEN interval '1 hour' ELSE interval '1 day' END)
+                     THEN now() ELSE rate_limits.window_start END
+      RETURNING key, count
+    `;
+    const rows = (await sql.query(text, keys)) as { key: string; count: number }[];
+    for (const r of rows) {
+      const cap = r.key.endsWith(':hour') ? limits.perHour : limits.perDay;
+      if (Number(r.count) > cap) return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('[ratelimit] email send limit failing open:', err);
+    return true;
+  }
+}

@@ -1,10 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import crypto from 'node:crypto';
-import { neon } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-http';
 import { eq, and, isNull, gt } from 'drizzle-orm';
 import { applyCors } from '../src/server/http.js';
-import { checkRateLimit } from '../src/server/ratelimit.js';
+import { checkRateLimit, checkEmailSendLimit } from '../src/server/ratelimit.js';
+import { getDb } from '../src/server/db.js';
 import { users, authTokens } from '../src/db/schema.js';
 import { sendEmail, magicLinkEmail, welcomeEmail } from '../src/server/email.js';
 import { issueSession, clearSession } from '../src/server/session.js';
@@ -13,11 +12,6 @@ import { sendOnce } from '../src/server/emailLog.js';
 
 // Dedicated Resend + magic-link auth function (SPEC_RESEND_AUTH §4). Action-routed,
 // rate-limited. Phase A: issue a session on verify; enforcement elsewhere is Phase B.
-
-function getDb() {
-  const sql = neon(process.env.DATABASE_URL!);
-  return drizzle(sql, { schema: { users, authTokens } });
-}
 
 const sha256 = (s: string) => crypto.createHash('sha256').update(s).digest('hex');
 
@@ -44,6 +38,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (action === 'request-link') {
     const email = String(req.body?.email ?? '').trim().toLowerCase();
     if (!email || !email.includes('@')) return res.status(400).json({ error: 'valid email required' });
+
+    // Per-destination throttle (audit F02) — cap magic-link emails TO this address so a
+    // rotating-IP attacker can't inbox-bomb a victim or burn the Resend quota. On throttle
+    // we still return 200 (below) — never reveal the throttle OR whether the account exists.
+    const maySend = await checkEmailSendLimit(email, { perHour: 4, perDay: 10 });
+    if (!maySend) return res.status(200).json({ ok: true });
 
     try {
       // Optional post-verify redirect (funnel confirm-email → program start). Only safe

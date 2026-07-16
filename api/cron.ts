@@ -1,7 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { neon } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-http';
-import { eq, and, ne } from 'drizzle-orm';
+import { eq, and, ne, sql } from 'drizzle-orm';
+import { getDb } from '../src/server/db.js';
+import { safeEqual } from '../src/server/env.js';
+import { captureError } from '../src/server/observability.js';
 import { users, tasks, completedLessons } from '../src/db/schema.js';
 import { MODULES } from '../src/data.js';
 import { sendOnce, alreadyLogged, logEmail } from '../src/server/emailLog.js';
@@ -21,10 +22,6 @@ import { createMagicLink } from '../src/server/magicLink.js';
 //   REGISTERED (verifiedAt set) → the existing #5–#8 lifecycle (weekly/reflection/
 //     book-mentor / re-engagement) at LOCAL 11:00 — never runs for pending users.
 // Protected by CRON_SECRET. Dedup via email_log. Test hooks: ?day/?hour/?dry=1/?only.
-
-function getDb() {
-  return drizzle(neon(process.env.DATABASE_URL!), { schema: { users, tasks, completedLessons } });
-}
 
 const DAY_MS = 86_400_000;
 const HOUR_MS = 3_600_000;
@@ -85,10 +82,10 @@ function currentModuleLabel(completedIds: Set<string>): string {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // §3 — CRON_SECRET gate. GitHub Actions / manual runs send `Authorization: Bearer <secret>`
   // (or ?secret=).
-  const secret = process.env.CRON_SECRET;
   const auth = req.headers.authorization;
   const provided = (auth?.startsWith('Bearer ') ? auth.slice(7) : '') || (req.query.secret as string) || '';
-  if (!secret || provided !== secret) return res.status(401).json({ error: 'unauthorized' });
+  // Constant-time compare (audit F15); safeEqual returns false when CRON_SECRET is unset → fail closed.
+  if (!safeEqual(provided, process.env.CRON_SECRET)) return res.status(401).json({ error: 'unauthorized' });
 
   const now = new Date();
   const forcedDay = req.query.day !== undefined ? Number(req.query.day) : null;
@@ -97,6 +94,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const only = typeof req.query.only === 'string' ? req.query.only : undefined;
 
   const db = getDb();
+
+  // Maintenance sweep (audit F33): rate_limits + auth_tokens grow without bound from
+  // attacker-controlled keys and one-time magic-link tokens. This hourly cron is the
+  // natural GC point. Best-effort — cleanup must never break the email sweep. A stale
+  // rate_limits row is safe to drop: the next hit for that key re-inserts a fresh window.
+  if (!dry) {
+    try {
+      await db.execute(sql`DELETE FROM rate_limits WHERE window_start < now() - interval '2 days'`);
+      await db.execute(sql`DELETE FROM auth_tokens WHERE used_at IS NOT NULL OR expires_at < now()`);
+    } catch (err) {
+      captureError(err, { endpoint: 'cron', mode: 'sweep' });
+    }
+  }
+
   let allUsers = await db.query.users.findMany();
   if (only) allUsers = allUsers.filter((u) => u.email === only);
 

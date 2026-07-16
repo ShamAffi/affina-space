@@ -1,0 +1,26 @@
+name: CI
+
+# Quality gate (audit P6): typecheck + tests + build on every push and PR. Gives a
+# red/green signal on each commit so a broken build or failing test is visible before
+# it reaches users. NOTE: Vercel (Hobby, GitHub integration) auto-deploys on push to
+# main independently of this check — to make the deploy WAIT for green, set Vercel's
+# "Ignored Build Step" to a git check or add a branch protection rule requiring "verify".
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Typecheck + build
+        run: npm run build   # tsc -b (typecheck all of src/ + api/) && vite build
+      - name: Unit tests
+        run: npm test        # vitest run

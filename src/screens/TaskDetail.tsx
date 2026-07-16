@@ -138,10 +138,10 @@ export default function TaskDetail({ task, email, onBack }: Props) {
     setSubmitting(true);
     setError('');
     try {
-      const r = await fetch('/api/tasks/submit', {
+      const r = await fetch('/api/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskId: currentTask.id, submissionText: text, submissionData }),
+        body: JSON.stringify({ action: 'submit', taskId: currentTask.id, submissionText: text, submissionData }),
       });
       if (r.status === 429) {
         setError("You're going a bit fast — give it a moment, then try again.");

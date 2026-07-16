@@ -1,10 +1,10 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import type Stripe from 'stripe';
-import { neon } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-http';
 import { eq } from 'drizzle-orm';
 import { applyCors } from '../src/server/http.js';
 import { requireAuth } from '../src/server/requireAuth.js';
+import { getDb } from '../src/server/db.js';
+import { captureError } from '../src/server/observability.js';
 import { stripe, priceQuarterly, priceAnnual } from '../src/server/stripe.js';
 import { users } from '../src/db/schema.js';
 import { sendOnce } from '../src/server/emailLog.js';
@@ -15,9 +15,6 @@ import { subscriptionEmail } from '../src/server/email.js';
 // disabled for the whole function; frontend actions route on ?action= (no body needed).
 export const config = { api: { bodyParser: false } };
 
-function getDb() {
-  return drizzle(neon(process.env.DATABASE_URL!), { schema: { users } });
-}
 const appUrl = () => process.env.APP_URL || 'https://affina-space.vercel.app';
 
 async function readRawBody(req: VercelRequest): Promise<Buffer> {
@@ -79,7 +76,7 @@ async function handleCheckout(email: string, res: VercelResponse) {
     });
     return res.status(200).json({ url: session.url });
   } catch (err) {
-    console.error('[stripe] checkout failed:', err);
+    captureError(err, { endpoint: 'stripe', mode: 'checkout' });
     return res.status(502).json({ error: 'checkout_failed' });
   }
 }
@@ -96,7 +93,7 @@ async function handlePortal(email: string, res: VercelResponse) {
     });
     return res.status(200).json({ url: portal.url });
   } catch (err) {
-    console.error('[stripe] portal failed:', err);
+    captureError(err, { endpoint: 'stripe', mode: 'portal' });
     return res.status(502).json({ error: 'portal_failed' });
   }
 }
@@ -144,7 +141,7 @@ async function handleWebhook(raw: Buffer, sig: string, res: VercelResponse) {
             ],
           });
         } catch (err) {
-          console.error('[stripe] schedule setup failed (subscription still active on quarterly):', err);
+          captureError(err, { endpoint: 'stripe', mode: 'schedule-setup', note: 'subscription still active on quarterly' });
         }
 
         await db.update(users).set({
@@ -201,7 +198,7 @@ async function handleWebhook(raw: Buffer, sig: string, res: VercelResponse) {
       }
     }
   } catch (err) {
-    console.error('[stripe] webhook handler error:', event.type, err);
+    captureError(err, { endpoint: 'stripe', mode: 'webhook', eventType: event.type });
     // 500 → Stripe retries. The events are idempotent, so a retry is safe.
     return res.status(500).json({ error: 'handler_error' });
   }
