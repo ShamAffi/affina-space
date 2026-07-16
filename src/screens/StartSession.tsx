@@ -7,6 +7,7 @@ import { track } from '../lib/analytics';
 // replaces the old mailto; sending it records the request + flips S1 to booked server-side.
 interface Props {
   onContinue: () => void;   // → Module 5
+  onPaywall?: () => void;   // defense: a mentor write 403 (subscription lapsed) → paywall
 }
 
 // PATCH via the session cookie (Auth Phase B) — no email in the body.
@@ -20,7 +21,7 @@ async function markS1(patch: { seen?: boolean }) {
   } catch { /* non-blocking */ }
 }
 
-export default function StartSession({ onContinue }: Props) {
+export default function StartSession({ onContinue, onPaywall }: Props) {
   const [advancing, setAdvancing] = useState(false);
   const [sent, setSent] = useState(false);
 
@@ -51,7 +52,7 @@ export default function StartSession({ onContinue }: Props) {
             look at your Snapshot together, and set your rhythm — the fastest way to make sure you're pointed
             at the right thing before Module 5.
           </p>
-          <MentorRequestForm session="S1" onSent={() => setSent(true)} />
+          <MentorRequestForm session="S1" onSent={() => setSent(true)} onPaywall={onPaywall} />
         </div>
 
         <button

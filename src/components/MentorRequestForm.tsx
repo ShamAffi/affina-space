@@ -9,9 +9,10 @@ interface Props {
   session: 'S1' | 'S2' | 'S3';
   onSent?: () => void; // parent marks the session booked locally / stops nudges
   alreadyBooked?: boolean; // a request is already on file (prior visit) — show the sent state, not the form
+  onPaywall?: () => void;  // server 403 subscription_required (paid feature) → open the paywall
 }
 
-export default function MentorRequestForm({ session, onSent, alreadyBooked }: Props) {
+export default function MentorRequestForm({ session, onSent, alreadyBooked, onPaywall }: Props) {
   const [topic, setTopic] = useState('');
   const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   const trimmed = topic.trim();
@@ -25,6 +26,8 @@ export default function MentorRequestForm({ session, onSent, alreadyBooked }: Pr
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mentorRequest: { session, topic: trimmed.slice(0, 500) } }),
       });
+      // Paid feature (SPEC_MENTOR_REQUEST amendment): server rejects an unsubscribed write → paywall.
+      if (r.status === 403) { setStatus('idle'); onPaywall?.(); return; }
       if (!r.ok) throw new Error('failed');
       track('mentor_request_submitted', { session });
       setStatus('sent');

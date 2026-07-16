@@ -549,7 +549,12 @@ My motivation & 12-week goal: …`;
                     const sessionUnlocked = mod.lessons.every((l) => userData.completedLessons.includes(l.id));
                     return (
                       <button
-                        onClick={() => sessionUnlocked && setOpenSession(mod.mentorSessionAfter!)}
+                        // Mentor sessions are paid (SPEC_MENTOR_REQUEST amendment): unpaid click → paywall.
+                        onClick={() => {
+                          if (!sessionUnlocked) return;
+                          if (userData.subscribed) setOpenSession(mod.mentorSessionAfter!);
+                          else onGoToPaywall?.();
+                        }}
                         disabled={!sessionUnlocked}
                         title={sessionUnlocked ? undefined : `Unlocks after Module ${mod.order} is complete`}
                         className={`mt-1 w-full flex items-center gap-2 px-3 py-2 rounded-control text-xs font-semibold transition-colors ${
@@ -1318,6 +1323,7 @@ My motivation & 12-week goal: …`;
           email={userData.email}
           completed={!!sessionsState[openSession]?.completed}
           booked={!!sessionsState[openSession]?.booked}
+          onPaywall={onGoToPaywall}
           onClose={() => setOpenSession(null)}
           onCompletedChange={(completed) =>
             setSessionsState((st) => ({ ...st, [openSession]: { ...st[openSession], completed } }))

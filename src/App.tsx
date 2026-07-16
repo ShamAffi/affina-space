@@ -245,8 +245,10 @@ function AppRoutes() {
       {/* Post-paywall S1 booking — required step, both CTAs advance to M5 */}
       <Route
         path="/start-session"
-        element={authed ? (
-          <StartSession onContinue={() => navigate(`/learning/${COURSE_SLUG}/${M5_FIRST}`)} />
+        element={authed ? (userData.subscribed
+          // Mentor sessions are paid (SPEC_MENTOR_REQUEST amendment) — guard direct URL entry.
+          ? <StartSession onContinue={() => navigate(`/learning/${COURSE_SLUG}/${M5_FIRST}`)} onPaywall={() => navigate('/unlock')} />
+          : <Navigate to="/unlock" replace />
         ) : toLanding}
       />
 

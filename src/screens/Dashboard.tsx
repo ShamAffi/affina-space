@@ -198,7 +198,9 @@ export default function Dashboard({ userData, onUpdateUserData, onGoToLMS, onGoT
               </p>
             </div>
             <button
-              onClick={() => setOpenSession(dueSession)}
+              // Mentor sessions are paid (SPEC_MENTOR_REQUEST amendment): card stays visible as a
+              // teaser, but an unpaid click opens the paywall instead of the request modal.
+              onClick={() => (userData.subscribed ? setOpenSession(dueSession) : onGoToPaywall())}
               className="flex-shrink-0 bg-brand hover:bg-brand-700 active:scale-95 text-white text-sm font-semibold px-5 py-2.5 rounded-pill transition-all duration-150"
             >
               View & book →
@@ -360,9 +362,11 @@ export default function Dashboard({ userData, onUpdateUserData, onGoToLMS, onGoT
           session={openSession}
           email={userData.email}
           completed={!!sessionsState[openSession]?.completed}
+          booked={!!sessionsState[openSession]?.booked}
+          onPaywall={onGoToPaywall}
           onClose={() => setOpenSession(null)}
           onCompletedChange={(completed) =>
-            setSessionsState((s) => ({ ...s, [openSession]: { completed } }))
+            setSessionsState((s) => ({ ...s, [openSession]: { ...s[openSession], completed } }))
           }
         />
       )}

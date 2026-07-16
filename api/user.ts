@@ -196,6 +196,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { name, projectName, idea, customer, businessModel, stage, goal, country, city, timezone, mentorSessions, mentorRequest, phone } = req.body ?? {};
     const existingUser = await db.query.users.findFirst({ where: eq(users.email, email) });
     if (!existingUser) return res.status(404).json({ error: 'user not found' });
+
+    // Mentor sessions are a PAID feature (SPEC_MENTOR_REQUEST amendment 2026-07-16). Reject any
+    // mentorRequest / mentorSessions write from an unsubscribed user BEFORE any row is inserted
+    // or any email is sent — UI gates are bypassable, this is the real enforcement. Profile and
+    // phone-lead edits stay ungated. The client maps this 403 to opening the paywall.
+    if ((mentorRequest !== undefined || mentorSessions !== undefined) && !existingUser.subscribed) {
+      return res.status(403).json({ error: 'subscription_required' });
+    }
+
     const patchFields: Record<string, unknown> = { updatedAt: new Date() };
     for (const [k, v] of Object.entries({ name, projectName, idea, customer, businessModel, stage, goal, country, city, timezone })) {
       if (v !== undefined) patchFields[k] = v;
