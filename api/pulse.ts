@@ -102,7 +102,7 @@ function parseMomentumCard(raw: unknown): { mood: z.infer<typeof MoodSchema>; bl
   const blocksIn = Array.isArray(obj.blocks) ? obj.blocks : [];
   const blocks = blocksIn
     .map((b) => MomentumBlockSchema.safeParse(b))
-    .filter((r): r is z.SafeParseSuccess<z.infer<typeof MomentumBlockSchema>> => r.success)
+    .filter((r): r is z.ZodSafeParseSuccess<z.infer<typeof MomentumBlockSchema>> => r.success)
     .map((r) => r.data)
     .slice(0, 4);
   if (blocks.length === 0) return null;

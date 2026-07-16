@@ -108,7 +108,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 
-  let allUsers = await db.query.users.findMany();
+  // Drizzle's no-arg findMany() collapses to unknown-typed rows under the api build's TS
+  // config (findFirst/where-scoped queries infer fine); the runtime rows are real users, so
+  // assert the select type — otherwise u.timezone/u.id below type as `unknown`.
+  let allUsers = (await db.query.users.findMany()) as (typeof users.$inferSelect)[];
   if (only) allUsers = allUsers.filter((u) => u.email === only);
 
   const summary: { email: string; tz: string; state: string; active?: boolean; sent: string[]; skipped: string[] }[] = [];

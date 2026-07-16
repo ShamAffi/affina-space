@@ -161,7 +161,9 @@ Produce the ${prev ? 'updated' : 'first'} Startup Snapshot. Source: ${source}.`;
       version: (prev?.version ?? 0) + 1,
       generatedAt: new Date().toISOString(),
       source,
-      sections: parsed.sections.slice(0, 12),
+      // coerce+catch already default title/content to '' at runtime; map to the required
+      // shape so the type is {title,content}[] regardless of zod's optional-key inference.
+      sections: parsed.sections.slice(0, 12).map((s) => ({ title: s.title ?? '', content: s.content ?? '' })),
     };
 
     // Persist: users.snapshot (+ history capped at 5) and the unique brain entry
