@@ -6,6 +6,7 @@ import MentorSessionModal from '../components/MentorSessionModal';
 import MarketResearchView from '../components/MarketResearchView';
 import { saveLessonInputToDB, toggleLessonCompleteToDB, patchUserToDB, loadProgressFromDB } from '../store';
 import { track } from '../lib/analytics';
+import PhoneLeadModal from '../components/PhoneLeadModal';
 import ProfileButton from '../components/ProfileButton';
 import AccountPanel from '../components/AccountPanel';
 import DocumentsPanel from '../components/DocumentsPanel';
@@ -99,6 +100,19 @@ export default function LMS({ userData, onUpdateUserData, onGoToDashboard, onLog
     window.scrollTo(0, 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeLessonId]);
+
+  // Phone lead popup (SPEC_PHONE_CAPTURE §2) — the moment M1's last block completes, offer
+  // the guide for a number. Gated: env GUIDE_URL set · no phone on file · once per device.
+  const [showGuidePopup, setShowGuidePopup] = useState(false);
+  useEffect(() => {
+    if (userData.phone || !userData.guideUrl) return;
+    try { if (localStorage.getItem('affina_guide_popup_seen')) return; } catch { return; }
+    const m1 = MODULES.find((m) => m.id === 'm1');
+    if (m1 && m1.lessons.every((l) => userData.completedLessons.includes(l.id))) {
+      try { localStorage.setItem('affina_guide_popup_seen', '1'); } catch { /* ignore */ }
+      setShowGuidePopup(true);
+    }
+  }, [userData.completedLessons, userData.phone, userData.guideUrl]);
 
   // On mount: sync profile to DB (post-auth PATCH), load progress + brain (session cookie).
   useEffect(() => {
@@ -1269,6 +1283,15 @@ My motivation & 12-week goal: …`;
           onCompletedChange={(completed) =>
             setSessionsState((st) => ({ ...st, [openSession]: { completed } }))
           }
+        />
+      )}
+
+      {showGuidePopup && (
+        <PhoneLeadModal
+          variant="guide"
+          guideUrl={userData.guideUrl}
+          onClose={() => setShowGuidePopup(false)}
+          onSubmitted={(p) => onUpdateUserData({ phone: p })}
         />
       )}
 

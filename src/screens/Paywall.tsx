@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { track } from '../lib/analytics';
+import PhoneLeadModal from '../components/PhoneLeadModal';
 
 // SPEC_PAYWALL + SPEC_STRIPE — full-page blocking-but-dismissible overlay gating M5–M12.
 // "Unlock" now starts a real Stripe Checkout (subscription; €360 first 3 months → €1,200/yr).
@@ -17,17 +18,22 @@ const VALUE_STACK = [
 
 interface Props {
   onDismiss: () => void;      // back to Dashboard
+  phone?: string | null;      // SPEC_PHONE_CAPTURE §3 — skip the founder-call offer if on file
 }
 
-export default function Paywall({ onDismiss }: Props) {
+export default function Paywall({ onDismiss, phone }: Props) {
   const [working, setWorking] = useState(false);
   const [error, setError] = useState('');
+  const [showOffer, setShowOffer] = useState(false);
 
   useEffect(() => { track('paywall_viewed'); }, []);
 
+  // Dismiss → the "talk to a founder" offer once per visit (skipped if a phone is on file);
+  // both its paths return to the Dashboard (SPEC_PHONE_CAPTURE §3).
   function dismiss() {
     track('paywall_dismissed');
-    onDismiss();
+    if (phone) onDismiss();
+    else setShowOffer(true);
   }
 
   async function unlock() {
@@ -116,6 +122,10 @@ export default function Paywall({ onDismiss }: Props) {
 
         <p className="text-[11px] text-ink-mute text-center mt-6">Built by founders who've been where you are.</p>
       </div>
+
+      {showOffer && (
+        <PhoneLeadModal variant="paywall" onClose={onDismiss} />
+      )}
     </div>
   );
 }

@@ -46,6 +46,10 @@ export const users = pgTable('users', {
   anonId: text('anon_id'),                 // joins the pre-auth event trail to this user
   utmFirst: jsonb('utm_first'),            // first-touch {source, medium, campaign, term, content, referrer, landing}
   utmLast: jsonb('utm_last'),              // last-touch before capture (same shape)
+  // Phone lead capture (SPEC_PHONE_CAPTURE §1) — written only via the session-authed PATCH.
+  phone: text('phone'),                    // light validation (a human dials it)
+  phoneSource: text('phone_source'),       // 'guide' | 'paywall' — the FIRST source wins
+  phoneAt: timestamp('phone_at', { withTimezone: true }),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });

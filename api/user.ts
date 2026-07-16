@@ -9,7 +9,7 @@ import { eq, and, isNull } from 'drizzle-orm';
 import { users, lessonInputs, completedLessons, brainEntries, tasks, checkIns, achievements, delegations, mentorRequests, events } from '../src/db/schema.js';
 import { MODULES } from '../src/data.js';
 import { GROWTH_SEED_XP } from '../src/server/progressUtils.js';
-import { sendEmail, mentorBookedEmail, mentorRequestAlertEmail } from '../src/server/email.js';
+import { sendEmail, mentorBookedEmail, mentorRequestAlertEmail, hotLeadAlertEmail, guideEmail } from '../src/server/email.js';
 import { sendOnce } from '../src/server/emailLog.js';
 
 // Auth Phase B (SPEC_AUTH_PHASE_B): GET + PATCH derive identity from the session cookie
@@ -67,6 +67,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       email: user.email,
       score: user.score ?? 0,
       subscribed: user.subscribed ?? false,
+      phone: user.phone ?? null,                       // SPEC_PHONE_CAPTURE — client gates the popups on this
+      guideUrl: process.env.GUIDE_URL || null,         // runtime feature gate for the guide popup
       mentorSessions: user.mentorSessions ?? null,
       // Funnel (SPEC_ONBOARDING_FUNNEL): verification state + persisted report for /report.
       verifiedAt: user.verifiedAt ? new Date(user.verifiedAt).toISOString() : null,
@@ -191,12 +193,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     // NOTE: `subscribed` is NOT accepted here — it's driven ONLY by the Stripe webhook
     // (SPEC_STRIPE §3), never from the browser. The paywall now redirects to Checkout.
-    const { name, projectName, idea, customer, businessModel, stage, goal, country, city, timezone, mentorSessions, mentorRequest } = req.body ?? {};
+    const { name, projectName, idea, customer, businessModel, stage, goal, country, city, timezone, mentorSessions, mentorRequest, phone } = req.body ?? {};
     const existingUser = await db.query.users.findFirst({ where: eq(users.email, email) });
     if (!existingUser) return res.status(404).json({ error: 'user not found' });
     const patchFields: Record<string, unknown> = { updatedAt: new Date() };
     for (const [k, v] of Object.entries({ name, projectName, idea, customer, businessModel, stage, goal, country, city, timezone })) {
       if (v !== undefined) patchFields[k] = v;
+    }
+
+    // Phone lead capture (SPEC_PHONE_CAPTURE §1) — light validation; phoneSource is FIRST-wins.
+    let phoneSave: { number: string; source: 'guide' | 'paywall' } | null = null;
+    if (phone !== undefined) {
+      const number = String(phone?.number ?? '').trim().slice(0, 40);
+      const source = phone?.source;
+      if (number.length >= 5 && (source === 'guide' || source === 'paywall')) {
+        phoneSave = { number, source };
+        patchFields.phone = number;
+        patchFields.phoneSource = (existingUser as { phoneSource?: string | null }).phoneSource ?? source; // first source wins
+        patchFields.phoneAt = new Date();
+      } else {
+        return res.status(400).json({ error: 'invalid phone (number ≥5 chars, source guide/paywall)' });
+      }
     }
 
     // Mentor request (SPEC_MENTOR_REQUEST §3) — validate; then fold into mentorSessions as a
@@ -271,6 +288,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         session: mentorReq.session, topic: mentorReq.topic,
         module: moduleLabel, subscribed: !!existingUser.subscribed,
       }));
+    }
+
+    // Phone lead: hot-lead alert to ADMIN_EMAIL (every save) + guide delivery (guide surface
+    // only, deduped) — SPEC_PHONE_CAPTURE §2.3/§4.
+    if (phoneSave) {
+      let moduleLabel: string | undefined;
+      try {
+        const done = await db.query.completedLessons.findMany({ where: eq(completedLessons.userId, existingUser.id) });
+        const doneSet = new Set(done.map((c) => c.lessonId));
+        let furthest = 0;
+        for (const m of MODULES) if (m.lessons.some((l) => doneSet.has(l.id))) furthest = Math.max(furthest, m.order);
+        moduleLabel = `M${furthest}`;
+      } catch { /* best-effort */ }
+      void sendEmail(hotLeadAlertEmail({
+        name: existingUser.name, project: existingUser.projectName, email,
+        phone: phoneSave.number, source: phoneSave.source, module: moduleLabel,
+        verified: !!existingUser.verifiedAt, subscribed: !!existingUser.subscribed,
+      }));
+      if (phoneSave.source === 'guide' && process.env.GUIDE_URL) {
+        const base = process.env.APP_URL || 'https://affina-space.vercel.app';
+        void sendOnce(existingUser.id, 'guide', 'once', guideEmail(email, base + process.env.GUIDE_URL));
+      }
     }
     return res.status(200).json({ ok: true });
   }

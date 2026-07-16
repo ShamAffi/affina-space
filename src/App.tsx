@@ -121,6 +121,8 @@ function AppRoutes() {
           timezone: db.timezone || withEmail.timezone,
           score: db.score || withEmail.score,
           subscribed: db.subscribed ?? false,
+          phone: db.phone ?? null,
+          guideUrl: db.guideUrl ?? null,
           onboardingReport: db.onboardingReport ?? withEmail.onboardingReport ?? null,
         });
       }
@@ -189,7 +191,7 @@ function AppRoutes() {
       {/* SPEC_PAYWALL + SPEC_STRIPE — full-page overlay gating M5–M12 (→ Stripe Checkout) */}
       <Route
         path="/unlock"
-        element={authed ? <Paywall onDismiss={() => navigate('/dashboard')} /> : toLanding}
+        element={authed ? <Paywall onDismiss={() => navigate('/dashboard')} phone={userData.phone} /> : toLanding}
       />
       {/* Stripe success return — the webhook flips `subscribed`; this polls for it then continues */}
       <Route
