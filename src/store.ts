@@ -1,4 +1,5 @@
 import type { UserData } from './types';
+import { getAnonId, getTouches, track } from './lib/analytics';
 
 const STORAGE_KEY = 'userData';
 
@@ -118,10 +119,14 @@ export async function captureEmail(
         ...userPayload(data),
         emailCapture: true,
         ...(previousEmail ? { previousEmail } : {}),
+        // Analytics stitch (SPEC_ANALYTICS §4.1) — joins the pre-signup trail to this user.
+        anonId: getAnonId(),
+        touches: getTouches(),
       }),
     });
     const json = await res.json().catch(() => ({}));
     if (json?.blocked) return { ok: false, blocked: true, reason: json.reason };
+    track('email_captured');
     return { ok: true };
   } catch {
     return { ok: true };

@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import MentorRequestForm from '../components/MentorRequestForm';
+import { track } from '../lib/analytics';
 
 // SPEC_PAYWALL §4 — full-page S1 mentor step (not a modal). Required step between payment
 // and M5: continuing is optional and never blocks. SPEC_MENTOR_REQUEST §1 — the topic form
@@ -22,6 +23,8 @@ async function markS1(patch: { seen?: boolean }) {
 export default function StartSession({ onContinue }: Props) {
   const [advancing, setAdvancing] = useState(false);
   const [sent, setSent] = useState(false);
+
+  useEffect(() => { track('mentor_book_clicked', { session: 'S1' }); }, []);
 
   async function later() {
     setAdvancing(true);

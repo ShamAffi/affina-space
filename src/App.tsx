@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams, useLoca
 import type { UserData, Task } from './types';
 import { loadUserData, updateUserData, defaultUserData, saveUserData } from './store';
 import { setSessionExpiredHandler, triggerSessionExpired, resetSessionExpired } from './rateLimit';
+import { initAnalytics, track } from './lib/analytics';
 import { MODULES } from './data';
 import Welcome from './screens/Welcome';
 import Onboarding from './screens/Onboarding';
@@ -38,6 +39,7 @@ export default function App() {
 
 function AppRoutes() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [userData, setUserData] = useState<UserData>(loadUserData);
   const authed = !!userData.email;
 
@@ -46,6 +48,11 @@ function AppRoutes() {
     setUserData(merged);
     return merged;
   }
+
+  // Analytics (SPEC_ANALYTICS §2): capture UTM + arm the beacon flush once, then fire an
+  // auto page_view on every route change. Fail-silent — never blocks routing.
+  useEffect(() => { initAnalytics(); }, []);
+  useEffect(() => { track('page_view'); }, [location.pathname]);
 
   // Auth Phase B (§5) — session expiry is handled centrally: a 401 from any guarded /api
   // call clears local state and bounces to /login. Register the action here; rateLimit's
@@ -289,6 +296,7 @@ function Login() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'request-link', email: email.trim() }),
       });
+      if (r.ok) track('magic_link_requested');
       setStatus(r.ok ? 'sent' : 'error');
     } catch {
       setStatus('error');

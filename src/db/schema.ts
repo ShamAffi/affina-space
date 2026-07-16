@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, timestamp, unique, boolean, jsonb } from 'drizzle-orm/pg-core';
+import { pgTable, serial, bigserial, text, integer, timestamp, unique, boolean, jsonb } from 'drizzle-orm/pg-core';
 
 export const users = pgTable('users', {
   id: serial('id').primaryKey(),
@@ -42,8 +42,25 @@ export const users = pgTable('users', {
   // Onboarding funnel (SPEC_ONBOARDING_FUNNEL): email captured before the report.
   emailCapturedAt: timestamp('email_captured_at', { withTimezone: true }),  // set at email capture; drives the finish-sequence clock (day 0/1/3/7)
   onboardingReport: jsonb('onboarding_report'),                             // persisted OnboardingScore — day-0 email + interactive /report page
+  // Analytics identity + attribution (SPEC_ANALYTICS §1) — stitched at email capture.
+  anonId: text('anon_id'),                 // joins the pre-auth event trail to this user
+  utmFirst: jsonb('utm_first'),            // first-touch {source, medium, campaign, term, content, referrer, landing}
+  utmLast: jsonb('utm_last'),              // last-touch before capture (same shape)
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// First-party analytics events (SPEC_ANALYTICS §1). anonId is client-generated; userId is
+// resolved SERVER-SIDE only (session cookie or stitching) — never trusted from the client.
+export const events = pgTable('events', {
+  id: bigserial('id', { mode: 'number' }).primaryKey(),
+  anonId: text('anon_id').notNull(),
+  userId: integer('user_id'),                          // no FK: events may predate/outlive stitching; app-level join
+  name: text('name').notNull(),                        // canonical taxonomy name (§5)
+  props: jsonb('props'),                               // small event-specific payload
+  path: text('path'),                                  // location.pathname
+  referrer: text('referrer'),                          // document.referrer (first event of a session)
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });
 
 export const lessonInputs = pgTable('lesson_inputs', {

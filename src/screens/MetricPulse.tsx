@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { track } from '../lib/analytics';
 import type { CheckIn, CheckInDraft, CheckInKeyResult, CheckInMetric, NorthStarValue } from '../types';
 
 const SENTIMENT_CONFIG = {
@@ -109,6 +110,7 @@ export default function MetricPulse({ email, projectName, onBack }: Props) {
         body: JSON.stringify({ action: 'commit', rawText, confirmedMetrics: editedMetrics, draft }),
       });
       const data = await r.json();
+      track('checkin_committed');
       setNewStreak(data.streak ?? 0);
       setNewTasks(draft.tasks?.slice(0, 3) ?? []);
       fetch('/api/pulse')

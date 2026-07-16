@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { track } from '../lib/analytics';
 
 // SPEC_PAYWALL + SPEC_STRIPE — full-page blocking-but-dismissible overlay gating M5–M12.
 // "Unlock" now starts a real Stripe Checkout (subscription; €360 first 3 months → €1,200/yr).
@@ -22,9 +23,17 @@ export default function Paywall({ onDismiss }: Props) {
   const [working, setWorking] = useState(false);
   const [error, setError] = useState('');
 
+  useEffect(() => { track('paywall_viewed'); }, []);
+
+  function dismiss() {
+    track('paywall_dismissed');
+    onDismiss();
+  }
+
   async function unlock() {
     setWorking(true);
     setError('');
+    track('checkout_started');
     try {
       // Start Stripe Checkout (session-authed server-side). The webhook flips `subscribed`.
       const r = await fetch('/api/stripe?action=checkout', { method: 'POST' });
@@ -47,7 +56,7 @@ export default function Paywall({ onDismiss }: Props) {
       <div className="relative z-10 max-w-lg mx-auto px-5 py-10 sm:py-16">
         {/* Dismiss */}
         <button
-          onClick={onDismiss}
+          onClick={dismiss}
           className="absolute right-4 top-4 w-9 h-9 flex items-center justify-center rounded-pill bg-surface border border-hairline text-ink-mute hover:text-ink transition shadow-sm"
           aria-label="Close"
         >
@@ -99,7 +108,7 @@ export default function Paywall({ onDismiss }: Props) {
         </button>
         {error && <p className="text-center text-xs text-red-500 mt-3">{error}</p>}
         <button
-          onClick={onDismiss}
+          onClick={dismiss}
           className="w-full mt-3 text-sm font-semibold text-ink-mute hover:text-ink-soft transition text-center py-2"
         >
           Not now — I'll keep exploring

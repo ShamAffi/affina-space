@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { UserData, OnboardingScore } from '../types';
 import { syncUserToDB, captureEmail } from '../store';
+import { track } from '../lib/analytics';
 import { QUESTIONS } from '../data';
 import OnboardingQuestion from './OnboardingQuestion';
 import OnboardingLocation from './OnboardingLocation';
@@ -41,6 +42,8 @@ export default function Onboarding({ userData, update, onSignIn }: Props) {
   const [step, setStep] = useState<Step>('q_idea');
   const [result, setResult] = useState<OnboardingScore | null>(null);
 
+  useEffect(() => { track('onboarding_start'); }, []);
+
   function advance() {
     const idx = STEPS.indexOf(step);
     if (idx >= 0 && idx < STEPS.length - 1) setStep(STEPS[idx + 1]);
@@ -56,7 +59,7 @@ export default function Onboarding({ userData, update, onSignIn }: Props) {
         questionIndex={qConfig.qIdx}
         totalQuestions={5}
         initialValue={(userData[qConfig.field as keyof UserData] as string) ?? ''}
-        onNext={(value) => { update({ [qConfig.field]: value }); advance(); }}
+        onNext={(value) => { update({ [qConfig.field]: value }); track('onboarding_q_answered', { step: qConfig.field }); advance(); }}
       />
     );
   }
@@ -96,6 +99,7 @@ export default function Onboarding({ userData, update, onSignIn }: Props) {
             const u = update({ score: r.score, onboardingReport: r });
             syncUserToDB(u);
             setResult(r);
+            track('report_viewed');
             advance();
           }}
         />
@@ -123,7 +127,7 @@ export default function Onboarding({ userData, update, onSignIn }: Props) {
       return (
         <OnboardingName
           initialValue={userData.name}
-          onNext={(name) => { const u = update({ name }); syncUserToDB(u); advance(); }}
+          onNext={(name) => { const u = update({ name }); syncUserToDB(u); track('name_set'); advance(); }}
         />
       );
 
@@ -135,7 +139,7 @@ export default function Onboarding({ userData, update, onSignIn }: Props) {
           businessModel={userData.businessModel}
           stage={userData.stage}
           initialValue={userData.projectName}
-          onNext={(projectName) => { const u = update({ projectName }); syncUserToDB(u); advance(); }}
+          onNext={(projectName) => { const u = update({ projectName }); syncUserToDB(u); track('project_named'); advance(); }}
         />
       );
 
@@ -161,6 +165,7 @@ export default function Onboarding({ userData, update, onSignIn }: Props) {
                 // welcome zone (App.onVerified), which then starts the program.
                 body: JSON.stringify({ action: 'request-link', email }),
               });
+              if (res.ok) track('magic_link_requested');
               return res.ok;
             } catch {
               return false;

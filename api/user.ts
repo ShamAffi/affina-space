@@ -5,8 +5,8 @@ import { checkRateLimit } from '../src/server/ratelimit.js';
 import { getDb } from '../src/server/db.js';
 import { clampInt } from '../src/server/limits.js';
 import { captureError } from '../src/server/observability.js';
-import { eq } from 'drizzle-orm';
-import { users, lessonInputs, completedLessons, brainEntries, tasks, checkIns, achievements, delegations, mentorRequests } from '../src/db/schema.js';
+import { eq, and, isNull } from 'drizzle-orm';
+import { users, lessonInputs, completedLessons, brainEntries, tasks, checkIns, achievements, delegations, mentorRequests, events } from '../src/db/schema.js';
 import { MODULES } from '../src/data.js';
 import { GROWTH_SEED_XP } from '../src/server/progressUtils.js';
 import { sendEmail, mentorBookedEmail, mentorRequestAlertEmail } from '../src/server/email.js';
@@ -120,19 +120,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // re-sends the full onboarding data, and the old pending row is left to expire.
     if (emailCapture === true) {
       const capturedAt = new Date();
+      // Analytics stitch (SPEC_ANALYTICS §4.1) — anonId + UTM touches from the tracker.
+      const anonId = typeof body.anonId === 'string' && body.anonId.trim() ? body.anonId.trim().slice(0, 80) : undefined;
+      const touches = body.touches as { first?: unknown; last?: unknown } | undefined;
+      const analyticsSet: Record<string, unknown> = {};
+      if (anonId) analyticsSet.anonId = anonId;
+      if (touches?.first) analyticsSet.utmFirst = touches.first;
+      if (touches?.last) analyticsSet.utmLast = touches.last;
+
       const target = await db.query.users.findFirst({ where: eq(users.email, email) });
       // The one intentional signal the funnel UX needs (EmailCapture/ConfirmEmail show
       // "you already have an account — sign in"). Bounded by the IP rate limit above.
       if (target?.verifiedAt) return res.status(200).json({ blocked: true, reason: 'already_registered' });
 
+      let uid: number;
       if (target) {
         // Reuse the pending row: overwrite intake/report with this run, refresh the clock.
         await wipeUserChildren(db, target.id);
         await db.update(users)
-          .set({ ...profile, ...derivedReset, onboardingReport, emailCapturedAt: capturedAt, updatedAt: capturedAt })
+          .set({ ...profile, ...derivedReset, ...analyticsSet, onboardingReport, emailCapturedAt: capturedAt, updatedAt: capturedAt })
           .where(eq(users.id, target.id));
+        uid = target.id;
       } else {
-        await db.insert(users).values({ email, ...profile, onboardingReport, emailCapturedAt: capturedAt });
+        const [created] = await db.insert(users)
+          .values({ email, ...profile, ...analyticsSet, onboardingReport, emailCapturedAt: capturedAt })
+          .returning({ id: users.id });
+        uid = created.id;
+      }
+      // Backfill the pre-signup event trail onto this user (same-device events by anonId).
+      if (anonId) {
+        try { await db.update(events).set({ userId: uid }).where(and(eq(events.anonId, anonId), isNull(events.userId))); }
+        catch (err) { captureError(err, { endpoint: 'user', mode: 'events-backfill', email }); }
       }
       // Uniform success shape (no id / reused / created leak) — the only distinguishable
       // response is the verified-account block above, which the UX requires.

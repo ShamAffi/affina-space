@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { MentorSessionId, StartupSnapshot } from '../types';
 import MentorRequestForm from './MentorRequestForm';
+import { track } from '../lib/analytics';
 
 // §6.5 — mentor session block (v2: booking is a placeholder; completion is manual)
 const SESSION_META: Record<MentorSessionId, { title: string; when: string; purpose: string; agenda: string[] }> = {
@@ -48,6 +49,8 @@ export default function MentorSessionModal({ session, email, completed, onClose,
   const meta = SESSION_META[session];
   const [snapshotBullets, setSnapshotBullets] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => { track('mentor_book_clicked', { session }); }, [session]);
 
   // Personal agenda points pulled from the Snapshot (Next focus / Risk flags)
   useEffect(() => {

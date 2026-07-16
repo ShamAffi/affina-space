@@ -5,6 +5,7 @@ import { blockKind } from '../types';
 import MentorSessionModal from '../components/MentorSessionModal';
 import MarketResearchView from '../components/MarketResearchView';
 import { saveLessonInputToDB, toggleLessonCompleteToDB, patchUserToDB, loadProgressFromDB } from '../store';
+import { track } from '../lib/analytics';
 import ProfileButton from '../components/ProfileButton';
 import AccountPanel from '../components/AccountPanel';
 import DocumentsPanel from '../components/DocumentsPanel';
@@ -93,6 +94,7 @@ export default function LMS({ userData, onUpdateUserData, onGoToDashboard, onLog
   // (long lessons / mentor reviews otherwise leave you mid-page on the next one).
   useEffect(() => {
     onActiveLessonChange?.(activeLessonId);
+    track('lesson_opened', { lessonId: activeLessonId });
     mainRef.current?.scrollTo({ top: 0 });
     window.scrollTo(0, 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -218,6 +220,7 @@ My motivation & 12-week goal: …`;
     // After doc-fly: show spinner, call Claude
     setTimeout(() => {
       setSavingLesson(lessonId);
+      track('exercise_submitted', { lessonId });
 
       const lesson = allLessons.find((l) => l.id === lessonId)!;
       const isCompare = lesson.aiMode === 'compare';
@@ -245,6 +248,7 @@ My motivation & 12-week goal: …`;
           setSavingLesson(null);
           setAiErrorLesson(null);
           setRateLimitedLesson(null);
+          track('ai_feedback_received', { lessonId, score: isCompare ? null : (data as AiFeedback).score ?? null });
           if (isCompare) {
             setCompareByLesson((prev) => ({ ...prev, [lessonId]: data as CompareResult }));
           } else {
@@ -296,6 +300,7 @@ My motivation & 12-week goal: …`;
     setDelegateErrorLesson(null);
     setRateLimitedLesson(null);
     setDelegating(lessonId);
+    track('delegate_used', { lessonId, mode: dMode });
     fetch('/api/ai', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1339,6 +1344,7 @@ function NorthStarExercise({ lessonId, alreadySubmitted, onComplete, onSaveInput
       if (!r.ok) throw new Error('commit failed');
       const data = await r.json();
       setResult(data);
+      track('northstar_set');
       onSaveInput(lessonId, `North Star: ${label} (${unit}). ${rationale}`);
       setStatus('done');
     } catch {

@@ -144,3 +144,27 @@ export async function checkEmailSendLimit(
     return true;
   }
 }
+
+// Generous per-IP limit for the analytics ingestion endpoint (SPEC_ANALYTICS §3) — it's a
+// batch endpoint fired every ~5s, so 120/min/IP is comfortable for a real user and still
+// caps a flood. Returns true (proceed) unless the minute budget is exceeded. Fails OPEN:
+// the analytics limiter must never block a page.
+export async function checkTrackLimit(req: VercelRequest): Promise<boolean> {
+  const url = process.env.DATABASE_URL;
+  if (!url) return true;
+  try {
+    const sql = neon(url);
+    const key = `trk:${clientIp(req)}:min`;
+    const rows = (await sql.query(
+      `INSERT INTO rate_limits (key, window_start, count) VALUES ($1, now(), 1)
+       ON CONFLICT (key) DO UPDATE SET
+         count = CASE WHEN rate_limits.window_start <= now() - interval '1 minute' THEN 1 ELSE rate_limits.count + 1 END,
+         window_start = CASE WHEN rate_limits.window_start <= now() - interval '1 minute' THEN now() ELSE rate_limits.window_start END
+       RETURNING count`,
+      [key],
+    )) as { count: number }[];
+    return Number(rows[0]?.count ?? 0) <= 120;
+  } catch {
+    return true;
+  }
+}

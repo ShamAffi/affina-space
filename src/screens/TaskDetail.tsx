@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { track } from '../lib/analytics';
 import type { Task, TaskReview, TaskSource, TaskSubmissionData, InterviewLogEntry, FieldArtifactType } from '../types';
 import { MODULES } from '../data';
 import InterviewLog from '../components/InterviewLog';
@@ -149,6 +150,7 @@ export default function TaskDetail({ task, email, onBack }: Props) {
       }
       const data = await r.json();
       if (data.task) {
+        if (data.task.status === 'done') track('task_completed', { taskId: data.task.id });
         setCurrentTask(data.task);
         setIsEditing(false);
       } else {

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { UserData, OnboardingScore } from '../types';
 import RevealTeaser from './RevealTeaser';
+import { track } from '../lib/analytics';
 
 interface Props {
   userData: UserData;
@@ -13,6 +14,8 @@ interface Props {
 export default function ReportPage({ userData, onContinue }: Props) {
   const [report, setReport] = useState<OnboardingScore | null>(userData.onboardingReport ?? null);
   const [loading, setLoading] = useState(!userData.onboardingReport);
+
+  useEffect(() => { track('report_page_viewed'); }, []);
 
   // signIn usually preloads onboardingReport; fetch it directly if we arrived without it.
   useEffect(() => {

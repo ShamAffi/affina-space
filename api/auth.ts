@@ -9,6 +9,7 @@ import { sendEmail, magicLinkEmail, welcomeEmail } from '../src/server/email.js'
 import { issueSession, clearSession } from '../src/server/session.js';
 import { createMagicLink } from '../src/server/magicLink.js';
 import { sendOnce } from '../src/server/emailLog.js';
+import { insertServerEvent, backfillEvents } from '../src/server/events.js';
 
 // Dedicated Resend + magic-link auth function (SPEC_RESEND_AUTH §4). Action-routed,
 // rate-limited. Phase A: issue a session on verify; enforcement elsewhere is Phase B.
@@ -98,6 +99,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
     if (firstVerify) await sendOnce(userId, 'welcome', 'once', welcomeEmail(row.email, existing?.name ?? undefined));
+
+    // Analytics (SPEC_ANALYTICS §4.2/§5): re-run the anonId backfill (same-device events
+    // between capture and verify) + the server-truth email_verified event.
+    if (firstVerify) {
+      const anonId = existing?.anonId ?? null;
+      if (anonId) await backfillEvents(db, anonId, userId);
+      await insertServerEvent(db, userId, 'email_verified', {}, anonId);
+    }
 
     issueSession(res, row.email);
     // firstLogin = the account was just verified for the first time (drives the welcome

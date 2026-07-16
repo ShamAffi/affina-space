@@ -5,6 +5,7 @@ import { applyCors } from '../src/server/http.js';
 import { requireAuth } from '../src/server/requireAuth.js';
 import { getDb } from '../src/server/db.js';
 import { captureError } from '../src/server/observability.js';
+import { insertServerEvent } from '../src/server/events.js';
 import { stripe, priceQuarterly, priceAnnual } from '../src/server/stripe.js';
 import { users } from '../src/db/schema.js';
 import { sendOnce } from '../src/server/emailLog.js';
@@ -173,6 +174,14 @@ async function handleWebhook(raw: Buffer, sig: string, res: VercelResponse) {
             ...(typeof periodEnd === 'number' ? { currentPeriodEnd: new Date(periodEnd * 1000) } : {}),
             updatedAt: new Date(),
           }).where(eq(users.id, u.id));
+          // Server-truth revenue event (SPEC_ANALYTICS §5) — ONE per paid invoice (first +
+          // renewals), so no double-count with checkout.session.completed. Amount from the invoice.
+          const line = invoice.lines?.data?.[0] as { price?: { recurring?: { interval?: string } } } | undefined;
+          await insertServerEvent(db, u.id, 'payment_succeeded', {
+            amountCents: invoice.amount_paid,
+            currency: invoice.currency,
+            interval: line?.price?.recurring?.interval ?? invoice.billing_reason ?? null,
+          }, u.anonId);
         }
         break;
       }
@@ -193,7 +202,10 @@ async function handleWebhook(raw: Buffer, sig: string, res: VercelResponse) {
         const customerId = idOf(sub.customer);
         if (!customerId) break;
         const u = await db.query.users.findFirst({ where: eq(users.stripeCustomerId, customerId) });
-        if (u) await db.update(users).set({ subscribed: false, subscriptionStatus: 'canceled', updatedAt: new Date() }).where(eq(users.id, u.id));
+        if (u) {
+          await db.update(users).set({ subscribed: false, subscriptionStatus: 'canceled', updatedAt: new Date() }).where(eq(users.id, u.id));
+          await insertServerEvent(db, u.id, 'subscription_canceled', {}, u.anonId);
+        }
         break;
       }
     }
