@@ -1,22 +1,32 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams, useLocation } from 'react-router-dom';
 import type { UserData, Task } from './types';
 import { loadUserData, updateUserData, defaultUserData, saveUserData } from './store';
 import { setSessionExpiredHandler, triggerSessionExpired, resetSessionExpired } from './rateLimit';
 import { initAnalytics, track } from './lib/analytics';
-import { MODULES } from './data';
-import Welcome from './screens/Welcome';
-import Onboarding from './screens/Onboarding';
-import Dashboard from './screens/Dashboard';
-import LMS from './screens/LMS';
-import Tasks from './screens/Tasks';
-import TaskDetail from './screens/TaskDetail';
-import MetricPulse from './screens/MetricPulse';
-import Paywall from './screens/Paywall';
-import StartSession from './screens/StartSession';
-import Programs from './screens/Programs';
-import ReportPage from './screens/ReportPage';
-import WelcomeZone from './screens/WelcomeZone';
+import Welcome from './screens/Welcome'; // eager — the landing/first paint
+// Code-split (audit F43): everything past the landing loads on demand, so the initial
+// bundle (the conversion funnel entry) is small. data.ts lives in these chunks, not main.
+const Onboarding = lazy(() => import('./screens/Onboarding'));
+const Dashboard = lazy(() => import('./screens/Dashboard'));
+const LMS = lazy(() => import('./screens/LMS'));
+const Tasks = lazy(() => import('./screens/Tasks'));
+const TaskDetail = lazy(() => import('./screens/TaskDetail'));
+const MetricPulse = lazy(() => import('./screens/MetricPulse'));
+const Paywall = lazy(() => import('./screens/Paywall'));
+const StartSession = lazy(() => import('./screens/StartSession'));
+const Programs = lazy(() => import('./screens/Programs'));
+const ReportPage = lazy(() => import('./screens/ReportPage'));
+const WelcomeZone = lazy(() => import('./screens/WelcomeZone'));
+
+// Lightweight fallback while a route chunk loads.
+function RouteFallback() {
+  return (
+    <div className="min-h-screen bg-canvas flex items-center justify-center">
+      <div className="w-8 h-8 rounded-pill bg-brand animate-orb-pulse" />
+    </div>
+  );
+}
 
 const M0_FIRST = 'm0l1';
 
@@ -25,9 +35,12 @@ const COURSE_SLUG = 'launch';
 const M5_FIRST = 'm5l1';
 
 // SPEC_PAYWALL — a lesson is gated when its module is paid (M5+) and she isn't subscribed.
-const PAID_LESSON_IDS = new Set(MODULES.filter((m) => m.paid).flatMap((m) => m.lessons.map((l) => l.id)));
+// Parsed from the id (m{N}l{block}, paid ⟺ N≥5) so App doesn't import the 125KB data.ts into
+// the initial bundle (audit F43 code-splitting). The server independently enforces this.
 export function isPaidLocked(lessonId: string | undefined, subscribed: boolean): boolean {
-  return !!lessonId && !subscribed && PAID_LESSON_IDS.has(lessonId);
+  if (!lessonId || subscribed) return false;
+  const m = /^m(\d+)l\d+$/.exec(lessonId);
+  return m ? Number(m[1]) >= 5 : false;
 }
 
 export default function App() {
@@ -42,7 +55,11 @@ function AppRoutes() {
   const navigate = useNavigate();
   const location = useLocation();
   const [userData, setUserData] = useState<UserData>(loadUserData);
-  const authed = !!userData.email;
+  // audit F39 — "authed" means a real verified session, not just a typed email. A user
+  // mid-onboarding (email captured, not yet verified) is verified:false → not authed, so a
+  // refresh/return doesn't bounce her to /dashboard → 401 → wiped state. Legacy localStorage
+  // has no `verified` field (undefined) → treated as authed, so existing sessions aren't logged out.
+  const authed = !!userData.email && userData.verified !== false;
 
   function update(updates: Partial<UserData>): UserData {
     const merged = updateUserData(updates);
@@ -103,7 +120,13 @@ function AppRoutes() {
   async function signIn(rawEmail: string, dest: string = '/dashboard') {
     resetSessionExpired(); // fresh session — re-arm so a later expiry redirects again
     const email = rawEmail.trim().toLowerCase();
-    const withEmail = update({ email });
+    // audit F38 — if a DIFFERENT account signs in on this browser, drop the previous user's
+    // cached localStorage first so their name/idea/report can't bleed into this session.
+    if (userData.email && userData.email.toLowerCase() !== email) {
+      saveUserData(defaultUserData);
+      setUserData(defaultUserData);
+    }
+    const withEmail = update({ email, verified: true }); // real session (post magic-link)
     navigate(dest);
     try {
       const res = await fetch('/api/user'); // identity from the session cookie
@@ -137,7 +160,7 @@ function AppRoutes() {
   //   • returning (already verified) → dashboard
   function onVerified(email: string, isNew: boolean, next?: string | null, firstLogin?: boolean) {
     if (next) { signIn(email, next); }
-    else if (isNew) { update({ email }); navigate('/start'); }
+    else if (isNew) { update({ email, verified: true }); navigate('/start'); } // verified session, just no onboarding yet
     else if (firstLogin) { signIn(email, '/welcome'); }
     else { signIn(email); }
   }
@@ -145,6 +168,7 @@ function AppRoutes() {
   const toLanding = <Navigate to="/" replace />;
 
   return (
+    <Suspense fallback={<RouteFallback />}>
     <Routes>
       {/* Public — / is the (future) landing; for now reuse the hero with a Start CTA */}
       <Route
@@ -236,6 +260,7 @@ function AppRoutes() {
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </Suspense>
   );
 }
 

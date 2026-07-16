@@ -68,33 +68,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const token = String(req.body?.token ?? '').trim();
     if (!token) return res.status(400).json({ error: 'token required' });
 
-    const row = await db.query.authTokens.findFirst({
-      where: and(
+    // Atomic single-use consume (audit F04/F29): the guarded UPDATE only touches the row
+    // while it's still unused+unexpired, so two concurrent requests for the same token can
+    // never both succeed (only one gets a returned row). No separate SELECT-then-UPDATE.
+    const consumed = await db.update(authTokens)
+      .set({ usedAt: new Date() })
+      .where(and(
         eq(authTokens.tokenHash, sha256(token)),
         isNull(authTokens.usedAt),
         gt(authTokens.expiresAt, new Date()),
-      ),
-    });
-    if (!row) return res.status(401).json({ error: 'invalid_or_expired' });
+      ))
+      .returning({ email: authTokens.email });
+    if (consumed.length === 0) return res.status(401).json({ error: 'invalid_or_expired' });
+    const row = consumed[0];
 
-    // Single-use: consume the token.
-    await db.update(authTokens).set({ usedAt: new Date() }).where(eq(authTokens.id, row.id));
-
-    // Upsert user by email — creating the shell doubles as signup. AMENDMENT: welcome
-    // fires on the verifiedAt null→set transition only (genuine first verification).
-    const existing = await db.query.users.findFirst({ where: eq(users.email, row.email) });
+    // Upsert user by email — creating the shell doubles as signup. Race-safe (audit F31):
+    // onConflictDoNothing means two concurrent first-verifies can't 23505; the loser just
+    // resolves the existing row. Welcome fires on the verifiedAt null→set transition only.
+    const [inserted] = await db.insert(users)
+      .values({ email: row.email, verifiedAt: new Date() })
+      .onConflictDoNothing({ target: users.email })
+      .returning({ id: users.id });
     let isNew = false;
     let firstVerify = false;
     let userId: number;
-    if (!existing) {
-      const [created] = await db.insert(users).values({ email: row.email, verifiedAt: new Date() }).returning({ id: users.id });
-      userId = created.id;
+    let existing: typeof users.$inferSelect | undefined;
+    if (inserted) {
+      userId = inserted.id;
       isNew = true;
       firstVerify = true;
     } else {
-      userId = existing.id;
-      if (!existing.verifiedAt) {
-        await db.update(users).set({ verifiedAt: new Date() }).where(eq(users.id, existing.id));
+      existing = await db.query.users.findFirst({ where: eq(users.email, row.email) });
+      userId = existing!.id;
+      if (!existing!.verifiedAt) {
+        await db.update(users).set({ verifiedAt: new Date() }).where(eq(users.id, existing!.id));
         firstVerify = true;
       }
     }

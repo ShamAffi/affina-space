@@ -3,6 +3,7 @@ import { applyCors } from '../src/server/http.js';
 import { requireAuth } from '../src/server/requireAuth.js';
 import { getDb } from '../src/server/db.js';
 import { safeEqual } from '../src/server/env.js';
+import { captureError } from '../src/server/observability.js';
 import { eq } from 'drizzle-orm';
 import { users, lessonInputs, completedLessons, brainEntries, tasks, checkIns, achievements } from '../src/db/schema.js';
 import { computeLaunchReadiness, computeGrowth, GROWTH_SEED_XP, onboardingSeed } from '../src/server/progressUtils.js';
@@ -182,12 +183,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ...traction,
     });
   } catch (err) {
-    console.error('progress error', err);
-    return res.status(200).json({
-      phase: 'launch',
-      launch: { readiness: 0, seed: 0, breakdown: null },
-      completedLessons: [],
-      lessonInputs: {},
-    });
+    // audit F12 — DO NOT return a zeroed 200: that is indistinguishable from a genuinely
+    // empty account and silently regressed a paying founder to M0 on a transient DB blip.
+    // A real 500 lets the client keep its cached state and retry.
+    captureError(err, { endpoint: 'progress', mode: 'get', email });
+    return res.status(500).json({ error: 'progress_unavailable' });
   }
 }

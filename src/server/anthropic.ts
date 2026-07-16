@@ -4,7 +4,10 @@ import Anthropic from '@anthropic-ai/sdk';
 // `new Anthropic({...})` that used to live in all 8 endpoints. Lives in src/ (not
 // api/lib) — every .ts under /api counts against the Vercel Hobby 12-function cap.
 
-export const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+// timeout/maxRetries pinned (audit F23): the SDK default (10-min timeout, 2 retries) would
+// let a slow/overloaded Anthropic call blow past Vercel's 60s maxDuration and get hard-killed
+// into an opaque 504. 45s + 1 retry keeps a bad call inside the function budget.
+export const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 45_000, maxRetries: 1 });
 
 export type CallMeta = {
   endpoint: string; // which api handler (e.g. 'ai', 'brain', 'score')

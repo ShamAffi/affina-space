@@ -81,7 +81,7 @@ export default function Onboarding({ userData, update, onSignIn }: Props) {
         <EmailCapture
           initialEmail={userData.email}
           onSubmit={async (email) => {
-            const u = update({ email });
+            const u = update({ email, verified: false }); // audit F39 — not a session until the link is verified
             const r = await captureEmail(u);
             if (!r.blocked) advance();
             return r;
@@ -151,7 +151,7 @@ export default function Onboarding({ userData, update, onSignIn }: Props) {
           email={userData.email}
           onChangeEmail={async (newEmail) => {
             const prev = userData.email;
-            const u = update({ email: newEmail });
+            const u = update({ email: newEmail, verified: false });
             const r = await captureEmail(u, prev);
             if (r.blocked) update({ email: prev }); // revert local email if the new one is taken
             return r;

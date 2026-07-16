@@ -116,7 +116,14 @@ export default function LMS({ userData, onUpdateUserData, onGoToDashboard, onLog
 
   // On mount: sync profile to DB (post-auth PATCH), load progress + brain (session cookie).
   useEffect(() => {
-    patchUserToDB(userData);
+    // audit F50 — the profile write is a safety re-sync, not needed on EVERY LMS mount.
+    // Run it at most once per browser session (edits go through their own PATCH anyway).
+    try {
+      if (userData.email && !sessionStorage.getItem('affina_profile_synced')) {
+        sessionStorage.setItem('affina_profile_synced', '1');
+        patchUserToDB(userData);
+      }
+    } catch { patchUserToDB(userData); }
     if (!userData.email) { setProgressLoading(false); return; }
 
     Promise.all([

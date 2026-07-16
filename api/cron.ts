@@ -113,7 +113,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const summary: { email: string; tz: string; state: string; active?: boolean; sent: string[]; skipped: string[] }[] = [];
 
+  // audit F47 — the per-user loop does sequential awaited queries/sends; stop before the 60s
+  // maxDuration kills the function mid-write and LOG the truncation (it re-runs hourly, and
+  // sends are email_log-deduped so the deferred users are picked up next tick, never double-sent).
+  const startedAt = Date.now();
+  let truncated = 0;
   for (const u of allUsers) {
+    if (Date.now() - startedAt > 50_000) { truncated = allUsers.length - summary.length; break; }
     const tz = u.timezone?.trim() || 'UTC';
     const local = localParts(now, tz);
     const hour = forcedHour ?? local.hour;
@@ -196,8 +202,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     summary.push({ email: u.email, tz, state: 'registered', active, sent, skipped });
   }
 
+  if (truncated > 0) console.warn(`[cron] time budget hit — ${truncated} users deferred to the next run`);
   return res.status(200).json({
     ok: true, sendHour: SEND_HOUR, forcedDay, forcedHour, dry, only: only ?? null,
-    scanned: allUsers.length, acted: summary.length, summary,
+    scanned: allUsers.length, acted: summary.length, truncated, summary,
   });
 }

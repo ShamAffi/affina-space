@@ -269,6 +269,7 @@ function EditModal({
 }) {
   const [draft, setDraft] = useState(entry.content);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
   const lesson = LESSON_BY_ID[entry.lessonId];
   const maxLen = lesson?.inputMaxLength;
@@ -279,13 +280,16 @@ function EditModal({
 
   async function handleSave() {
     setSaving(true);
+    setError('');
     try {
-      // 1. Persist the edited text.
-      await fetch('/api/brain', {
+      // 1. Persist the edited text. audit F40 — check the status: a failed save must NOT be
+      // reported to the user (and to parent state) as a success.
+      const saveRes = await fetch('/api/brain', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'save-input', lessonId: entry.lessonId, content: draft }),
-      });
+      }).catch(() => null);
+      if (!saveRes || !saveRes.ok) { setError("Couldn't save — please try again."); return; }
 
       // 2. Re-run the AI mentor for exercise docs and refresh the score + feedback.
       if (reEvaluatable && draft.trim()) {
@@ -423,6 +427,7 @@ function EditModal({
               : (reEvaluatable ? 'Update & Save' : 'Save changes')}
           </button>
         </div>
+        {error && <p className="text-xs text-red-500 text-center mt-2">{error}</p>}
       </div>
     </div>
   );

@@ -15,6 +15,7 @@ export const defaultUserData: UserData = {
   city: '',
   timezone: '',
   email: '',
+  verified: false,   // audit F39 — a real session sets this true (signIn / onVerified)
   score: 0,
   subscribed: false,
   onboardingReport: null,

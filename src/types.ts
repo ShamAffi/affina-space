@@ -33,6 +33,7 @@ export type UserData = {
   email: string;
   score: number;
   subscribed: boolean;   // paywall entitlement (SPEC_PAYWALL) — M5–M12 gated on this
+  verified?: boolean;    // audit F39 — real session vs just a typed email. undefined = legacy (treated as authed)
   phone?: string | null;         // SPEC_PHONE_CAPTURE — set = suppress the lead popups
   guideUrl?: string | null;      // runtime gate for the guide popup (from /api/user)
   onboardingReport?: OnboardingScore | null;   // funnel: persisted report (RevealTeaser / /report)

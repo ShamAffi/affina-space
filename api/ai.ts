@@ -13,6 +13,7 @@ import { eq, and, desc } from 'drizzle-orm';
 import { users, brainEntries, tasks, delegations, checkIns } from '../src/db/schema.js';
 import { computeExercisePoints, LAYER_LABELS } from '../src/server/progressUtils.js';
 import { RUBRICS, GLOBAL_RUBRIC_RULES, NO_SCORE_LESSONS } from '../src/rubrics.js';
+import { BRAIN_ENTRY_TYPES } from '../src/data.js';
 
 // Tolerant to LLM looseness (CLAUDE.md pattern): the model sometimes returns 3 strengths,
 // 0 gaps, a stringy score, etc. Strict .min()/.max() used to THROW on those → a silent 502
@@ -681,6 +682,12 @@ Return JSON with exactly this structure:
       const match = raw.match(/\{[\s\S]*\}/);
       if (!match) throw new Error('no JSON in response');
       const parsed = FeedbackSchema.parse(JSON.parse(match[0]));
+      // audit F22 — a structurally-empty parse means the model returned garbage; do NOT let
+      // it through, or the persistence step below overwrites a previously good aiScore with
+      // null. Treat it as a failure (→ 502 catch) so the last good score/feedback survives.
+      if (parsed.score === null && parsed.good.length === 0 && parsed.missing.length === 0 && !parsed.nextStep.trim()) {
+        throw new Error('empty feedback payload');
+      }
       // Schema no longer enforces counts (was a silent-502 source); clamp for a tidy card.
       parsed.good = parsed.good.slice(0, 3);
       parsed.missing = parsed.missing.slice(0, 3);
@@ -727,6 +734,20 @@ Return JSON with exactly this structure:
             }).where(eq(users.id, user.id));
           }
         }
+      } else if (!isCompare) {
+        // audit F54 — no brain entry yet (the save-input write raced this AI call). Insert
+        // it here (upsert semantics) so the feedback + score aren't silently lost.
+        await db.insert(brainEntries).values({
+          userId: user.id,
+          lessonId,
+          lessonTitle: lessonTitle || lessonId,
+          prompt: prompt || '',
+          content: answer,
+          entryType: BRAIN_ENTRY_TYPES[lessonId] ?? 'exercise',
+          processedByAi: true,
+          aiScore: (result as AiFeedback).score,
+          aiFeedback: JSON.stringify(result),
+        }).onConflictDoNothing({ target: [brainEntries.userId, brainEntries.lessonId] });
       }
 
       // Upsert real-world task if mentor returned one

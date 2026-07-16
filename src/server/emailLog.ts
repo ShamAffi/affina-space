@@ -40,13 +40,22 @@ export async function logEmail(userId: number, type: string, weekOf = 'once'): P
 
 /**
  * Send a user-scoped email at most ONCE per (userId, type, weekOf) window.
- * Checks email_log first, then sends + records. Returns true if it sent, false if
- * it was already sent (deduped). Cron runs once/day single-threaded, so the
- * check-then-write is race-free in practice.
+ * audit F30 — CLAIM-then-send: insert the log row FIRST (unique index → ON CONFLICT DO
+ * NOTHING); only send if WE claimed it. This is atomic (no double-send under concurrency)
+ * AND survives a failing send without re-sending (the claim is already recorded). Returns
+ * true if it sent, false if it was already claimed (deduped) or the claim failed.
  */
 export async function sendOnce(userId: number, type: string, weekOf: string, mail: Mail): Promise<boolean> {
-  if (await alreadyLogged(userId, type, weekOf)) return false;
+  let claimed = false;
+  try {
+    const r = await db().insert(emailLog).values({ userId, type, weekOf })
+      .onConflictDoNothing().returning({ id: emailLog.id });
+    claimed = r.length > 0;
+  } catch (err) {
+    console.error('[emailLog] claim failed (not sending):', err);
+    return false;
+  }
+  if (!claimed) return false; // already sent — deduped
   await sendEmail(mail);
-  await logEmail(userId, type, weekOf);
   return true;
 }
