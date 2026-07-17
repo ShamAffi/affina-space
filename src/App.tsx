@@ -16,6 +16,7 @@ const MetricPulse = lazy(() => import('./screens/MetricPulse'));
 const Paywall = lazy(() => import('./screens/Paywall'));
 const StartSession = lazy(() => import('./screens/StartSession'));
 const Programs = lazy(() => import('./screens/Programs'));
+const AdminPanel = lazy(() => import('./screens/AdminPanel'));
 const ReportPage = lazy(() => import('./screens/ReportPage'));
 const WelcomeZone = lazy(() => import('./screens/WelcomeZone'));
 
@@ -214,6 +215,10 @@ function AppRoutes() {
 
       {/* Programs catalog (SPEC_PROGRAMS_PAGE) — Dashboard "View all lessons" lands here */}
       <Route path="/programs" element={authed ? <Programs onGoToLMS={() => navigate('/learning')} onBack={() => navigate('/dashboard')} phone={userData.phone} /> : toLanding} />
+
+      {/* Internal admin panel (SPEC_ADMIN_PANEL) — not linked anywhere; the panel pings on mount
+          and bounces a non-admin, and every /api/admin action is isAdmin-gated server-side. */}
+      <Route path="/admin" element={authed ? <AdminPanel onBounce={() => navigate('/dashboard')} /> : toLanding} />
 
       <Route path="/tasks" element={authed ? <TasksRoute email={userData.email} /> : toLanding} />
 

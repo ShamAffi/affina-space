@@ -50,6 +50,8 @@ export const users = pgTable('users', {
   phone: text('phone'),                    // light validation (a human dials it)
   phoneSource: text('phone_source'),       // 'guide' | 'paywall' — the FIRST source wins
   phoneAt: timestamp('phone_at', { withTimezone: true }),
+  // Admin panel access (SPEC_ADMIN_PANEL §1) — gates api/admin.ts. Set via migration only.
+  isAdmin: boolean('is_admin').default(false),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
