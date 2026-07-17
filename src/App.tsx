@@ -252,7 +252,7 @@ function AppRoutes() {
         path="/start-session"
         element={authed ? (userData.subscribed
           // Mentor sessions are paid (SPEC_MENTOR_REQUEST amendment) — guard direct URL entry.
-          ? <StartSession onContinue={() => navigate(`/learning/${COURSE_SLUG}/${M5_FIRST}`)} onPaywall={() => navigate('/unlock')} />
+          ? <StartSession onContinue={() => navigate(`/learning/${COURSE_SLUG}/${M5_FIRST}`)} onPaywall={() => navigate('/unlock')} phone={userData.phone} />
           : <Navigate to="/unlock" replace />
         ) : toLanding}
       />

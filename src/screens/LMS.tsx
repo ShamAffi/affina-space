@@ -1324,6 +1324,7 @@ My motivation & 12-week goal: …`;
           completed={!!sessionsState[openSession]?.completed}
           booked={!!sessionsState[openSession]?.booked}
           onPaywall={onGoToPaywall}
+          phone={userData.phone}
           onClose={() => setOpenSession(null)}
           onCompletedChange={(completed) =>
             setSessionsState((st) => ({ ...st, [openSession]: { ...st[openSession], completed } }))

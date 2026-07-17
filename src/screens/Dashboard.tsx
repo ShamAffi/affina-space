@@ -364,6 +364,7 @@ export default function Dashboard({ userData, onUpdateUserData, onGoToLMS, onGoT
           completed={!!sessionsState[openSession]?.completed}
           booked={!!sessionsState[openSession]?.booked}
           onPaywall={onGoToPaywall}
+          phone={userData.phone}
           onClose={() => setOpenSession(null)}
           onCompletedChange={(completed) =>
             setSessionsState((s) => ({ ...s, [openSession]: { ...s[openSession], completed } }))

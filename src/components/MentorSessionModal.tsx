@@ -43,11 +43,12 @@ interface Props {
   completed: boolean;
   booked?: boolean;   // a request is already on file → show the sent state, not the form
   onPaywall?: () => void; // if a write 403s (subscription lapsed) → open the paywall instead of erroring
+  phone?: string | null;  // prefill the required phone field in the request form
   onClose: () => void;
   onCompletedChange: (completed: boolean) => void;
 }
 
-export default function MentorSessionModal({ session, email, completed, booked, onPaywall, onClose, onCompletedChange }: Props) {
+export default function MentorSessionModal({ session, email, completed, booked, onPaywall, phone, onClose, onCompletedChange }: Props) {
   const meta = SESSION_META[session];
   const [snapshotBullets, setSnapshotBullets] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
@@ -132,7 +133,7 @@ export default function MentorSessionModal({ session, email, completed, booked, 
         </div>
 
         <div className="px-6 pb-6 pt-4 border-t border-hairline flex flex-col gap-3">
-          <MentorRequestForm session={session} alreadyBooked={booked} onPaywall={onPaywall} />
+          <MentorRequestForm session={session} alreadyBooked={booked} onPaywall={onPaywall} initialPhone={phone} />
           <label className="flex items-center gap-2 justify-center text-xs text-ink-soft cursor-pointer select-none">
             <input type="checkbox" checked={completed} disabled={saving} onChange={toggleCompleted} className="accent-[#7150EA]" />
             Session completed <span className="text-ink-mute">(set manually in v2)</span>

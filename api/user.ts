@@ -210,18 +210,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (v !== undefined) patchFields[k] = v;
     }
 
-    // Phone lead capture (SPEC_PHONE_CAPTURE §1) — light validation; phoneSource is FIRST-wins.
-    let phoneSave: { number: string; source: 'guide' | 'paywall' } | null = null;
+    // Phone capture (SPEC_PHONE_CAPTURE §1) — light validation; phoneSource is FIRST-wins.
+    // 'mentor' (amendment): the REQUIRED phone on the mentor booking form — always saved so we
+    // never lose contact for the paid call (number updated even if a lead source came first).
+    let phoneSave: { number: string; source: 'guide' | 'paywall' | 'mentor' } | null = null;
     if (phone !== undefined) {
       const number = String(phone?.number ?? '').trim().slice(0, 40);
       const source = phone?.source;
-      if (number.length >= 5 && (source === 'guide' || source === 'paywall')) {
+      if (number.length >= 5 && (source === 'guide' || source === 'paywall' || source === 'mentor')) {
         phoneSave = { number, source };
         patchFields.phone = number;
         patchFields.phoneSource = (existingUser as { phoneSource?: string | null }).phoneSource ?? source; // first source wins
         patchFields.phoneAt = new Date();
       } else {
-        return res.status(400).json({ error: 'invalid phone (number ≥5 chars, source guide/paywall)' });
+        return res.status(400).json({ error: 'invalid phone (number ≥5 chars, source guide/paywall/mentor)' });
       }
     }
 
@@ -293,15 +295,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       } catch { /* best-effort */ }
       void sendEmail(mentorRequestAlertEmail({
         name: existingUser.name, project: existingUser.projectName, email,
-        phone: (existingUser as { phone?: string | null }).phone ?? null,
+        // Prefer the number just submitted with the booking (amendment) over any older one on file.
+        phone: phoneSave?.number ?? (existingUser as { phone?: string | null }).phone ?? null,
         session: mentorReq.session, topic: mentorReq.topic,
         module: moduleLabel, subscribed: !!existingUser.subscribed,
       }));
     }
 
     // Phone lead: hot-lead alert to ADMIN_EMAIL (every save) + guide delivery (guide surface
-    // only, deduped) — SPEC_PHONE_CAPTURE §2.3/§4.
-    if (phoneSave) {
+    // only, deduped) — SPEC_PHONE_CAPTURE §2.3/§4. A 'mentor' phone is a paying customer's
+    // contact for the call (not a lead) and the mentor alert above already carries it — skip.
+    if (phoneSave && phoneSave.source !== 'mentor') {
       let moduleLabel: string | undefined;
       try {
         const done = await db.query.completedLessons.findMany({ where: eq(completedLessons.userId, existingUser.id) });
