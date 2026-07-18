@@ -245,11 +245,19 @@ export type CompareResult = {
 export type OnboardingScore = {
   score: number;
   summary: string;
-  steps: { title: string; body: string }[];
   percentileAheadOf: number;
-  strength: string;
-  threat: string;
   firstFocus: string;
+  // ── v2 "Founder Readiness Snapshot" (SPEC_REPORT_V2). Optional so v1 stored reports still
+  // type-check and RevealTeaser can render-guard back to the v1 layout. ──
+  level?: { n: number; name: string; why: string; unlocksNext: string };
+  dimensions?: { key: string; score: number; read: string }[];
+  strengths?: { dimension: string; text: string }[];
+  risks?: { text: string; whyNow: string }[];
+  roadmap?: { horizon: string; title: string; body: string }[];
+  // ── v1 fields (kept for back-compat with reports stored before the v2 upgrade) ──
+  steps?: { title: string; body: string }[];
+  strength?: string;
+  threat?: string;
 };
 
 export type Phase = 'launch' | 'growth';

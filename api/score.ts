@@ -13,12 +13,30 @@ import { clamp, LIMITS } from '../src/server/limits.js';
 export const ScoreSchema = z.object({
   score: z.coerce.number().int().catch(60),
   summary: z.coerce.string().catch(''),
-  steps: z.array(z.object({
+  level: z.object({
+    n: z.coerce.number().int().catch(1),
+    name: z.coerce.string().catch(''),
+    why: z.coerce.string().catch(''),
+    unlocksNext: z.coerce.string().catch(''),
+  }).catch({ n: 1, name: '', why: '', unlocksNext: '' }),
+  dimensions: z.array(z.object({
+    key: z.coerce.string().catch(''),
+    score: z.coerce.number().int().catch(50),
+    read: z.coerce.string().catch(''),
+  })).catch([]),
+  strengths: z.array(z.object({
+    dimension: z.coerce.string().catch(''),
+    text: z.coerce.string().catch(''),
+  })).catch([]),
+  risks: z.array(z.object({
+    text: z.coerce.string().catch(''),
+    whyNow: z.coerce.string().catch(''),
+  })).catch([]),
+  roadmap: z.array(z.object({
+    horizon: z.coerce.string().catch(''),
     title: z.coerce.string().catch(''),
     body: z.coerce.string().catch(''),
   })).catch([]),
-  strength: z.coerce.string().catch(''),
-  threat: z.coerce.string().catch(''),
   firstFocus: z.coerce.string().catch(''),
 });
 
@@ -26,35 +44,65 @@ function computePercentile(score: number): number {
   return Math.min(92, Math.max(55, Math.round(score * 0.9 + 4)));
 }
 
-const SYSTEM_PROMPT = `You are Affina — an honest but encouraging startup mentor for early-stage female founders.
-Based on a founder's onboarding answers, give a readiness score, 3 personalized next steps, a strength, and a first-month focus.
+const SYSTEM_PROMPT = `You are Affina — an honest, warm startup mentor for early-stage female founders.
+From 5 onboarding answers, produce a "Founder Readiness Snapshot": an overall score, a readiness LEVEL, 4 scored DIMENSIONS, 3 STRENGTHS, 3 RISKS, a 90-day ROADMAP, a punchy SUMMARY, and this week's FIRST MOVE.
 
-Scoring guide (be honest — do not default to 80):
-- 20–45: Idea is vague, customer undefined, or very early stage
-- 46–65: Real problem identified, customer partially described, limited clarity
-- 66–80: Clear problem, identifiable customer segment, some thought given to model
-- 81–95: Sharp idea, specific customer, measurable value, real traction
+HONESTY (non-negotiable): you assess the CLARITY & READINESS of her thinking based ONLY on what she wrote — never the business's "true value". Do NOT invent facts, numbers, market sizes, or traction she didn't mention. When you infer, hedge ("based on what you've shared").
 
-Rules:
-- Reference their actual idea and words in the summary and steps — no generic advice.
-- Each step title must be an action (verb-first, e.g. "Narrow your customer segment to X").
-- Keep step body to 2 sentences max.
-- strength: one sentence naming the founder's clearest competitive asset based on what they wrote.
-- threat: one sentence naming the biggest near-future RISK to this business — a likely upcoming obstacle (market, competition, adoption, timing, regulation), NOT a current weakness in the answer. Think SWOT "T". Be honest and specific to their idea.
-- firstFocus: one specific, actionable sentence — the single most valuable thing to do in Month 1.
-- Respond ONLY with valid JSON, no other text.`;
+READINESS LADDER — pick her level honestly:
+- L1 Spark — an idea, articulated
+- L2 Focus — a specific customer + a specific pain
+- L3 Validated — evidence from real people (interviews/signals)
+- L4 Built — an MVP live in the world
+- L5 Selling — first paying customers
+Most idea-stage founders are L1–L2. Reserve L3+ for real evidence in her answers. "unlocksNext" = the ONE concrete thing that moves her up one level.
+
+DIMENSIONS — score each 0–100 (readiness of her THINKING, not a valuation):
+- problem_customer — how sharply she knows WHO and what PAIN
+- market_timing — the opportunity / why-now signal in her answers
+- business_model — does the money flow fit how her customer buys
+- stage_momentum — where she is versus her stated ambition
+Scoring honesty (do NOT default to 80): vague/undefined = 25–45; a real problem but broad = 46–65; clear problem + identifiable customer + some model = 66–80; sharp + specific + measurable value = 81–95. A vague idea must NOT score 80+.
+
+STRENGTHS (exactly 3): each tagged to a dimension key, each echoing HER actual words — no generic praise.
+RISKS (exactly 3): each with "whyNow" = why it matters at her stage (one line, warm not scary). At least ONE must be a PACING risk if her goal outruns her stage (e.g. chasing investment/scale from an idea) — premature scaling is the #1 startup killer.
+ROADMAP (exactly 3 paragraphs, horizons w1_2 / w3_6 / w7_12): each 3–4 sentences — what to do → why (tie to a named risk or weak dimension) → the PROOF she'll hold at the end (interviews done, offer sharpened, first yes). Describe the work; don't name modules.
+SUMMARY: 2–3 sentences, honest but encouraging, referencing her actual idea.
+firstFocus: the single most valuable action to take THIS week.
+
+Respond ONLY with valid JSON, no other text.`;
 
 const FALLBACK = {
-  score: 62,
-  percentileAheadOf: 60,
-  strength: "You've identified a real problem with a clear target audience in mind.",
-  threat: "A larger, funded player could move on this space before you build a loyal early base.",
-  firstFocus: "Have 5 honest conversations with potential customers before building anything.",
-  summary: "You're onto a real opportunity — there's a genuine problem here worth solving. Right now your idea is still broad, which makes it harder to validate and sell. With sharper focus on one customer and one offer, this can become a launch-ready business.",
-  steps: [
-    { title: 'Narrow your idea to one problem', body: 'Focus on one specific pain felt often and badly enough to pay for a fix. The narrower you go, the faster you can validate.' },
-    { title: 'Name your first customer', body: "Don't say \"everyone\" — pick one type of person who suffers this problem most. Describe her life in one sentence." },
-    { title: 'Define the result you deliver', body: 'What measurable change does your customer get? Time saved, money earned, stress removed — make it concrete.' },
+  score: 58,
+  percentileAheadOf: 56,
+  summary: "You're onto a real problem worth solving — that's the hardest part to find. Right now the idea is still broad, which makes it harder to validate and sell. Sharpen who it's for and what changes for them, and this becomes something you can test in weeks.",
+  firstFocus: "This week, have 5 honest conversations with people who have this problem — before building anything.",
+  level: {
+    n: 1,
+    name: 'Spark',
+    why: "You've articulated an idea — a real start — but it isn't yet tied to one specific customer and one specific pain.",
+    unlocksNext: "Name one specific customer and the exact pain they feel to reach Level 2 — Focus.",
+  },
+  dimensions: [
+    { key: 'problem_customer', score: 50, read: 'The problem is visible, but the customer is still described broadly.' },
+    { key: 'market_timing', score: 52, read: "There's an opportunity here; the \"why now\" isn't spelled out yet." },
+    { key: 'business_model', score: 48, read: 'A sense of how this makes money exists, but the details are early.' },
+    { key: 'stage_momentum', score: 45, read: "You're at the idea stage — the next weeks are about evidence, not scale." },
+  ],
+  strengths: [
+    { dimension: 'problem_customer', text: "You've identified a genuine problem — the kind people actually feel." },
+    { dimension: 'stage_momentum', text: "You're taking a structured first step instead of guessing in the dark." },
+    { dimension: 'business_model', text: 'You already have an instinct for how this could make money.' },
+  ],
+  risks: [
+    { text: 'The customer is still close to "everyone" — a broad audience is hard to reach and harder to convince.', whyNow: 'At the idea stage, focus is what makes validation fast and cheap.' },
+    { text: 'Building before talking to customers risks solving the wrong problem well.', whyNow: "Every week spent building on an unvalidated guess is a week you can't get back." },
+    { text: 'Aiming for scale or investment before proof can stall you.', whyNow: 'Growth and investors follow evidence — get real conversations first.' },
+  ],
+  roadmap: [
+    { horizon: 'w1_2', title: 'Talk to 5 real people', body: "Find five people who likely have this problem and ask how they handle it today. You're not pitching — you're learning whether the pain is real and sharp enough to pay to remove. By the end you'll know if you're onto something or need to adjust." },
+    { horizon: 'w3_6', title: 'Sharpen one offer', body: 'Using what you heard, narrow to ONE customer and ONE result you deliver, written as a single clear sentence anyone could repeat. This directly attacks the "too broad" risk. It turns a vague idea into something you can actually test and sell.' },
+    { horizon: 'w7_12', title: 'Get a real yes', body: 'Build the simplest possible version — a landing page, a manual service, a prototype — and get real people to commit (sign up, pre-pay, or book). This is the proof that separates a hobby from a business. A single genuine yes from a stranger outweighs a hundred "great idea"s from friends.' },
   ],
 };
 
@@ -89,22 +137,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
 Return JSON with exactly this structure:
 {
-  "score": <integer 0-100>,
-  "summary": "<2-3 sentences: honest assessment referencing their actual idea>",
-  "steps": [
-    { "title": "<action-oriented, specific to their idea>", "body": "<2 sentences max>" },
-    { "title": "<action-oriented, specific to their idea>", "body": "<2 sentences max>" },
-    { "title": "<action-oriented, specific to their idea>", "body": "<2 sentences max>" }
+  "score": <integer 0-100, overall readiness of her thinking>,
+  "summary": "<2-3 sentence honest verdict referencing her actual idea>",
+  "level": { "n": <1-5>, "name": "<Spark|Focus|Validated|Built|Selling>", "why": "<one line, honest>", "unlocksNext": "<one line: the single thing that reaches the next level>" },
+  "dimensions": [
+    { "key": "problem_customer", "score": <0-100>, "read": "<one line referencing her words>" },
+    { "key": "market_timing", "score": <0-100>, "read": "<one line>" },
+    { "key": "business_model", "score": <0-100>, "read": "<one line>" },
+    { "key": "stage_momentum", "score": <0-100>, "read": "<one line>" }
   ],
-  "strength": "<one sentence: their clearest competitive asset based on what they wrote>",
-  "threat": "<one sentence: the biggest near-future risk/obstacle to this business — SWOT 'T', not a current weakness>",
-  "firstFocus": "<one specific action sentence: the single most valuable thing to do in Month 1>"
+  "strengths": [
+    { "dimension": "<one of the 4 keys>", "text": "<echoes her actual words>" },
+    { "dimension": "<key>", "text": "<echoes her words>" },
+    { "dimension": "<key>", "text": "<echoes her words>" }
+  ],
+  "risks": [
+    { "text": "<risk>", "whyNow": "<why it matters at her stage>" },
+    { "text": "<risk>", "whyNow": "<why it matters at her stage>" },
+    { "text": "<include a PACING risk here if her goal outruns her stage>", "whyNow": "<why it matters now>" }
+  ],
+  "roadmap": [
+    { "horizon": "w1_2", "title": "<short label>", "body": "<3-4 sentences: what to do -> why -> the proof she'll hold>" },
+    { "horizon": "w3_6", "title": "<short label>", "body": "<3-4 sentences>" },
+    { "horizon": "w7_12", "title": "<short label>", "body": "<3-4 sentences>" }
+  ],
+  "firstFocus": "<one specific action: the single most valuable thing to do THIS week>"
 }`;
 
   try {
     const message = await callClaude({
       model: MODELS.standard,
-      max_tokens: 900,
+      max_tokens: 2200,
       system: SYSTEM_PROMPT,
       messages: [{ role: 'user', content: userMessage }],
     }, { endpoint: 'score', mode: 'score' });
@@ -114,12 +177,18 @@ Return JSON with exactly this structure:
     if (!match) throw new Error('no JSON');
     const parsed = ScoreSchema.parse(JSON.parse(match[0]));
     // A structurally-empty parse (model returned garbage) → keep the graceful fallback.
-    if (!parsed.summary && parsed.steps.length === 0) return res.status(200).json(FALLBACK);
+    if (!parsed.summary && parsed.dimensions.length === 0) return res.status(200).json(FALLBACK);
     const score = Math.max(0, Math.min(100, parsed.score));
+    // Trim to the contracted counts (prompt demands 4/3/3/3; tolerate fewer, never more).
     return res.status(200).json({
-      ...parsed,
       score,
-      steps: parsed.steps.slice(0, 3),
+      summary: parsed.summary,
+      firstFocus: parsed.firstFocus,
+      level: { ...parsed.level, n: Math.max(1, Math.min(5, parsed.level.n)) },
+      dimensions: parsed.dimensions.slice(0, 4).map((d) => ({ ...d, score: Math.max(0, Math.min(100, d.score)) })),
+      strengths: parsed.strengths.slice(0, 3),
+      risks: parsed.risks.slice(0, 3),
+      roadmap: parsed.roadmap.slice(0, 3),
       percentileAheadOf: computePercentile(score),
     });
   } catch {
