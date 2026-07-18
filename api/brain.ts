@@ -320,7 +320,7 @@ Produce SIX blocks:
 2. opportunity: { frame ('income' or 'valuation' — SEE calibration), numbers: 2-3 napkin stats each {label (small caption), hero (ONLY the number/range, e.g. "250–500"), support (one plain human line)}, whyNow (ONE qualitative sentence naming a real trend in words — NO invented statistic) }.
    - Number 1 = reachable audience in year one (a RANGE), anchored to her market + goal.
    - Number 2 = revenue potential at an illustrative price (a RANGE), the price said humanly.
-   - Number 3 = CALIBRATED to her ambition (see below).
+   - Number 3 = CALIBRATED to her ambition (see below) — still a FIGURE or range, never a milestone sentence.
 3. whyYouCanWin: 2-3 items each {point (why SHE specifically can pull this off — founder-fit), quote (a SHORT phrase echoing HER actual words from whyMe/doneSoFar)}. Grounded, not praise.
 4. whatsMissing: 2-3 items each {gap (a concrete gap from her stuckPoint + stage-vs-ambition distance), solvableAs (frame it as a solvable PROCESS problem — "this is a process problem, not a you problem")}. Each maps to what structure fixes; do NOT name modules.
 5. risks: 2-3 items each {text, whyNow (why it matters at her stage)}. Honest — include a PACING risk if her 3-year goal outruns her stage (premature scaling), warm tone. Risks make the praise credible.
@@ -328,12 +328,12 @@ Produce SIX blocks:
 
 AMBITION CALIBRATION (her 3-YEAR GOAL is the PRIMARY signal — read its number AND shape, then anchor Number 3 and the SIZE of every number to it):
 - INCOME / lifestyle (goal is a monthly/annual income figure, "a business that pays me", first customers, OR low weekly capacity) → frame "income". Number 3 = MONTHLY INCOME, label "What it means for you", hero anchored to HER stated income target. Keep ALL numbers modest and grounded. NEVER show a valuation.
-- SCALE / INVESTMENT / EXIT (goal mentions raising money, a valuation, selling for $Z, big growth; or onboarding goal = Investment) → frame "valuation". Number 3 = VALUATION, label "What it could be worth", anchored toward HER figure as an early-stage step toward it. Bigger numbers, revenue language ok.
+- SCALE / INVESTMENT / EXIT (goal mentions raising money, a valuation, selling for $Z, big growth; or onboarding goal = Investment) → frame "valuation". Number 3 = a VALUATION figure or range (e.g. "$2M–$5M"), label "What it could be worth", anchored toward HER figure as an early-stage step toward it. It MUST be a number, never a milestone phrase like "early step toward 40,000 users". Bigger numbers, revenue language ok.
 - UNCLEAR / not stated → frame "income" + one light line of upside. No valuation.
 Never contradict her stated 3-year number.
 
 HARD PRESENTATION RULES:
-- hero = ONLY the number/range/short phrase (the app renders it large + bold). label and support are plain.
+- hero = ONLY a number or a range — e.g. "1,000–4,000", "$150K–$600K/yr", "$3M–$6M", "$5k/mo". Keep it to AT MOST 2 short lines (~18 characters); NEVER a sentence or a multi-word phrase — the describing words go in "support", never in the hero.
 - BAN jargon from all visible text: "TAM", "SAM", "multiple", "ARR", "illustrative only", "benchmark", "conservative anchor". No formula/derivation lines.
 - Do NOT add "napkin"/"not a promise" caveats inside the numbers — the app appends the single honesty line itself.
 - Use her name and project name naturally throughout.

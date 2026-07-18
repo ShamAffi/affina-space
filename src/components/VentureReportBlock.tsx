@@ -120,8 +120,8 @@ export default function VentureReportBlock({ projectName, name, onReportReady, o
         {report.opportunity.numbers.length > 0 && (
           <div className="flex flex-col divide-y divide-hairline border-y border-hairline my-2">
             {report.opportunity.numbers.map((num, i) => (
-              <div key={i} className="flex items-baseline gap-4 py-3.5">
-                <p className="font-display text-2xl sm:text-3xl text-brand-700 font-medium leading-none tracking-tight shrink-0 w-32">{num.hero}</p>
+              <div key={i} className="flex items-center gap-4 py-4">
+                <p className="font-display text-2xl sm:text-3xl text-brand-700 font-medium leading-tight tracking-tight shrink-0 w-36 line-clamp-2">{num.hero}</p>
                 <div className="min-w-0">
                   <p className="text-[11px] uppercase tracking-wider text-ink-mute font-semibold">{num.label}</p>
                   {num.support && <p className="text-sm text-ink-soft leading-relaxed mt-0.5">{num.support}</p>}
