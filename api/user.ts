@@ -274,7 +274,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // dedups by (user, 'mentor_booked', sid) so a false→true→false→true toggle can't
     // re-send (audit F07); combined with the ≤3-key bound + rate limit, fan-out is capped.
     for (const sid of newlyBooked) {
-      await sendOnce(existingUser.id, 'mentor_booked', sid, mentorBookedEmail(email, sid));
+      await sendOnce(existingUser.id, 'mentor_booked', sid, mentorBookedEmail(email, sid, undefined, existingUser.name));
     }
 
     // Mentor request row (feeds the future admin panel) + admin alert (SPEC_MENTOR_REQUEST §3.4/§4).

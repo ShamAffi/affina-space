@@ -144,7 +144,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         else if (await alreadyLogged(u.id, 'report_ready', 'once')) mark('report_ready', false);
         else {
           const link = await createMagicLink(u.email, FINISH_TTL_MS, RECOVERY_NEXT);
-          await sendEmail(reportReadyEmail(u.email, link));
+          await sendEmail(reportReadyEmail(u.email, link, u.name));
           await logEmail(u.id, 'report_ready', 'once');
           mark('report_ready', true);
         }
@@ -163,7 +163,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           else if (await alreadyLogged(u.id, stage.type, 'once')) mark(stage.type, false);
           else {
             const link = await createMagicLink(u.email, FINISH_TTL_MS, RECOVERY_NEXT); // verify + /report
-            await sendEmail(stage.build(u.email, link));
+            await sendEmail(stage.build(u.email, link, u.name));
             await logEmail(u.id, stage.type, 'once');
             mark(stage.type, true);
           }
@@ -185,21 +185,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const open = await db.query.tasks.findMany({ where: and(eq(tasks.userId, u.id), ne(tasks.status, 'done')) });
         if (open.length >= 1) {
           const titles = open.slice(0, 5).map((t) => t.title);
-          mark('weekly_tasks', dry ? true : await sendOnce(u.id, 'weekly_tasks', weekOf(now), weeklyTasksEmail(u.email, titles)));
+          mark('weekly_tasks', dry ? true : await sendOnce(u.id, 'weekly_tasks', weekOf(now), weeklyTasksEmail(u.email, titles, u.name)));
         }
       }
       if (dow === SATURDAY) {
-        mark('reflection', dry ? true : await sendOnce(u.id, 'reflection', weekOf(now), reflectionEmail(u.email)));
+        mark('reflection', dry ? true : await sendOnce(u.id, 'reflection', weekOf(now), reflectionEmail(u.email, u.name)));
       }
       const dueSid = dueUnbookedSession(completedIds, ms);
       if (dueSid) {
-        mark(`book_mentor:${dueSid}`, dry ? true : await sendOnce(u.id, 'book_mentor', dueSid, bookMentorEmail(u.email, dueSid)));
+        mark(`book_mentor:${dueSid}`, dry ? true : await sendOnce(u.id, 'book_mentor', dueSid, bookMentorEmail(u.email, dueSid, u.name)));
       }
     } else {
       // registered-only: a PENDING quiet user gets the finish chain above, never re-engagement
       const label = currentModuleLabel(completedIds);
       const line = (u.idea?.trim() || u.projectName?.trim() || 'your idea').slice(0, 120);
-      mark('reengagement', dry ? true : await sendOnce(u.id, 'reengagement', 'once', reengagementEmail(u.email, label, line)));
+      mark('reengagement', dry ? true : await sendOnce(u.id, 'reengagement', 'once', reengagementEmail(u.email, label, line, u.name)));
     }
 
     summary.push({ email: u.email, tz, state: 'registered', active, sent, skipped });

@@ -77,13 +77,27 @@ function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+// ── Personalization (we have users.name from onboarding). First name only (a founder may
+// enter a full name), with a graceful fallback to the generic copy when we have no name. ──
+function firstName(name?: string | null): string { return (name ?? '').trim().split(/\s+/)[0] || ''; }
+// Standalone "Hey {name} 👋" greeting line (→ "Hey 👋" when nameless).
+function heyLine(name?: string | null): string {
+  const n = firstName(name);
+  return `<p style="${P}">Hey${n ? ` ${escapeHtml(n)}` : ''} 👋</p>`;
+}
+// Personalize a subject: "{Name}, {lowercased base}" when we have a name, else the base as-is.
+function subj(name: string | null | undefined, base: string): string {
+  const n = firstName(name);
+  return n ? `${n}, ${base.charAt(0).toLowerCase()}${base.slice(1)}` : base;
+}
+
 // ── 1. Magic link (§2.1) ──────────────────────────────────────────────────────
-export function magicLinkEmail(to: string, link: string): Mail {
+export function magicLinkEmail(to: string, link: string, name?: string | null): Mail {
   return {
     to,
-    subject: 'Your Affina sign-in link',
+    subject: subj(name, 'Your Affina sign-in link'),
     html: wrap(`
-      <p style="${P}">Hey 👋</p>
+      ${heyLine(name)}
       <p style="${P}">Tap the button and you're in. No password needed.</p>
       <p style="margin:0 0 18px 0;">${button(link, 'Sign in to Affina')}</p>
       <p style="font-size:13px;line-height:1.5;color:#71717a;margin:0;">This link works once and expires in 15 minutes. If this wasn't you, just ignore this email — nothing will happen.</p>
@@ -93,13 +107,12 @@ export function magicLinkEmail(to: string, link: string): Mail {
 }
 
 // ── 2. Welcome (§2.2) ─────────────────────────────────────────────────────────
-export function welcomeEmail(to: string, name?: string): Mail {
-  const hi = name?.trim() ? `Hey ${name.trim()} 👋` : 'Hey 👋';
+export function welcomeEmail(to: string, name?: string | null): Mail {
   return {
     to,
-    subject: "Welcome to Affina — let's build this",
+    subject: subj(name, "Welcome to Affina — let's build this"),
     html: wrap(`
-      <p style="${P}">${hi}</p>
+      ${heyLine(name)}
       <p style="${P}">You're in. Affina takes you from an idea to your first paying customer — one small, real step at a time. Not a course to watch: a program to <em>do</em>.</p>
       <p style="${P}">You won't do it alone — you've got AI guidance, live mentors, and a community of women building right alongside you.</p>
       <p style="${P}">Start with Module 0. It's short, and it sets everything up.</p>
@@ -110,10 +123,10 @@ export function welcomeEmail(to: string, name?: string): Mail {
 }
 
 // ── 3. Subscription confirmed (§2.3) ──────────────────────────────────────────
-export function subscriptionEmail(to: string): Mail {
+export function subscriptionEmail(to: string, name?: string | null): Mail {
   return {
     to,
-    subject: "You're in — the full program is open",
+    subject: subj(name, "You're in — the full program is open"),
     html: wrap(`
       <p style="${P}">That's the hard part started — now you build the business.</p>
       <p style="${P}">You've just unlocked:</p>
@@ -131,14 +144,14 @@ export function subscriptionEmail(to: string): Mail {
 }
 
 // ── 4. Mentor session booked (§2.4) ───────────────────────────────────────────
-export function mentorBookedEmail(to: string, sessionId: string, dateTime?: string): Mail {
+export function mentorBookedEmail(to: string, sessionId: string, dateTime?: string, name?: string | null): Mail {
   const label = sessionLabel(sessionId);
   const when = dateTime?.trim()
     ? `You're set for your <strong>${label}</strong> session on ${dateTime.trim()}.`
     : `You're set for your <strong>${label}</strong> session. We'll be in touch to confirm your time.`;
   return {
     to,
-    subject: `Your ${label} session is booked ✅`,
+    subject: subj(name, `Your ${label} session is booked ✅`),
     html: wrap(`
       <p style="${P}">${when}</p>
       <p style="${P}">It's a 1:1 with a founder who's done this. Come with your Snapshot open and whatever's on your mind — this hour is yours.</p>
@@ -149,12 +162,13 @@ export function mentorBookedEmail(to: string, sessionId: string, dateTime?: stri
 }
 
 // ── 5. Weekly tasks — Thursday (§2.5) ─────────────────────────────────────────
-export function weeklyTasksEmail(to: string, taskTitles: string[]): Mail {
+export function weeklyTasksEmail(to: string, taskTitles: string[], name?: string | null): Mail {
   return {
     to,
-    subject: 'Your tasks for this week',
+    subject: subj(name, 'Your tasks for this week'),
     html: wrap(`
-      <p style="${P}">Hey! Here's what's waiting for you in Affina — small steps toward your first customer:</p>
+      ${heyLine(name)}
+      <p style="${P}">Here's what's waiting for you in Affina — small steps toward your first customer:</p>
       ${bullets(taskTitles)}
       <p style="${P}">Even one task done is momentum. Start with the easiest one.</p>
       <p style="margin:0;">${button(`${appUrl()}/tasks`, 'Open my tasks')}</p>
@@ -163,12 +177,12 @@ export function weeklyTasksEmail(to: string, taskTitles: string[]): Mail {
 }
 
 // ── 6. Business-week reflection — Saturday (§2.6) ─────────────────────────────
-export function reflectionEmail(to: string): Mail {
+export function reflectionEmail(to: string, name?: string | null): Mail {
   return {
     to,
-    subject: 'How did your week go? (2 min — and it\'s for you)',
+    subject: subj(name, 'How did your week go? (2 min — and it\'s for you)'),
     html: wrap(`
-      <p style="${P}">Hey 👋</p>
+      ${heyLine(name)}
       <p style="${P}">Saturday's a good moment to look back. Not to report to us — for yourself: what actually moved this week, and what got stuck.</p>
       <p style="${P}">This is the quiet habit of founders who go the distance — they <strong>notice their own progress</strong>. Heads-down in the day-to-day, it feels like you're standing still. But mark the week and you see it: <em>"oh — I talked to three customers and rewrote my offer."</em> That gives your energy back and shows you where to steer next.</p>
       <p style="${P}">Takes a couple of minutes:</p>
@@ -180,11 +194,11 @@ export function reflectionEmail(to: string): Mail {
 }
 
 // ── 7. Book your mentor (§2.7) ────────────────────────────────────────────────
-export function bookMentorEmail(to: string, sessionId: string): Mail {
+export function bookMentorEmail(to: string, sessionId: string, name?: string | null): Mail {
   const label = sessionLabel(sessionId);
   return {
     to,
-    subject: 'Your mentor session is waiting',
+    subject: subj(name, 'Your mentor session is waiting'),
     html: wrap(`
       <p style="${P}">You've reached the point where one real conversation saves you weeks. Your <strong>${label}</strong> session is a 1:1 with a founder who's already walked this path — you'll talk through where you're headed and check your course.</p>
       <p style="margin:0;">${button(`${appUrl()}/dashboard`, 'Book my session')}</p>
@@ -193,12 +207,13 @@ export function bookMentorEmail(to: string, sessionId: string): Mail {
 }
 
 // ── 8. Re-engagement — 14 days no login (§2.8) ────────────────────────────────
-export function reengagementEmail(to: string, moduleLabel: string, snapshotLine: string): Mail {
+export function reengagementEmail(to: string, moduleLabel: string, snapshotLine: string, name?: string | null): Mail {
+  const n = firstName(name);
   return {
     to,
-    subject: 'Your idea is still here',
+    subject: subj(name, 'Your idea is still here'),
     html: wrap(`
-      <p style="${P}">Hey 👋 We haven't seen you in a couple of weeks — everything okay?</p>
+      <p style="${P}">Hey${n ? ` ${escapeHtml(n)}` : ''} 👋 We haven't seen you in a couple of weeks — everything okay?</p>
       <p style="${P}">You left off at <strong>${moduleLabel}</strong>, and your project — <em>"${snapshotLine}"</em> — hasn't gone anywhere. Picking back up is easy: just continue from where you stopped.</p>
       <p style="margin:0 0 18px 0;">${button(`${appUrl()}/dashboard`, 'Jump back in')}</p>
       <p style="font-size:13px;line-height:1.5;color:#71717a;margin:0;">Life gets busy — no pressure. But your first customer won't find itself 🙂</p>
@@ -210,12 +225,12 @@ export function reengagementEmail(to: string, moduleLabel: string, snapshotLine:
 // CTA = a fresh magic link (one tap verifies + signs in). ──────────────────────────
 
 // #9 — Day 1 · simple reminder
-export function finish1Email(to: string, link: string): Mail {
+export function finish1Email(to: string, link: string, name?: string | null): Mail {
   return {
     to,
-    subject: 'Your project is waiting — one click to continue',
+    subject: subj(name, 'Your project is waiting — one click to continue'),
     html: wrap(`
-      <p style="${P}">Hey 👋</p>
+      ${heyLine(name)}
       <p style="${P}">You started with Affina but haven't confirmed your email yet — so your spot (and your project) is on pause. One tap and you're in for good, no password:</p>
       <p style="margin:0;">${button(link, 'Confirm my email &amp; continue')}</p>
       ${sign}
@@ -227,12 +242,12 @@ export function finish1Email(to: string, link: string): Mail {
 // partner) — 5× more likely to START a business + higher revenues & growth. Framed as
 // "the right support" (Affina = AI + mentors + community). Do NOT reframe to "with a
 // mentor" or "start and succeed". Source: score.org mentorship-improves-odds-of-success.
-export function finish2Email(to: string, link: string): Mail {
+export function finish2Email(to: string, link: string, name?: string | null): Mail {
   return {
     to,
-    subject: "With the right support, you're 5× more likely to start",
+    subject: subj(name, "With the right support, you're 5× more likely to start"),
     html: wrap(`
-      <p style="${P}">Hey 👋</p>
+      ${heyLine(name)}
       <p style="${P}">Do you know: <strong>entrepreneurs with the right support are 5× more likely to start a business</strong> — and report higher revenues and increased business growth (SCORE, an SBA partner).</p>
       <p style="${P}">Most ideas never launch — not because they're bad, but because going it alone is overwhelming. With real guidance you stop guessing and just take the next step.</p>
       <p style="${P}">That's exactly Affina — AI incubation and real mentors guiding you the whole way, with honest feedback at each step. Your project's waiting:</p>
@@ -243,12 +258,12 @@ export function finish2Email(to: string, link: string): Mail {
 }
 
 // #11 — Day 7 · the dream + the right support (last one)
-export function finish3Email(to: string, link: string): Mail {
+export function finish3Email(to: string, link: string, name?: string | null): Mail {
   return {
     to,
-    subject: "You had a reason to start. Don't let it fade.",
+    subject: subj(name, "You had a reason to start. Don't let it fade."),
     html: wrap(`
-      <p style="${P}">Hey 👋</p>
+      ${heyLine(name)}
       <p style="${P}">You came to Affina for a reason — a dream, an itch, a <em>"what if I actually did this?"</em> Don't let it quietly slip.</p>
       <p style="${P}">You don't have to do it alone. With Affina you get <strong>AI incubation</strong> guiding each step, <strong>live expert mentors</strong> when it matters, and a <strong>community of women founders</strong> building right alongside you.</p>
       <p style="${P}">Your idea deserves that. One tap and it's yours:</p>
@@ -261,12 +276,12 @@ export function finish3Email(to: string, link: string): Mail {
 // #12 — Day 0, T+1h · report ready (SPEC_ONBOARDING_FUNNEL §4 / SPEC_EMAILS §D2).
 // Elapsed-time trigger (now - emailCapturedAt ≥ 1h), before the +1/+3/+7 nudges. The
 // CTA is a fresh magic link → verify + land on the interactive /report page.
-export function reportReadyEmail(to: string, link: string): Mail {
+export function reportReadyEmail(to: string, link: string, name?: string | null): Mail {
   return {
     to,
-    subject: 'Your Affina report is ready 📋',
+    subject: subj(name, 'Your Affina report is ready 📋'),
     html: wrap(`
-      <p style="${P}">Hey 👋</p>
+      ${heyLine(name)}
       <p style="${P}">You started mapping out your idea on Affina — here's your report, saved and ready for you.</p>
       <p style="${P}">Open it to see where your idea stands and take the next step. It's all set up — one tap and you're in:</p>
       <p style="margin:0;">${button(link, 'Open my report &amp; continue')}</p>

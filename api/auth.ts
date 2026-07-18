@@ -53,8 +53,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const next = typeof rawNext === 'string' && /^\/[A-Za-z0-9/_-]*$/.test(rawNext) ? rawNext : undefined;
       // 15-min magic link; only sha256(token) is stored (raw lives in the emailed link).
       const link = await createMagicLink(email, 15 * 60 * 1000, next);
+      // Personalize if we already know them (returning login); pre-name capture → graceful "Hey 👋".
+      // Reads only the name into the email to the account owner — reveals nothing externally (F02).
+      const known = await getDb().query.users.findFirst({ where: eq(users.email, email), columns: { name: true } });
       // fire-and-forget: sendEmail never throws; await so the lambda doesn't freeze mid-send.
-      await sendEmail(magicLinkEmail(email, link));
+      await sendEmail(magicLinkEmail(email, link, known?.name));
     } catch (err) {
       console.error('[auth] request-link failed:', err);
       // fall through — still return 200 (don't leak failures or account existence)

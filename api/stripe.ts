@@ -167,7 +167,7 @@ async function handleWebhook(raw: Buffer, sig: string, res: VercelResponse) {
 
         // §2.3 subscription-confirmed email (moved off the browser PATCH → the webhook).
         const u = await db.query.users.findFirst({ where: eq(users.id, userId) });
-        if (u) await sendOnce(userId, 'subscription', 'once', subscriptionEmail(u.email));
+        if (u) await sendOnce(userId, 'subscription', 'once', subscriptionEmail(u.email, u.name));
         break;
       }
 
