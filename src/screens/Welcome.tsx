@@ -22,18 +22,20 @@ export default function Welcome({ onStart, onSignIn }: Props) {
 
       {/* Hero */}
       <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 py-16 text-center">
-        {/* Badge */}
-        <div className="inline-flex items-center gap-2 bg-brand-50 border border-brand-200 text-brand-700 text-sm font-medium px-4 py-1.5 rounded-pill mb-8 animate-fade-in">
-          <span className="w-2 h-2 rounded-pill bg-brand-600 animate-pulse" />
-          AI-Native Venture Studio
+        {/* Badge — two lines, no dot (founding-cohort positioning) */}
+        <div className="inline-block text-center bg-brand-50 border border-brand-200 text-brand-700 text-sm font-semibold px-5 py-2 rounded-2xl mb-8 animate-fade-in leading-snug">
+          The First AI Native Incubator<br />for Female Founders
         </div>
 
         <h1 className="font-display text-4xl sm:text-5xl md:text-6xl font-medium tracking-tight text-ink leading-tight max-w-3xl mb-5 animate-slide-up">
-          Let's build your<br />
-          <span className="text-brand">startup plan.</span>
+          Your business growth<br />
+          <span className="text-brand">starts here</span>
         </h1>
 
-        <p className="text-base sm:text-lg text-ink-soft mb-10 animate-slide-up">
+        <p className="text-base sm:text-lg text-ink-soft mb-3 animate-slide-up">
+          Realize your ambition — with the right support.
+        </p>
+        <p className="text-sm text-ink-mute mb-10 animate-slide-up">
           5 questions &nbsp;·&nbsp; ~2 min &nbsp;·&nbsp; free personalized roadmap
         </p>
 
@@ -41,7 +43,7 @@ export default function Welcome({ onStart, onSignIn }: Props) {
           onClick={onStart}
           className="bg-brand hover:bg-brand-700 active:scale-95 text-white text-lg font-semibold px-10 py-4 rounded-pill transition-all duration-150 animate-slide-up"
         >
-          Start →
+          Let's do this →
         </button>
 
         <button
@@ -53,7 +55,7 @@ export default function Welcome({ onStart, onSignIn }: Props) {
 
         {/* Social proof strip */}
         <div className="mt-16 flex flex-wrap items-center justify-center gap-8 text-sm text-ink-mute animate-fade-in">
-          {['Real Experts', 'AI-powered', 'Global Community'].map((tag) => (
+          {['Proven Methodology', 'Live Mentorship', 'AI powered'].map((tag) => (
             <span key={tag} className="flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-pill bg-brand-400" />
               {tag}

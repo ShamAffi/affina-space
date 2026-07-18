@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { COUNTRIES, flag } from '../lib/countries';
 
 interface Props {
   initialCountry: string;
@@ -28,18 +29,21 @@ export default function OnboardingLocation({ initialCountry, initialCity, onNext
         <h1 className="text-2xl font-extrabold text-ink text-center mb-2">Where are you based?</h1>
         <p className="text-sm text-ink-soft text-center mb-6">Your country and city.</p>
         <div className="flex flex-col gap-3">
-          <input
-            type="text"
+          <select
             autoFocus
-            placeholder="Country"
             value={country}
             onChange={(e) => setCountry(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && valid) submit(); }}
-            className="w-full rounded-card border-2 border-hairline focus:border-brand-400 focus:ring-4 focus:ring-brand-100 outline-none px-5 py-4 text-base text-ink placeholder-ink-mute transition"
-          />
+            aria-label="Country"
+            className={`w-full rounded-card border-2 border-hairline focus:border-brand-400 focus:ring-4 focus:ring-brand-100 outline-none px-5 py-4 text-base bg-surface transition ${country ? 'text-ink' : 'text-ink-mute'}`}
+          >
+            <option value="">Select your country…</option>
+            {COUNTRIES.map((c) => (
+              <option key={c.iso} value={c.name} className="text-ink">{flag(c.iso)}  {c.name}</option>
+            ))}
+          </select>
           <input
             type="text"
-            placeholder="City (optional)"
+            placeholder="City (you can type it in)"
             value={city}
             onChange={(e) => setCity(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && valid) submit(); }}

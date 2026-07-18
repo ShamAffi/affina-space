@@ -49,8 +49,8 @@ export default function EmailCapture({ initialEmail, onSubmit, onSignIn }: Props
             <span className="w-1.5 h-1.5 rounded-pill bg-brand-600" />
             Your report is almost ready
           </div>
-          <h1 className="text-2xl font-extrabold text-ink mb-2">See your personalized report</h1>
-          <p className="text-sm text-ink-soft mb-6">It opens on the next screen. Add your email and we'll save it to your account, so you can pick up any time — on any device.</p>
+          <h1 className="text-2xl font-extrabold text-ink mb-2 leading-snug">Great! We have everything we need to evaluate your project and give recommendations.</h1>
+          <p className="text-sm text-ink-soft mb-6">Add your email and we'll send it your way — so you can pick up any time, on any device.</p>
 
           <input
             type="email"

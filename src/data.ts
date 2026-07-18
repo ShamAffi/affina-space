@@ -75,6 +75,7 @@ export const QUESTIONS: Question[] = [
     label: "Who's it for?",
     type: 'text',
     multiline: false,
+    maxLength: 250,
     placeholder: 'e.g. Working moms in the US with children under 5…',
   },
   {
@@ -82,6 +83,7 @@ export const QUESTIONS: Question[] = [
     label: 'How will it make money?',
     type: 'text',
     multiline: false,
+    maxLength: 250,
     placeholder: 'e.g. Monthly subscription, marketplace commission, one-time purchase…',
   },
   {
