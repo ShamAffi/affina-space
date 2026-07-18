@@ -39,6 +39,13 @@ export function saveUserData(data: UserData): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
 
+// PHYSICALLY remove the cache key (SPEC_PROGRESS_SYNC §2) — logout / session-expiry / an
+// account switch must leave NO cached state behind, not just overwrite it with defaults, so
+// one user's completions can never render for another (and the Application tab shows it gone).
+export function clearUserData(): void {
+  try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
+}
+
 export function updateUserData(updates: Partial<UserData>): UserData {
   const current = loadUserData();
   const updated = { ...current, ...updates };
@@ -152,16 +159,22 @@ export async function saveLessonInputToDB(
   }
 }
 
-export async function toggleLessonCompleteToDB(email: string, lessonId: string): Promise<void> {
-  if (!email) return;
+// Persist a completion (SPEC_PROGRESS_SYNC §3). Returns the OUTCOME so the caller can revert
+// the optimistic checkmark on failure instead of losing the completion forever. 'rate' → the
+// 429 "slow down" affordance; 'fail' → generic offline/error; a 401 is 'fail' here but the
+// global fetch interceptor also fires (session expiry → /login), which supersedes the revert.
+export async function toggleLessonCompleteToDB(email: string, lessonId: string): Promise<'ok' | 'rate' | 'fail'> {
+  if (!email) return 'fail';
   try {
-    await fetch('/api/brain', {
+    const res = await fetch('/api/brain', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'toggle-complete', lessonId }),
     });
+    if (res.ok) return 'ok';
+    return res.status === 429 ? 'rate' : 'fail';
   } catch {
-    // fail silently
+    return 'fail';
   }
 }
 

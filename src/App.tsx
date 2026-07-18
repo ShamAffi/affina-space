@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams, useLocation } from 'react-router-dom';
 import type { UserData, Task } from './types';
-import { loadUserData, updateUserData, defaultUserData, saveUserData } from './store';
+import { loadUserData, updateUserData, defaultUserData, clearUserData } from './store';
 import { setSessionExpiredHandler, triggerSessionExpired, resetSessionExpired } from './rateLimit';
 import { initAnalytics, track } from './lib/analytics';
 import Welcome from './screens/Welcome'; // eager — the landing/first paint
@@ -73,13 +73,32 @@ function AppRoutes() {
   useEffect(() => { initAnalytics(); }, []);
   useEffect(() => { track('page_view'); }, [location.pathname]);
 
+  // SPEC_PROGRESS_SYNC §1 — on any full app load with an existing session (e.g. a refresh),
+  // re-hydrate the authoritative progress from the server and REPLACE it — never trust the
+  // localStorage cache for checkmarks. signIn does this right after login; this covers reload.
+  useEffect(() => {
+    if (!authed) return;
+    let alive = true;
+    fetch('/api/user').then((r) => (r.ok ? r.json() : null)).then((db) => {
+      if (!alive || !db) return;
+      update({
+        completedLessons: Array.isArray(db.completedLessons) ? db.completedLessons : [],
+        lessonInputs: db.lessonInputs ?? {},
+        subscribed: db.subscribed ?? false,
+      });
+    }).catch(() => { /* offline → keep the cache */ });
+    return () => { alive = false; };
+    // once on mount; a 401 here is handled by the global interceptor (session expiry → /login)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Auth Phase B (§5) — session expiry is handled centrally: a 401 from any guarded /api
   // call clears local state and bounces to /login. Register the action here; rateLimit's
   // checkRes AND the fetch interceptor below both route through triggerSessionExpired, so
   // every call site behaves identically (never a fake "server hiccup").
   useEffect(() => {
     setSessionExpiredHandler(() => {
-      saveUserData(defaultUserData);
+      clearUserData();
       setUserData(defaultUserData);
       navigate('/login');
     });
@@ -110,7 +129,7 @@ function AppRoutes() {
         body: JSON.stringify({ action: 'logout' }),
       });
     } catch { /* clear locally regardless */ }
-    saveUserData(defaultUserData);
+    clearUserData();
     setUserData(defaultUserData);
     navigate('/login');
   }
@@ -124,7 +143,7 @@ function AppRoutes() {
     // audit F38 — if a DIFFERENT account signs in on this browser, drop the previous user's
     // cached localStorage first so their name/idea/report can't bleed into this session.
     if (userData.email && userData.email.toLowerCase() !== email) {
-      saveUserData(defaultUserData);
+      clearUserData();
       setUserData(defaultUserData);
     }
     const withEmail = update({ email, verified: true }); // real session (post magic-link)
@@ -149,6 +168,11 @@ function AppRoutes() {
           phone: db.phone ?? null,
           guideUrl: db.guideUrl ?? null,
           onboardingReport: db.onboardingReport ?? withEmail.onboardingReport ?? null,
+          // SPEC_PROGRESS_SYNC §1 — REPLACE progress-bearing state from the server, never merge
+          // local: the checkmarks / drafts must be the DB's, not a stale cache. (mentorSessions
+          // isn't cached in userData — the LMS/Dashboard load it fresh from the DB each time.)
+          completedLessons: Array.isArray(db.completedLessons) ? db.completedLessons : [],
+          lessonInputs: db.lessonInputs ?? {},
         });
       }
     } catch { /* fail silently — localStorage is the fallback */ }

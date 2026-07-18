@@ -4,7 +4,7 @@ import type { UserData, Lesson, AiFeedback, CompareResult, BrainEntry, NorthStar
 import { blockKind } from '../types';
 import MentorSessionModal from '../components/MentorSessionModal';
 import MarketResearchView from '../components/MarketResearchView';
-import { saveLessonInputToDB, toggleLessonCompleteToDB, patchUserToDB, loadProgressFromDB } from '../store';
+import { saveLessonInputToDB, toggleLessonCompleteToDB, patchUserToDB, loadProgressFromDB, loadUserData } from '../store';
 import { track } from '../lib/analytics';
 import PhoneLeadModal from '../components/PhoneLeadModal';
 import ProfileButton from '../components/ProfileButton';
@@ -68,6 +68,8 @@ export default function LMS({ userData, onUpdateUserData, onGoToDashboard, onLog
   const [delegateErrorLesson, setDelegateErrorLesson] = useState<string | null>(null);
   // §4 API hardening — a 429 (rate limit) is shown as a calm "slow down", distinct from a 500
   const [rateLimitedLesson, setRateLimitedLesson] = useState<string | null>(null);
+  // SPEC_PROGRESS_SYNC §3 — a completion write failed; the optimistic checkmark was reverted.
+  const [completeError, setCompleteError] = useState<string | null>(null);
   // §4 Delegate — Try → Review → Delegate
   const [delegating, setDelegating] = useState<string | null>(null);
   const [delegateOpen, setDelegateOpen] = useState<string | null>(null);
@@ -135,9 +137,10 @@ export default function LMS({ userData, onUpdateUserData, onGoToDashboard, onLog
         const ms = (dbProgress as { mentorSessions?: MentorSessionsState }).mentorSessions;
         if (ms) setSessionsState(ms);
         const merged = {
-          completedLessons: [
-            ...new Set([...userData.completedLessons, ...dbProgress.completedLessons]),
-          ],
+          // SPEC_PROGRESS_SYNC §1 — server REPLACES completions (no union): a stale or phantom
+          // local checkmark must disappear, never resurrect. Drafts stay merged (content, not a
+          // checkmark) so an unsaved local draft isn't dropped.
+          completedLessons: dbProgress.completedLessons,
           lessonInputs: { ...userData.lessonInputs, ...dbProgress.lessonInputs },
         };
         onUpdateUserData(merged);
@@ -313,6 +316,21 @@ My motivation & 12-week goal: …`;
       .finally(() => setResearchLoading(false));
   }
 
+  // SPEC_PROGRESS_SYNC §3 — reliable completion: optimistic checkmark → awaited write → on
+  // failure REVERT the checkmark (against the LATEST persisted state, so a concurrent completion
+  // isn't dropped) + a calm error. Never a silent local-only completion that vanishes on relogin.
+  async function completeLesson(lessonId: string) {
+    if (userData.completedLessons.includes(lessonId)) return; // already done — no-op
+    setCompleteError(null);
+    onUpdateUserData({ completedLessons: [...userData.completedLessons, lessonId] }); // optimistic
+    const r = await toggleLessonCompleteToDB(userData.email, lessonId);
+    if (r !== 'ok') {
+      const cur = loadUserData().completedLessons;
+      onUpdateUserData({ completedLessons: cur.filter((id) => id !== lessonId) }); // revert
+      setCompleteError(r === 'rate' ? RATE_LIMIT_MESSAGE : "Couldn't save your progress — check your connection and try again.");
+    }
+  }
+
   // m2l6 is a PAID done-for-you service — start the SAME subscription as the M4 paywall, then
   // return to THIS lesson (?next = current path) so she can run the research she just paid for.
   async function unlockResearch() {
@@ -402,6 +420,13 @@ My motivation & 12-week goal: …`;
 
   return (
     <div className="min-h-screen bg-canvas flex flex-col">
+      {/* SPEC_PROGRESS_SYNC §3 — completion write failed: the checkmark was reverted; say so calmly. */}
+      {completeError && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 text-sm font-medium px-4 py-2.5 rounded-pill shadow-sm max-w-[90vw]">
+          <span className="min-w-0 truncate">{completeError}</span>
+          <button onClick={() => setCompleteError(null)} className="flex-shrink-0 text-red-400 hover:text-red-600" aria-label="Dismiss">✕</button>
+        </div>
+      )}
       {/* Top bar */}
       <header className="bg-surface border-b border-hairline flex items-center gap-3 px-4 sm:px-6 py-4 sticky top-0 z-30">
         <button
@@ -739,8 +764,7 @@ My motivation & 12-week goal: …`;
                     saveLessonInputToDB(userData.email, 'm0l3', links);
                   }
                   if (!isCompleted) {
-                    onUpdateUserData({ completedLessons: [...userData.completedLessons, 'm0l3'] });
-                    toggleLessonCompleteToDB(userData.email, 'm0l3');
+                    completeLesson('m0l3');
                   }
                   if (nextLesson) openLesson(nextLesson.id);
                 }}
@@ -771,8 +795,7 @@ My motivation & 12-week goal: …`;
                   onUpdateUserData({ lessonInputs: { ...userData.lessonInputs, ...inputsPatch } });
                   saveLessonInputToDB(userData.email, 'm0l4', json);
                   if (!isCompleted) {
-                    onUpdateUserData({ completedLessons: [...userData.completedLessons, 'm0l4'] });
-                    toggleLessonCompleteToDB(userData.email, 'm0l4');
+                    completeLesson('m0l4');
                   }
                   setAutoSnapshot(true);
                   if (nextLesson) openLesson(nextLesson.id);
@@ -788,8 +811,7 @@ My motivation & 12-week goal: …`;
                 autoStart={autoSnapshot}
                 onComplete={() => {
                   if (!isCompleted) {
-                    onUpdateUserData({ completedLessons: [...userData.completedLessons, activeLessonId] });
-                    toggleLessonCompleteToDB(userData.email, activeLessonId);
+                    completeLesson(activeLessonId);
                   }
                   if (nextLesson) openLesson(nextLesson.id);
                 }}
@@ -803,8 +825,7 @@ My motivation & 12-week goal: …`;
                 email={userData.email}
                 onContinue={() => {
                   if (!isCompleted) {
-                    onUpdateUserData({ completedLessons: [...userData.completedLessons, activeLessonId] });
-                    toggleLessonCompleteToDB(userData.email, activeLessonId);
+                    completeLesson(activeLessonId);
                   }
                   onGoToPaywall?.();
                 }}
@@ -818,8 +839,7 @@ My motivation & 12-week goal: …`;
               if (activeLesson.aiMode === 'north-star') {
                 const onContinue = () => {
                   if (!isCompleted) {
-                    onUpdateUserData({ completedLessons: [...userData.completedLessons, activeLessonId] });
-                    toggleLessonCompleteToDB(userData.email, activeLessonId);
+                    completeLesson(activeLessonId);
                   }
                   if (nextLesson) openLesson(nextLesson.id);
                 };
@@ -849,8 +869,7 @@ My motivation & 12-week goal: …`;
               const onContinue = () => {
                 setRefiningLesson(null);
                 if (!isCompleted) {
-                  onUpdateUserData({ completedLessons: [...userData.completedLessons, activeLessonId] });
-                  toggleLessonCompleteToDB(userData.email, activeLessonId);
+                  completeLesson(activeLessonId);
                 }
                 if (nextLesson) openLesson(nextLesson.id);
               };
@@ -1281,8 +1300,7 @@ My motivation & 12-week goal: …`;
 
               function handleNext() {
                 if (!isCompleted) {
-                  onUpdateUserData({ completedLessons: [...userData.completedLessons, activeLessonId] });
-                  toggleLessonCompleteToDB(userData.email, activeLessonId);
+                  completeLesson(activeLessonId);
                 }
                 if (nextLesson) openLesson(nextLesson.id);
               }
