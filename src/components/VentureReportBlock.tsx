@@ -31,6 +31,18 @@ function SectionRule({ label, n }: { label: string; n: string }) {
   );
 }
 
+// Nobody likes one giant wall of text: use the AI's blank-line breaks when present, else split a
+// single block into ~2 balanced paragraphs at a sentence boundary (handles reports cached before
+// the paragraph prompt, or a model that returns one block).
+function toParagraphs(text: string): string[] {
+  const byBlank = text.split(/\n{2,}/).map((s) => s.trim()).filter(Boolean);
+  if (byBlank.length >= 2) return byBlank;
+  const sentences = (byBlank[0] ?? text).replace(/\s+/g, ' ').trim().match(/[^.!?]+[.!?]+(?:\s|$)/g);
+  if (!sentences || sentences.length < 2) return byBlank.length ? byBlank : [text.trim()];
+  const mid = Math.ceil(sentences.length / 2);
+  return [sentences.slice(0, mid).join('').trim(), sentences.slice(mid).join('').trim()];
+}
+
 export default function VentureReportBlock({ projectName, name, onReportReady, onJoinCohort }: Props) {
   const [report, setReport] = useState<VentureReport | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -184,8 +196,8 @@ export default function VentureReportBlock({ projectName, name, onReportReady, o
         <>
           <SectionRule label="The Path" n="05" />
           <section className="mb-8 flex flex-col gap-3">
-            {report.path.split(/\n{2,}/).map((para, i) => para.trim() && (
-              <p key={i} className="text-[15px] text-ink leading-relaxed">{para.trim()}</p>
+            {toParagraphs(report.path).map((para, i) => (
+              <p key={i} className="text-[15px] text-ink leading-relaxed">{para}</p>
             ))}
           </section>
         </>
@@ -197,7 +209,6 @@ export default function VentureReportBlock({ projectName, name, onReportReady, o
       >
         Turn this into a real business →
       </button>
-      <p className="text-center text-xs text-ink-mute mt-3">15 seats · founding price · your report is saved to your account</p>
     </div>
   );
 }
