@@ -13,3 +13,7 @@ export function stripe(): Stripe {
 
 export const priceQuarterly = () => process.env.STRIPE_PRICE_QUARTERLY ?? '';
 export const priceAnnual = () => process.env.STRIPE_PRICE_ANNUAL ?? '';
+// Founding-cohort price (SPEC_COHORT_PAYWALL §0): recurring €300 every 3 months, single-phase
+// (NO quarterly→annual schedule). Checkout uses this; the webhook bypasses the annual-phase
+// schedule when the purchased price id matches it.
+export const priceFounding = () => process.env.STRIPE_PRICE_FOUNDING ?? '';

@@ -6,7 +6,7 @@ import { requireAuth } from '../src/server/requireAuth.js';
 import { getDb } from '../src/server/db.js';
 import { captureError } from '../src/server/observability.js';
 import { insertServerEvent } from '../src/server/events.js';
-import { stripe, priceQuarterly, priceAnnual } from '../src/server/stripe.js';
+import { stripe, priceQuarterly, priceAnnual, priceFounding } from '../src/server/stripe.js';
 import { users } from '../src/db/schema.js';
 import { sendOnce } from '../src/server/emailLog.js';
 import { subscriptionEmail } from '../src/server/email.js';
@@ -64,7 +64,9 @@ function safeReturnPath(p: string | undefined): string | undefined {
 
 // POST /api/stripe?action=checkout[&next=/path] — Checkout Session (subscription, quarterly first term).
 async function handleCheckout(email: string, res: VercelResponse, next?: string) {
-  if (!process.env.STRIPE_SECRET_KEY || !priceQuarterly()) {
+  // Founding-cohort funnel (SPEC_COHORT_PAYWALL §0): checkout now charges the €300/3mo founding
+  // price. Until STRIPE_PRICE_FOUNDING is set in Vercel, this 503s (acceptable per spec).
+  if (!process.env.STRIPE_SECRET_KEY || !priceFounding()) {
     return res.status(503).json({ error: 'stripe_not_configured' });
   }
   const db = getDb();
@@ -77,7 +79,7 @@ async function handleCheckout(email: string, res: VercelResponse, next?: string)
   try {
     const session = await stripe().checkout.sessions.create({
       mode: 'subscription',
-      line_items: [{ price: priceQuarterly(), quantity: 1 }],
+      line_items: [{ price: priceFounding(), quantity: 1 }],
       // Map the payment → user for the webhook. Reuse the customer if we have one.
       client_reference_id: String(user.id),
       ...(user.stripeCustomerId ? { customer: user.stripeCustomerId } : { customer_email: email }),
@@ -136,24 +138,29 @@ async function handleWebhook(raw: Buffer, sig: string, res: VercelResponse) {
 
         const sub = await stripe().subscriptions.retrieve(subscriptionId);
 
-        // §2 — convert the subscription to a schedule and add Phase 2 (annual, ongoing)
-        // so it transitions after the first quarterly cycle. Never let this fail the webhook.
-        try {
-          const schedule = await stripe().subscriptionSchedules.create({ from_subscription: subscriptionId });
-          // from_subscription already sets phase[0] to the quarterly cycle (its end_date =
-          // the 3-month period end). Preserve it and append the annual phase (ongoing) →
-          // Stripe transitions to annual when the quarterly cycle ends. (No `iterations` —
-          // removed in current API versions; the phase boundary is end_date/start_date.)
-          const p0 = schedule.phases[0];
-          await stripe().subscriptionSchedules.update(schedule.id, {
-            end_behavior: 'release',
-            phases: [
-              { items: [{ price: priceQuarterly(), quantity: 1 }], start_date: p0.start_date, end_date: p0.end_date },
-              { items: [{ price: priceAnnual(), quantity: 1 }] }, // ongoing → renews yearly
-            ],
-          });
-        } catch (err) {
-          captureError(err, { endpoint: 'stripe', mode: 'schedule-setup', note: 'subscription still active on quarterly' });
+        // §2 — quarterly→annual schedule. SPEC_COHORT_PAYWALL §0: founding-cohort subs are a
+        // single recurring €300/3mo price with NO annual phase — so we BYPASS this block when the
+        // purchased price is the founding price (gate by price id; keep the code for legacy
+        // quarterly subs). `subscribed` still flips below regardless. Never fail the webhook.
+        const purchasedPrice = sub.items.data[0]?.price?.id;
+        if (purchasedPrice && purchasedPrice !== priceFounding()) {
+          try {
+            const schedule = await stripe().subscriptionSchedules.create({ from_subscription: subscriptionId });
+            // from_subscription already sets phase[0] to the quarterly cycle (its end_date =
+            // the 3-month period end). Preserve it and append the annual phase (ongoing) →
+            // Stripe transitions to annual when the quarterly cycle ends. (No `iterations` —
+            // removed in current API versions; the phase boundary is end_date/start_date.)
+            const p0 = schedule.phases[0];
+            await stripe().subscriptionSchedules.update(schedule.id, {
+              end_behavior: 'release',
+              phases: [
+                { items: [{ price: priceQuarterly(), quantity: 1 }], start_date: p0.start_date, end_date: p0.end_date },
+                { items: [{ price: priceAnnual(), quantity: 1 }] }, // ongoing → renews yearly
+              ],
+            });
+          } catch (err) {
+            captureError(err, { endpoint: 'stripe', mode: 'schedule-setup', note: 'subscription still active on quarterly' });
+          }
         }
 
         await db.update(users).set({

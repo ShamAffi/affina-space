@@ -4,6 +4,7 @@ import type { UserData, Task } from './types';
 import { loadUserData, updateUserData, defaultUserData, clearUserData } from './store';
 import { setSessionExpiredHandler, triggerSessionExpired, resetSessionExpired } from './rateLimit';
 import { initAnalytics, track } from './lib/analytics';
+import { PAYWALL_BOUNDARY } from './server/entitlement'; // shared free/paid seam (pure util, type-only server import erased)
 import Welcome from './screens/Welcome'; // eager — the landing/first paint
 // Code-split (audit F43): everything past the landing loads on demand, so the initial
 // bundle (the conversion funnel entry) is small. data.ts lives in these chunks, not main.
@@ -33,15 +34,16 @@ const M0_FIRST = 'm0l1';
 
 // Single course for now; the URL keeps a course segment so parallel courses slot in later.
 const COURSE_SLUG = 'launch';
-const M5_FIRST = 'm5l1';
+const M1_FIRST = 'm1l1';
 
-// SPEC_PAYWALL — a lesson is gated when its module is paid (M5+) and she isn't subscribed.
-// Parsed from the id (m{N}l{block}, paid ⟺ N≥5) so App doesn't import the 125KB data.ts into
-// the initial bundle (audit F43 code-splitting). The server independently enforces this.
+// Founding-cohort funnel — a lesson is gated when its module is paid (M1+) and she isn't
+// subscribed. Parsed from the id (m{N}l{block}, paid ⟺ N≥PAYWALL_BOUNDARY) so App doesn't
+// import the 125KB data.ts into the initial bundle (audit F43). PAYWALL_BOUNDARY is the one
+// shared constant (src/server/entitlement.ts); the server independently enforces the same.
 export function isPaidLocked(lessonId: string | undefined, subscribed: boolean): boolean {
   if (!lessonId || subscribed) return false;
   const m = /^m(\d+)l\d+$/.exec(lessonId);
-  return m ? Number(m[1]) >= 5 : false;
+  return m ? Number(m[1]) >= PAYWALL_BOUNDARY : false;
 }
 
 export default function App() {
@@ -167,6 +169,11 @@ function AppRoutes() {
           subscribed: db.subscribed ?? false,
           phone: db.phone ?? null,
           guideUrl: db.guideUrl ?? null,
+          calendlyUrl: db.calendlyUrl ?? null,
+          cohortSeatsTotal: db.cohortSeatsTotal ?? 15,
+          cohortSeatsLeft: db.cohortSeatsLeft ?? 11,
+          cohortAcceptedAt: db.cohortAcceptedAt ?? null,
+          seatHeldUntil: db.seatHeldUntil ?? null,
           onboardingReport: db.onboardingReport ?? withEmail.onboardingReport ?? null,
           // SPEC_PROGRESS_SYNC §1 — REPLACE progress-bearing state from the server, never merge
           // local: the checkmarks / drafts must be the DB's, not a stale cache. (mentorSessions
@@ -249,7 +256,18 @@ function AppRoutes() {
       {/* SPEC_PAYWALL + SPEC_STRIPE — full-page overlay gating M5–M12 (→ Stripe Checkout) */}
       <Route
         path="/unlock"
-        element={authed ? (userData.subscribed ? <Navigate to="/start-session" replace /> : <Paywall onDismiss={() => navigate('/dashboard')} phone={userData.phone} />) : toLanding}
+        element={authed ? (userData.subscribed ? <Navigate to="/start-session" replace /> : (
+          <Paywall
+            onDismiss={() => navigate('/dashboard')}
+            name={userData.name}
+            phone={userData.phone}
+            seatsTotal={userData.cohortSeatsTotal}
+            seatsLeft={userData.cohortSeatsLeft}
+            calendlyUrl={userData.calendlyUrl}
+            accepted={!!userData.cohortAcceptedAt && !userData.subscribed}
+            seatHeldUntil={userData.seatHeldUntil}
+          />
+        )) : toLanding}
       />
       {/* Stripe success return — the webhook flips `subscribed`; this polls for it then continues */}
       <Route
@@ -271,12 +289,12 @@ function AppRoutes() {
           />
         ) : toLanding}
       />
-      {/* Post-paywall S1 booking — required step, both CTAs advance to M5 */}
+      {/* Post-paywall S1 booking — required step, both CTAs advance to M1 (founding-cohort funnel) */}
       <Route
         path="/start-session"
         element={authed ? (userData.subscribed
           // Mentor sessions are paid (SPEC_MENTOR_REQUEST amendment) — guard direct URL entry.
-          ? <StartSession onContinue={() => navigate(`/learning/${COURSE_SLUG}/${M5_FIRST}`)} onPaywall={() => navigate('/unlock')} phone={userData.phone} />
+          ? <StartSession onContinue={() => navigate(`/learning/${COURSE_SLUG}/${M1_FIRST}`)} onPaywall={() => navigate('/unlock')} phone={userData.phone} />
           : <Navigate to="/unlock" replace />
         ) : toLanding}
       />

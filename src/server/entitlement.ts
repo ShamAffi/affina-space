@@ -6,11 +6,16 @@ import type { VercelResponse } from '@vercel/node';
 // lesson is independently re-checked here against users.subscribed.
 //
 // Source of truth is the lesson id itself. Program v2 ids are `m{module}l{block}`
-// (SPEC_PROGRAM_V2 §3.5) and modules M5–M12 carry `paid: true` (src/data.ts). So a
-// lesson is paid ⟺ its module index ≥ FIRST_PAID_MODULE. Deriving it by parsing the
+// (SPEC_PROGRAM_V2 §3.5) and paid modules carry `paid: true` (src/data.ts). So a
+// lesson is paid ⟺ its module index ≥ PAYWALL_BOUNDARY. Deriving it by parsing the
 // id keeps this a pure string check — no endpoint has to import the 125 KB content
 // module just to gate a lesson (that would worsen cold starts, audit F49).
-export const FIRST_PAID_MODULE = 5;
+//
+// Founding-cohort funnel (2026-07): only Module 0 is free — the boundary moved M5 → M1.
+// SINGLE SOURCE OF TRUTH: the client (src/App.tsx isPaidLocked) imports PAYWALL_BOUNDARY
+// from here too, so the free/paid seam lives in exactly one place.
+export const PAYWALL_BOUNDARY = 1;
+export const FIRST_PAID_MODULE = PAYWALL_BOUNDARY; // alias kept for existing call sites
 
 const LESSON_ID = /^m(\d+)l\d+$/;
 

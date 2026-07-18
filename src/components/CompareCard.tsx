@@ -57,7 +57,7 @@ export default function CompareCard({ lessonTitle, prompt, answer, result, onRef
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <polyline points="20 6 9 17 4 12" />
             </svg>
-            Saved to Company Brain
+            Saved to Startup Brain
           </span>
         </div>
       </div>

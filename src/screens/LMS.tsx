@@ -6,13 +6,13 @@ import MentorSessionModal from '../components/MentorSessionModal';
 import MarketResearchView from '../components/MarketResearchView';
 import { saveLessonInputToDB, toggleLessonCompleteToDB, patchUserToDB, loadProgressFromDB, loadUserData } from '../store';
 import { track } from '../lib/analytics';
-import PhoneLeadModal from '../components/PhoneLeadModal';
 import ProfileButton from '../components/ProfileButton';
 import AccountPanel from '../components/AccountPanel';
 import DocumentsPanel from '../components/DocumentsPanel';
 import FeedbackCard from '../components/FeedbackCard';
 import CompareCard from '../components/CompareCard';
 import LessonBody from '../components/LessonBody';
+import VentureReportBlock from '../components/VentureReportBlock';
 import { splitMissionVision, composeMissionVision } from '../missionVision';
 import { composePSC, splitPSC, pscRecapBlocks, PSC_LABELS, type PscBlocks } from '../problemSolution';
 import { checkRes, isRateLimit, isSessionExpired, RATE_LIMIT_MESSAGE } from '../rateLimit';
@@ -104,18 +104,9 @@ export default function LMS({ userData, onUpdateUserData, onGoToDashboard, onLog
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeLessonId]);
 
-  // Phone lead popup (SPEC_PHONE_CAPTURE §2) — the moment M1's last block completes, offer
-  // the guide for a number. Gated: env GUIDE_URL set · no phone on file · once per device.
-  const [showGuidePopup, setShowGuidePopup] = useState(false);
-  useEffect(() => {
-    if (userData.phone || !userData.guideUrl) return;
-    try { if (localStorage.getItem('affina_guide_popup_seen')) return; } catch { return; }
-    const m1 = MODULES.find((m) => m.id === 'm1');
-    if (m1 && m1.lessons.every((l) => userData.completedLessons.includes(l.id))) {
-      try { localStorage.setItem('affina_guide_popup_seen', '1'); } catch { /* ignore */ }
-      setShowGuidePopup(true);
-    }
-  }, [userData.completedLessons, userData.phone, userData.guideUrl]);
+  // Guide lead-magnet popup moved to the Dashboard (SPEC_VENTURE_REPORT §6): M1 is now paid, so
+  // the old "M1 complete" trigger was dead as lead-gen. It now fires on dashboard mount for an
+  // unpaid founder who finished M0 and already dismissed the paywall once.
 
   // On mount: sync profile to DB (post-auth PATCH), load progress + brain (session cookie).
   useEffect(() => {
@@ -803,22 +794,28 @@ My motivation & 12-week goal: …`;
               />
             )}
 
-            {/* ⚙️ M0.5 — Startup Snapshot generation (§6.1, wow moment №1) */}
+            {/* 📄 M0.5 — "Your First Venture Report" (SPEC_VENTURE_REPORT). The visible artifact is
+                the editorial venture memo; its CTA opens the founding-cohort paywall. The Startup
+                Snapshot machinery (§3) still runs — SnapshotBlock is mounted HIDDEN so its existing
+                autoStart generation keeps producing the snapshot (Delegate/market-research/emails
+                read it) without changing any snapshot code. */}
             {activeLesson.id === 'm0l5' && (
-              <SnapshotBlock
-                key={activeLessonId}
-                email={userData.email}
-                autoStart={autoSnapshot}
-                onComplete={() => {
-                  if (!isCompleted) {
-                    completeLesson(activeLessonId);
-                  }
-                  if (nextLesson) openLesson(nextLesson.id);
-                }}
-              />
+              <>
+                <VentureReportBlock
+                  key={activeLessonId}
+                  projectName={userData.projectName}
+                  name={userData.name}
+                  onReportReady={() => { if (!isCompleted) completeLesson(activeLessonId); }}
+                  onJoinCohort={() => onGoToPaywall?.()}
+                />
+                <div className="hidden" aria-hidden>
+                  <SnapshotBlock email={userData.email} autoStart={autoSnapshot} onComplete={() => { /* snapshot runs silently; navigation is owned by the report CTA */ }} />
+                </div>
+              </>
             )}
 
-            {/* 🏛 m4l10 The Founder's Case — free reveal; its CTA opens the paywall (SPEC_PAYWALL §0) */}
+            {/* 🏛 m4l10 "Your Validated Venture Report" — end-of-M4 SUBSCRIBER milestone
+                (SPEC_VENTURE_REPORT §6). No longer pre-paywall; its CTA continues to Module 5. */}
             {activeLesson.id === 'm4l10' && (
               <FoundersCaseBlock
                 key={activeLessonId}
@@ -827,7 +824,7 @@ My motivation & 12-week goal: …`;
                   if (!isCompleted) {
                     completeLesson(activeLessonId);
                   }
-                  onGoToPaywall?.();
+                  openLesson('m5l1');
                 }}
               />
             )}
@@ -1347,15 +1344,6 @@ My motivation & 12-week goal: …`;
           onCompletedChange={(completed) =>
             setSessionsState((st) => ({ ...st, [openSession]: { ...st[openSession], completed } }))
           }
-        />
-      )}
-
-      {showGuidePopup && (
-        <PhoneLeadModal
-          variant="guide"
-          guideUrl={userData.guideUrl}
-          onClose={() => setShowGuidePopup(false)}
-          onSubmitted={(p) => onUpdateUserData({ phone: p })}
         />
       )}
 
@@ -2207,7 +2195,7 @@ function FoundersCaseBlock({ email, onContinue }: { email: string; onContinue: (
       <div className="bg-brand-50 border border-brand-100 rounded-card p-6 mb-8 text-center animate-fade-in">
         <p className="text-sm text-ink-soft mb-4">Couldn't assemble your case just now — you can continue anyway.</p>
         <button onClick={onContinue} className="bg-brand hover:bg-brand-700 active:scale-95 text-white text-sm font-semibold px-6 py-3 rounded-pill transition-all duration-150">
-          Sounds great — continue →
+          Continue to Module 5 →
         </button>
       </div>
     );

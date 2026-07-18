@@ -3,6 +3,9 @@ import { neon } from '@neondatabase/serverless';
 import { applyCors } from '../src/server/http.js';
 import { requireAuth } from '../src/server/requireAuth.js';
 import { captureError } from '../src/server/observability.js';
+import { sendOnce } from '../src/server/emailLog.js';
+import { acceptanceEmail } from '../src/server/email.js';
+import { createMagicLink } from '../src/server/magicLink.js';
 
 // Internal admin panel (SPEC_ADMIN_PANEL). This is the ONE endpoint that returns OTHER users'
 // data, so access control is critical (§1): every action requires a valid session (requireAuth
@@ -38,6 +41,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'unknown action' });
     }
     if (req.method === 'POST' && action === 'request-status') return await setRequestStatus(sql, req.body, res);
+    if (req.method === 'POST' && action === 'cohort-accept') return await cohortAccept(sql, req.body, res);
     return res.status(405).json({ error: 'method not allowed' });
   } catch (err) {
     captureError(err, { endpoint: 'admin', mode: action });
@@ -162,4 +166,33 @@ async function setRequestStatus(sql: Sql, body: unknown, res: VercelResponse) {
   const updated = await sql`UPDATE mentor_requests SET status = ${status} WHERE id = ${id} RETURNING id, status`;
   if (!updated[0]) return res.status(404).json({ error: 'not found' });
   return res.status(200).json({ ok: true, id: updated[0].id, status: updated[0].status });
+}
+
+// ─── §3a Accept a founder into the cohort (post-call). Sets the 72h hold window + fires the
+// acceptance email (#13, magic-link claim). Idempotent; never touches a subscribed founder. ──
+async function cohortAccept(sql: Sql, body: unknown, res: VercelResponse) {
+  const b = (body ?? {}) as { id?: unknown };
+  const id = Number(b.id);
+  if (!id || Number.isNaN(id)) return res.status(400).json({ error: 'invalid (id required)' });
+  const rows = await sql`SELECT id, email, name, project_name, subscribed FROM users WHERE id = ${id} LIMIT 1`;
+  const u = rows[0];
+  if (!u) return res.status(404).json({ error: 'not found' });
+  // Short-circuit: a subscribed founder is already in — never accept/email her (§3a guard).
+  if (u.subscribed) return res.status(200).json({ ok: true, skipped: 'already_subscribed' });
+  // Idempotent: the FIRST accept sets both timestamps (72h hold); re-accepts keep them stable,
+  // and the email is deduped by email_log — so calling twice is safe.
+  const updated = await sql`UPDATE users
+    SET cohort_accepted_at = COALESCE(cohort_accepted_at, now()),
+        seat_held_until    = COALESCE(seat_held_until, now() + interval '72 hours'),
+        updated_at = now()
+    WHERE id = ${id}
+    RETURNING seat_held_until`;
+  const heldIso = (updated[0]?.seat_held_until as string | null) ?? null;
+  const holdDate = heldIso ? new Date(heldIso).toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : '';
+  const link = await createMagicLink(u.email as string, 14 * 24 * 60 * 60 * 1000, '/unlock');
+  const emailed = await sendOnce(id, 'cohort_accept', 'once',
+    acceptanceEmail(u.email as string, link, (u.name as string) ?? null, (u.project_name as string) ?? null, holdDate));
+  // Server-truth analytics event (admin.ts uses raw neon SQL, not Drizzle).
+  await sql`INSERT INTO events (anon_id, user_id, name, props) VALUES (${`server:${id}`}, ${id}, 'cohort_accepted', '{}'::jsonb)`;
+  return res.status(200).json({ ok: true, seatHeldUntil: heldIso, emailed });
 }

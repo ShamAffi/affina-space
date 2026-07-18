@@ -52,6 +52,10 @@ export const users = pgTable('users', {
   phoneAt: timestamp('phone_at', { withTimezone: true }),
   // Admin panel access (SPEC_ADMIN_PANEL §1) — gates api/admin.ts. Set via migration only.
   isAdmin: boolean('is_admin').default(false),
+  // Founding-cohort acceptance (SPEC_COHORT_PAYWALL §3a) — set by the admin "Accept into cohort"
+  // action; drives the accepted paywall variant + acceptance/reminder emails.
+  cohortAcceptedAt: timestamp('cohort_accepted_at', { withTimezone: true }),
+  seatHeldUntil: timestamp('seat_held_until', { withTimezone: true }),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });

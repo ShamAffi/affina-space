@@ -1,47 +1,63 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import { track } from '../lib/analytics';
 import PhoneLeadModal from '../components/PhoneLeadModal';
 
-// SPEC_PAYWALL + SPEC_STRIPE — full-page blocking-but-dismissible overlay gating M5–M12.
-// "Unlock" now starts a real Stripe Checkout (subscription; €360 first 3 months → €1,200/yr).
-// `subscribed` is flipped by the Stripe webhook, never here — on return the success page
-// polls the server for it. Gating logic (M5–M12 on users.subscribed) is unchanged.
-const PRICE = '€360 for your first 3 months, then €1,200/year · cancel anytime';
-
-const VALUE_STACK = [
-  { title: 'The full Launch Program', sub: 'all 12 modules, idea → first paying customer (you’ve done 4)' },
-  { title: '3 live 1:1 mentor sessions', sub: 'real founders, at the moments that matter' },
-  { title: 'Specialized deep-dive programs', sub: 'Marketing, AI, Fundraising' },
-  { title: 'Live online events & workshops', sub: '' },
-  { title: 'A community of women founders', sub: 'building alongside you' },
-];
+// SPEC_COHORT_PAYWALL — the founding-cohort selling page. Full-page, dismissible overlay shown
+// after the m0l5 Venture Report and on any locked M1+ click. Stripe checkout charges the €300/3mo
+// founding price; `subscribed` is flipped by the webhook, never here. Photos/screenshots are
+// labeled PLACEHOLDERS (§4 — Shamil supplies real assets later).
 
 interface Props {
-  onDismiss: () => void;      // back to Dashboard
-  phone?: string | null;      // SPEC_PHONE_CAPTURE §3 — skip the founder-call offer if on file
+  onDismiss: () => void;            // back to Dashboard
+  name?: string;                    // her first name (accepted-variant hero)
+  phone?: string | null;            // skip the founder-call offer if on file
+  seatsTotal?: number;
+  seatsLeft?: number;
+  calendlyUrl?: string | null;      // §3 — primary CTA opens this when set, else the phone modal
+  accepted?: boolean;               // §3a — post-call acceptance state (personal "claim your seat")
+  seatHeldUntil?: string | null;    // ISO — hold date shown in the accepted hero
 }
 
-export default function Paywall({ onDismiss, phone }: Props) {
+// Placeholder visual frame — a labeled slot where a real screenshot/photo drops in later (§4).
+function Slot({ label, className = '', children }: { label?: string; className?: string; children?: ReactNode }) {
+  return (
+    <div className={`relative rounded-control bg-inset border border-hairline overflow-hidden ${className}`}>
+      {children}
+      {label && (
+        <span className="absolute bottom-1.5 right-2 text-[9px] uppercase tracking-wider text-ink-mute/70 font-semibold">{label}</span>
+      )}
+    </div>
+  );
+}
+
+export default function Paywall({ onDismiss, name, phone, seatsTotal = 15, seatsLeft = 11, calendlyUrl, accepted = false, seatHeldUntil }: Props) {
   const [working, setWorking] = useState(false);
   const [error, setError] = useState('');
-  const [showOffer, setShowOffer] = useState(false);
+  const [offer, setOffer] = useState<null | 'dismiss' | 'book'>(null);
 
-  useEffect(() => { track('paywall_viewed'); }, []);
+  useEffect(() => {
+    track('paywall_viewed');
+    if (accepted) track('seat_claim_viewed');
+  }, [accepted]);
 
-  // Dismiss → the "talk to a founder" offer once per visit (skipped if a phone is on file);
-  // both its paths return to the Dashboard (SPEC_PHONE_CAPTURE §3).
+  const soldOut = seatsLeft <= 0;
+  const holdDate = seatHeldUntil ? new Date(seatHeldUntil).toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : '';
+
+  // Dismiss → the founder-call offer once (skipped if a phone is on file); both paths → Dashboard.
+  // Also records that she's seen & dismissed the paywall (drives the dashboard guide popup, §6).
   function dismiss() {
     track('paywall_dismissed');
+    try { localStorage.setItem('affina_paywall_dismissed', '1'); } catch { /* ignore */ }
     if (phone) onDismiss();
-    else setShowOffer(true);
+    else setOffer('dismiss');
   }
 
-  async function unlock() {
+  async function checkout() {
     setWorking(true);
     setError('');
+    track('cohort_checkout_clicked');
     track('checkout_started');
     try {
-      // Start Stripe Checkout (session-authed server-side). The webhook flips `subscribed`.
       const r = await fetch('/api/stripe?action=checkout', { method: 'POST' });
       const d = await r.json().catch(() => ({}));
       if (d.url) { window.location.href = d.url; return; }
@@ -52,6 +68,98 @@ export default function Paywall({ onDismiss, phone }: Props) {
     }
   }
 
+  function bookCall() {
+    track('cohort_call_clicked');
+    if (calendlyUrl) { window.open(calendlyUrl, '_blank', 'noopener'); return; }
+    setOffer('book');
+  }
+
+  function joinWaitlist() {
+    track('waitlist_joined');
+    setOffer('book');
+  }
+
+  const CARDS: { title: string; body: string; visual: ReactNode }[] = [
+    {
+      title: 'The 12-Week Launch Sprint',
+      body: 'Twelve weeks: from your project to real business results.',
+      visual: (
+        <Slot className="h-28 flex items-center justify-center px-4">
+          <div className="flex items-center gap-1.5 w-full">
+            {['Idea', 'Validated', 'Built', 'First sale'].map((s, i) => (
+              <div key={s} className="flex items-center gap-1.5 flex-1 last:flex-none">
+                <span className="text-[10px] font-semibold text-brand-700 whitespace-nowrap">{s}</span>
+                {i < 3 && <span className="flex-1 h-px bg-brand-200" />}
+              </div>
+            ))}
+          </div>
+        </Slot>
+      ),
+    },
+    {
+      title: '3 Private Mentor Sessions',
+      body: 'Real founders and operators, 1:1 — at the moments that matter most.',
+      visual: (
+        <Slot label="photos" className="h-28 flex items-center justify-center">
+          <div className="flex -space-x-3">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <div key={i} className="w-11 h-11 rounded-pill bg-gradient-to-br from-brand-200 to-brand-100 border-2 border-surface" />
+            ))}
+          </div>
+        </Slot>
+      ),
+    },
+    {
+      title: 'Your Working Dashboard',
+      body: 'Tasks, feedback, momentum — your whole build in one place.',
+      visual: (
+        <Slot label="screenshot" className="h-28 p-3">
+          <div className="flex gap-2 h-full">
+            <div className="w-1/3 rounded bg-brand-100/60" />
+            <div className="flex-1 flex flex-col gap-1.5">
+              <div className="h-2 rounded bg-hairline" />
+              <div className="h-2 rounded bg-hairline w-3/4" />
+              <div className="h-2 rounded bg-accent-100 w-1/2 mt-auto" />
+            </div>
+          </div>
+        </Slot>
+      ),
+    },
+    {
+      title: 'Your Startup Brain (AI)',
+      body: 'An AI that actually knows your project — every insight and fact, working for your decisions.',
+      visual: (
+        <Slot label="AI" className="h-28 p-3 flex flex-col justify-center gap-1.5">
+          <p className="text-[10px] text-ink-mute font-semibold">AI review</p>
+          <p className="text-[11px] text-ink-soft leading-snug italic">“Your 3 interviews all name price as the blocker — test a lower tier before building.”</p>
+        </Slot>
+      ),
+    },
+    {
+      title: 'Deep-Dive Programs & Consults',
+      body: 'From vibe-coding to marketing to B2B sales — go deep where your business needs it.',
+      visual: (
+        <Slot label="screenshot" className="h-28 p-3">
+          <div className="grid grid-cols-2 gap-1.5 h-full">
+            {['Marketing', 'AI build', 'B2B sales', 'Fundraising'].map((s) => (
+              <div key={s} className="rounded bg-surface border border-hairline flex items-center justify-center text-[10px] font-semibold text-ink-soft">{s}</div>
+            ))}
+          </div>
+        </Slot>
+      ),
+    },
+    {
+      title: 'Founding Status',
+      body: 'Shape the product. A direct channel to the founders. Founding terms — forever.',
+      visual: (
+        <div className="h-28 rounded-control bg-brand flex flex-col items-center justify-center gap-1.5 text-white">
+          <span className="text-2xl">✦</span>
+          <span className="text-[11px] font-semibold uppercase tracking-widest">Founding member</span>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="min-h-screen bg-canvas">
       <div className="fixed inset-0 pointer-events-none overflow-hidden" aria-hidden>
@@ -59,7 +167,7 @@ export default function Paywall({ onDismiss, phone }: Props) {
         <div className="absolute -bottom-40 -left-24 w-80 h-80 rounded-pill bg-accent-50 opacity-50 blur-3xl" />
       </div>
 
-      <div className="relative z-10 max-w-lg mx-auto px-5 py-10 sm:py-16">
+      <div className="relative z-10 max-w-xl mx-auto px-5 py-10 sm:py-14">
         {/* Dismiss */}
         <button
           onClick={dismiss}
@@ -69,50 +177,98 @@ export default function Paywall({ onDismiss, phone }: Props) {
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg>
         </button>
 
-        <p className="text-xs font-bold text-accent-600 uppercase tracking-widest mb-3">You've made it further than most.</p>
-        <h1 className="font-display text-3xl sm:text-4xl font-medium tracking-tight text-ink leading-tight mb-5">
-          The problem is real. Now build the business.
-        </h1>
+        {/* Hero — accepted variant swaps the copy (§3a) */}
+        {accepted ? (
+          <>
+            <p className="text-xs font-bold text-accent-600 uppercase tracking-widest mb-3">You're accepted</p>
+            <h1 className="font-display text-3xl sm:text-4xl font-medium tracking-tight text-ink leading-tight mb-4">
+              Your seat in the founding cohort is reserved{name ? `, ${name}` : ''}.
+            </h1>
+            <p className="text-base text-ink-soft leading-relaxed mb-8">
+              {holdDate ? <>We loved talking about your project. Your seat is held until <span className="font-semibold text-ink">{holdDate}</span> — claim it below and we start properly: your 12 weeks, your mentors, your cohort.</>
+                : <>We loved talking about your project. Claim your seat below and we start properly: your 12 weeks, your mentors, your cohort.</>}
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="text-xs font-bold text-brand-600 uppercase tracking-widest mb-3">Founding cohort · {seatsTotal} seats</p>
+            <h1 className="font-display text-3xl sm:text-4xl font-medium tracking-tight text-ink leading-tight mb-4">
+              Be one of the {seatsTotal} we build this with.
+            </h1>
+            <p className="text-base text-ink-soft leading-relaxed mb-8">
+              A founding cohort of {seatsTotal} women founders. Super-personal attention, a direct line to us, and a
+              hand in shaping the platform that will help millions of women build — at half the price, as a one-time
+              founding offer.
+            </p>
+          </>
+        )}
 
-        <p className="text-base text-ink leading-relaxed mb-3">
-          In four modules you've sharpened your idea, sized your market, talked to real people, and tested
-          your hypothesis against what they actually said — the hard part most founders skip.
-        </p>
-        <p className="text-base text-ink leading-relaxed mb-7">
-          What comes next is where it becomes a company: your business model, your first MVP, your first sale.
-          <span className="font-semibold"> This is the part you came for.</span>
-        </p>
-
-        <div className="bg-surface border border-hairline rounded-card p-5 shadow-sm mb-6">
-          <p className="text-[11px] font-bold text-ink-mute uppercase tracking-widest mb-3">What you unlock</p>
-          <ul className="flex flex-col gap-3">
-            {VALUE_STACK.map((v) => (
-              <li key={v.title} className="flex gap-3">
-                <span className="mt-0.5 flex-shrink-0 w-5 h-5 rounded-pill bg-accent-50 flex items-center justify-center">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#119C74" strokeWidth="2.5"><polyline points="20 6 9 17 4 12" /></svg>
-                </span>
-                <span className="min-w-0">
-                  <span className="text-sm font-semibold text-ink">{v.title}</span>
-                  {v.sub && <span className="block text-xs text-ink-soft leading-relaxed">{v.sub}</span>}
-                </span>
-              </li>
-            ))}
-          </ul>
+        {/* 6-card slider */}
+        <div className="-mx-5 px-5 mb-8 overflow-x-auto snap-x snap-mandatory flex gap-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {CARDS.map((c) => (
+            <div key={c.title} className="snap-start shrink-0 w-[260px] bg-surface border border-hairline rounded-card p-4 shadow-sm">
+              {c.visual}
+              <p className="text-sm font-bold text-ink mt-3">{c.title}</p>
+              <p className="text-xs text-ink-soft leading-relaxed mt-1">{c.body}</p>
+            </div>
+          ))}
         </div>
 
-        <p className="text-center text-sm font-bold text-ink mb-1">{PRICE}</p>
-        <p className="text-center text-[11px] text-ink-mute leading-relaxed mb-4">
-          Cancel anytime — your first 3 months are yours; cancel before renewal to stop the annual plan.
-        </p>
+        {/* Price block */}
+        <div className="bg-surface border border-hairline rounded-card p-5 shadow-sm mb-6 text-center">
+          <p className="flex items-center justify-center gap-2 mb-1">
+            <span className="text-lg text-ink-mute line-through">€600</span>
+            <span className="font-display text-3xl font-medium text-brand-700">€300</span>
+            <span className="text-sm font-semibold text-ink">founding price</span>
+          </p>
+          <p className="text-xs text-ink-mute mb-3">one-time price offer</p>
+          {soldOut ? (
+            <p className="text-sm font-bold text-amber-700">All {seatsTotal} founding seats are taken — join the waitlist below.</p>
+          ) : (
+            <p className="inline-block text-sm font-bold text-accent-700 bg-accent-50 border border-accent-100 rounded-pill px-3 py-1">{seatsLeft} of {seatsTotal} seats left</p>
+          )}
+          <p className="text-[11px] text-ink-mute leading-relaxed mt-3">3-month subscription · all updates · live mentor sessions · community</p>
+          <p className="text-[11px] text-ink-mute mt-1">€600 after the founding cohort.</p>
+        </div>
 
-        <button
-          onClick={unlock}
-          disabled={working}
-          className="w-full bg-brand hover:bg-brand-700 active:scale-95 disabled:opacity-60 text-white text-base font-semibold py-4 rounded-pill transition-all duration-150"
-        >
-          {working ? 'Starting checkout…' : 'Unlock the full program →'}
-        </button>
+        {/* CTA block */}
+        {accepted ? (
+          <button
+            onClick={checkout}
+            disabled={working}
+            className="w-full bg-brand hover:bg-brand-700 active:scale-95 disabled:opacity-60 text-white text-base font-semibold py-4 rounded-pill transition-all duration-150"
+          >
+            {working ? 'Starting checkout…' : 'Claim my seat — €300'}
+          </button>
+        ) : soldOut ? (
+          <button
+            onClick={joinWaitlist}
+            className="w-full bg-brand hover:bg-brand-700 active:scale-95 text-white text-base font-semibold py-4 rounded-pill transition-all duration-150"
+          >
+            Join the waitlist →
+          </button>
+        ) : (
+          <>
+            <button
+              onClick={bookCall}
+              className="w-full bg-brand hover:bg-brand-700 active:scale-95 text-white text-base font-semibold py-4 rounded-pill transition-all duration-150"
+            >
+              Book my seat — 20 minutes with a founder
+            </button>
+            <p className="text-center text-[11px] text-ink-mute leading-relaxed mt-2 mb-4">
+              Not a sales call — we'll walk through your project together and decide if we're a fit.
+            </p>
+            <button
+              onClick={checkout}
+              disabled={working}
+              className="w-full border border-hairline bg-surface hover:bg-inset disabled:opacity-60 text-ink-soft text-sm font-semibold py-3 rounded-pill transition"
+            >
+              {working ? 'Starting checkout…' : "I'm not waiting — start now"}
+            </button>
+          </>
+        )}
         {error && <p className="text-center text-xs text-red-500 mt-3">{error}</p>}
+
         <button
           onClick={dismiss}
           className="w-full mt-3 text-sm font-semibold text-ink-mute hover:text-ink-soft transition text-center py-2"
@@ -120,11 +276,21 @@ export default function Paywall({ onDismiss, phone }: Props) {
           Not now — I'll keep exploring
         </button>
 
-        <p className="text-[11px] text-ink-mute text-center mt-6">Built by founders who've been where you are.</p>
+        {/* Guarantee */}
+        <div className="bg-inset border border-hairline rounded-card p-5 mt-8">
+          <p className="text-sm font-bold text-ink mb-2">The Founding Cohort Guarantee</p>
+          <p className="text-sm text-ink-soft leading-relaxed">
+            Finish the program without your first customers — and we refund everything. Or, if you'd rather, we keep
+            working with you personally until you get there. We're here for business results, not subscriptions.
+          </p>
+        </div>
       </div>
 
-      {showOffer && (
-        <PhoneLeadModal variant="paywall" onClose={onDismiss} />
+      {offer && (
+        <PhoneLeadModal
+          variant="paywall"
+          onClose={() => { if (offer === 'dismiss') onDismiss(); else setOffer(null); }}
+        />
       )}
     </div>
   );

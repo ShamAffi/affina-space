@@ -125,7 +125,7 @@ export const MODULES: Module[] = [
 
 Courses give you information and a certificate. We're here for something harder and far more valuable: a real business, with a real customer who pays you real money. Every module works the same way — a short piece of theory, an exercise where you apply it to *your* startup, and a field mission you complete out in the real world. What you bring back gets reviewed, scored, and turned into your next move.
 
-==Everything you do feeds your Brain== — a living memory of your startup. Your answers, your interviews, your numbers all land there, and your AI mentor uses them to give advice about your business specifically, not generic startup wisdom pulled from a textbook. The further you go, the smarter it gets about you.
+==Everything you do feeds your Startup Brain== — a living memory of your startup. Your answers, your interviews, your numbers all land there, and your AI mentor uses them to give advice about your business specifically, not generic startup wisdom pulled from a textbook. The further you go, the smarter it gets about you.
 
 **Three honest rules.**
 
@@ -191,6 +191,7 @@ Sara Blakely started Spanx with $5,000 and zero industry contacts. Nobody gave e
     title: 'Find Your Focus',
     track: 'Foundations',
     courseId: 'launching',
+    paid: true,
     lessons: [
       {
         id: 'm1l1',
@@ -293,6 +294,7 @@ Your job next, in the exercise that follows: write the sharp version of your own
     title: 'Research the Market',
     track: 'Validation',
     courseId: 'launching',
+    paid: true,
     lessons: [
       {
         id: 'm2l1',
@@ -411,6 +413,7 @@ You don't need a forty-tab spreadsheet for this. You need a napkin, three honest
     title: 'Customer Discovery',
     track: 'Validation',
     courseId: 'launching',
+    paid: true,
     lessons: [
       {
         id: 'm3l1',
@@ -524,6 +527,7 @@ Candidate C: [who they are]
     title: 'Problem, Solution & Product',
     track: 'Validation',
     courseId: 'launching',
+    paid: true,
     mentorSessionAfter: 'S1',
     lessons: [
       {
@@ -662,12 +666,13 @@ How it powers the value above: …`,
         },
       },
       {
-        // The Founder's Case (SPEC_PAYWALL §0) — last block of M4, free, not scored.
-        // A milestone reveal (like m0l5) generated from her Brain; its CTA opens the paywall.
+        // Your Validated Venture Report (SPEC_VENTURE_REPORT §6) — last block of M4, a
+        // SUBSCRIBER milestone re-analyzed from 4 modules of real Brain data. No longer
+        // pre-paywall (the paywall moved to m0l5); its CTA continues to Module 5.
         id: 'm4l10',
         type: 'text',
         kind: 'system',
-        title: "The Founder's Case",
+        title: 'Your Validated Venture Report',
         body: `You've done what most people only talk about: sharpened an idea, sized a market, talked to real people, and tested your hypothesis against what they actually said. Before you go on, take a moment to see the whole picture — your vision, your proof, and what it could become.`,
       },
     ],

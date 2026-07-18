@@ -6,9 +6,9 @@ import { Resend } from 'resend';
 // broken Resend can't fail signup / login / a check-in. All copy is the final English
 // from SPEC_EMAILS — that doc is the source of truth for content.
 
-type Mail = { to: string; subject: string; html: string };
+type Mail = { to: string; subject: string; html: string; replyTo?: string };
 
-export async function sendEmail({ to, subject, html }: Mail): Promise<void> {
+export async function sendEmail({ to, subject, html, replyTo }: Mail): Promise<void> {
   const key = process.env.RESEND_API_KEY;
   if (!key) {
     console.error('[email] RESEND_API_KEY unset — skipping send:', subject, '→', to);
@@ -17,7 +17,8 @@ export async function sendEmail({ to, subject, html }: Mail): Promise<void> {
   const from = process.env.EMAIL_FROM || 'Affina <hello@affina.space>';
   try {
     const resend = new Resend(key);
-    const { error } = await resend.emails.send({ from, to, subject, html });
+    // replyTo (§3a): the acceptance email invites replies — they must reach a mailbox Shamil reads.
+    const { error } = await resend.emails.send({ from, to, subject, html, ...(replyTo ? { replyTo } : {}) });
     if (error) console.error('[email] Resend returned an error:', error);
   } catch (err) {
     console.error('[email] send threw (swallowed, request continues):', err);
@@ -114,7 +115,7 @@ export function welcomeEmail(to: string, name?: string | null): Mail {
     html: wrap(`
       ${heyLine(name)}
       <p style="${P}">You're in. Affina takes you from an idea to your first paying customer — one small, real step at a time. Not a course to watch: a program to <em>do</em>.</p>
-      <p style="${P}">You won't do it alone — you've got AI guidance, live mentors, and a community of women building right alongside you.</p>
+      <p style="${P}">You won't do it alone — you've got AI guidance, live mentors, and a community of women building right alongside you — and everything you do builds your Startup Brain: every insight in one place, working for your decisions.</p>
       <p style="${P}">Start with Module 0. It's short, and it sets everything up.</p>
       <p style="margin:0;">${button(appUrl(), 'Start Module 0')}</p>
       ${sign}
@@ -285,6 +286,44 @@ export function reportReadyEmail(to: string, link: string, name?: string | null)
       <p style="${P}">You started mapping out your idea on Affina — here's your report, saved and ready for you.</p>
       <p style="${P}">Open it to see where your idea stands and take the next step. It's all set up — one tap and you're in:</p>
       <p style="margin:0;">${button(link, 'Open my report &amp; continue')}</p>
+      ${sign}
+    `, LIFECYCLE_NOTE),
+  };
+}
+
+// ── 13. Founding-cohort acceptance (SPEC_COHORT_PAYWALL §3a) — the post-call "you're in".
+// Magic-link claim CTA (→ /unlock, auto-login). Reply-To sk@ so the P.S. reaches Shamil.
+// Guarded upstream so it never reaches a subscribed user. ──
+export function acceptanceEmail(to: string, link: string, name?: string | null, project?: string | null, holdDate?: string): Mail {
+  const projLine = project ? ` about ${escapeHtml(project)}` : '';
+  const held = holdDate ? `<p style="${P}">Your seat is held until <strong>${escapeHtml(holdDate)}</strong>.</p>` : '';
+  return {
+    to,
+    subject: subj(name, "You're in — welcome to the founding cohort 🎉"),
+    replyTo: adminEmail(),
+    html: wrap(`
+      ${heyLine(name)}
+      <p style="${P}">We loved talking${projLine}. We'd be glad to build it with you — you're accepted into the founding cohort.</p>
+      ${held}
+      <p style="${P}">Claim your seat below, and from there we start properly: your 12 weeks, your mentors, your cohort.</p>
+      <p style="margin:0 0 16px 0;">${button(link, 'Claim my seat — €300 founding price')}</p>
+      <p style="${P}color:#71717a;">P.S. Questions? Just reply — this email reaches us directly.</p>
+      ${sign}
+    `),
+  };
+}
+
+// ── 14. Seat-hold reminder (§3a) — cron, once, at T+48h if still accepted & unsubscribed.
+// After the hold date passes, the caller omits holdDate and the copy simply drops it. ──
+export function seatHoldReminderEmail(to: string, link: string, name?: string | null, holdDate?: string): Mail {
+  const held = holdDate ? ` until <strong>${escapeHtml(holdDate)}</strong>` : '';
+  return {
+    to,
+    subject: subj(name, 'your seat is still held'),
+    html: wrap(`
+      ${heyLine(name)}
+      <p style="${P}">Just a quick note — your founding-cohort seat is still held${held}. Claim it whenever you're ready.</p>
+      <p style="margin:0 0 16px 0;">${button(link, 'Claim my seat — €300 founding price')}</p>
       ${sign}
     `, LIFECYCLE_NOTE),
   };

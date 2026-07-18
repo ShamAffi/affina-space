@@ -6,6 +6,7 @@ import AccountPanel from '../components/AccountPanel';
 import DocumentsPanel from '../components/DocumentsPanel';
 import MomentumCard from '../components/MomentumCard';
 import MentorSessionModal from '../components/MentorSessionModal';
+import PhoneLeadModal from '../components/PhoneLeadModal';
 
 const TASK_STATUS_DOT: Record<string, string> = {
   todo: 'bg-ink-mute',
@@ -41,6 +42,25 @@ export default function Dashboard({ userData, onUpdateUserData, onGoToLMS, onGoT
   const [taskList, setTaskList] = useState<Task[]>([]);
   const [panel, setPanel] = useState<'none' | 'account' | 'documents'>('none');
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [showGuidePopup, setShowGuidePopup] = useState(false);
+
+  // Guide lead-magnet popup (SPEC_VENTURE_REPORT §6). M1 is now paid, so the old "M1 complete"
+  // trigger is dead as lead-gen. The offer now fires on the DASHBOARD for an unpaid founder who
+  // finished the free Module 0 AND already saw & dismissed the cohort paywall at least once —
+  // never at the dismiss moment itself (the founder-call offer owns that). Gated: no phone on
+  // file · GUIDE_URL set · shown once per device.
+  useEffect(() => {
+    if (userData.subscribed || userData.phone || !userData.guideUrl) return;
+    try {
+      if (localStorage.getItem('affina_guide_popup_seen')) return;
+      if (!localStorage.getItem('affina_paywall_dismissed')) return;
+    } catch { return; }
+    const m0 = MODULES.find((m) => m.id === 'm0');
+    if (m0 && m0.lessons.every((l) => userData.completedLessons.includes(l.id))) {
+      try { localStorage.setItem('affina_guide_popup_seen', '1'); } catch { /* ignore */ }
+      setShowGuidePopup(true);
+    }
+  }, [userData.subscribed, userData.completedLessons, userData.phone, userData.guideUrl]);
 
   useEffect(() => {
     if (!userData.email) return;
@@ -383,6 +403,15 @@ export default function Dashboard({ userData, onUpdateUserData, onGoToLMS, onGoT
             onUpdateUserData({ lessonInputs: { ...userData.lessonInputs, [lessonId]: content } })
           }
           context={{ name: userData.name, idea: userData.idea, customer: userData.customer, stage: userData.stage }}
+        />
+      )}
+
+      {showGuidePopup && (
+        <PhoneLeadModal
+          variant="guide"
+          guideUrl={userData.guideUrl}
+          onClose={() => setShowGuidePopup(false)}
+          onSubmitted={(p) => onUpdateUserData({ phone: p })}
         />
       )}
     </div>

@@ -322,6 +322,9 @@ export default function RevealTeaser({ projectName, goal, result, onRegister, ct
           </div>
         </div>
 
+        <p className="text-xs text-ink-soft text-center mb-3 leading-relaxed">
+          From here, every step builds <span className="font-semibold text-ink">Your Startup Brain</span> — every insight and fact in one place, working for your decisions.
+        </p>
         <button
           onClick={onRegister}
           className="w-full bg-brand hover:bg-brand-700 active:scale-95 text-white text-base font-semibold py-4 rounded-pill transition-all duration-150"

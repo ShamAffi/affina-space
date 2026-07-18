@@ -54,7 +54,9 @@ export default function DocumentsPanel({ email, onClose, onLessonInputSaved, con
         if (researchEntry) {
           try { setResearch(JSON.parse(researchEntry.content) as MarketResearchReport); } catch { /* skip */ }
         }
-        setEntries(list.filter((e) => e.entryType !== 'startup_snapshot' && e.entryType !== 'market_research'));
+        // venture_report / founders_case are JSON reveal artifacts (rendered on their lessons),
+        // not documents — keep them out of the generic list so they don't show as raw JSON.
+        setEntries(list.filter((e) => e.entryType !== 'startup_snapshot' && e.entryType !== 'market_research' && e.entryType !== 'venture_report' && e.entryType !== 'founders_case'));
         setSnapshot(data.snapshot ?? null);
         setLoading(false);
       })
@@ -77,8 +79,8 @@ export default function DocumentsPanel({ email, onClose, onLessonInputSaved, con
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-5 border-b border-hairline">
             <div>
-              <h2 className="text-base font-bold text-ink">Documents</h2>
-              <p className="text-xs text-ink-mute mt-0.5">Your Company Brain</p>
+              <h2 className="text-base font-bold text-ink">Your Startup Brain</h2>
+              <p className="text-xs text-ink-mute mt-0.5 leading-snug">Every insight and fact about your startup — in one place, working for your decisions.</p>
             </div>
             <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-control hover:bg-inset text-ink-soft transition">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -136,7 +138,7 @@ export default function DocumentsPanel({ email, onClose, onLessonInputSaved, con
                   </svg>
                 </div>
                 <p className="text-sm text-ink-soft leading-relaxed">
-                  Complete exercises in the program<br />to build your Company Brain
+                  Complete exercises in the program<br />to build your Startup Brain
                 </p>
               </div>
             )}

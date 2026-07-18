@@ -8,7 +8,7 @@ import { MODULES } from '../src/data.js';
 import { sendOnce, alreadyLogged, logEmail } from '../src/server/emailLog.js';
 import {
   weeklyTasksEmail, reflectionEmail, bookMentorEmail, reengagementEmail,
-  finish1Email, finish2Email, finish3Email, reportReadyEmail, sendEmail,
+  finish1Email, finish2Email, finish3Email, reportReadyEmail, seatHoldReminderEmail, sendEmail,
 } from '../src/server/email.js';
 import { createMagicLink } from '../src/server/magicLink.js';
 
@@ -131,6 +131,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const sent: string[] = [];
     const skipped: string[] = [];
     const mark = (label: string, ok: boolean) => (ok ? sent : skipped).push(label);
+
+    // Seat-hold reminder (#14, SPEC_COHORT_PAYWALL §3a): once, ≥48h after acceptance, at ANY
+    // hour, only while still accepted & UNSUBSCRIBED (a paid founder never gets it). After the
+    // hold date passes there's no auto-release — the copy just drops the date.
+    if (u.cohortAcceptedAt && !u.subscribed) {
+      const acceptedMs = now.getTime() - new Date(u.cohortAcceptedAt).getTime();
+      if (acceptedMs >= 48 * HOUR_MS) {
+        if (dry) mark('cohort_hold_reminder', true);
+        else if (await alreadyLogged(u.id, 'cohort_hold_reminder', 'once')) mark('cohort_hold_reminder', false);
+        else {
+          const held = u.seatHeldUntil && new Date(u.seatHeldUntil).getTime() > now.getTime()
+            ? new Date(u.seatHeldUntil).toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : '';
+          const link = await createMagicLink(u.email, FINISH_TTL_MS, '/unlock');
+          await sendEmail(seatHoldReminderEmail(u.email, link, u.name, held));
+          await logEmail(u.id, 'cohort_hold_reminder', 'once');
+          mark('cohort_hold_reminder', true);
+        }
+      }
+    }
 
     if (!u.verifiedAt) {
       // ── PENDING → day-0 report (elapsed) + finish chain (11:00). No #5–#8. ──────

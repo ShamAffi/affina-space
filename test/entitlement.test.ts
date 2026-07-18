@@ -18,13 +18,13 @@ describe('moduleIndexOf', () => {
 });
 
 describe('isPaidLesson', () => {
-  it('gates exactly modules M5..M12', () => {
-    // free
-    for (const id of ['m0l1', 'm1l4', 'm2l6', 'm3l6', 'm4l5', 'm4l10']) {
+  it('gates exactly modules M1..M12 (only M0 is free — founding-cohort funnel)', () => {
+    // free — Module 0 only
+    for (const id of ['m0l1', 'm0l3', 'm0l4', 'm0l5']) {
       expect(isPaidLesson(id), `${id} should be free`).toBe(false);
     }
-    // paid
-    for (const id of ['m5l1', 'm5l4', 'm5l6', 'm9l4', 'm10l4', 'm11l4', 'm12l6']) {
+    // paid — every M1+ lesson (incl. m4l10, now a subscriber milestone)
+    for (const id of ['m1l1', 'm1l4', 'm2l6', 'm3l6', 'm4l5', 'm4l10', 'm5l1', 'm9l4', 'm12l6']) {
       expect(isPaidLesson(id), `${id} should be paid`).toBe(true);
     }
   });
@@ -34,10 +34,10 @@ describe('isPaidLesson', () => {
     expect(isPaidLesson(null)).toBe(false);
     expect(isPaidLesson('')).toBe(false);
   });
-  it('the boundary is FIRST_PAID_MODULE', () => {
-    expect(FIRST_PAID_MODULE).toBe(5);
-    expect(isPaidLesson(`m${FIRST_PAID_MODULE - 1}l1`)).toBe(false);
-    expect(isPaidLesson(`m${FIRST_PAID_MODULE}l1`)).toBe(true);
+  it('the boundary is FIRST_PAID_MODULE (M1 — only M0 free)', () => {
+    expect(FIRST_PAID_MODULE).toBe(1);
+    expect(isPaidLesson(`m${FIRST_PAID_MODULE - 1}l1`)).toBe(false); // m0l1 free
+    expect(isPaidLesson(`m${FIRST_PAID_MODULE}l1`)).toBe(true);      // m1l1 paid
   });
 });
 
@@ -54,7 +54,7 @@ function mockRes() {
 describe('requireEntitlement', () => {
   it('allows a free lesson regardless of subscription', () => {
     const { res, state } = mockRes();
-    expect(requireEntitlement(res, 'm4l10', false)).toBe(true);
+    expect(requireEntitlement(res, 'm0l1', false)).toBe(true); // M0 is the only free module now
     expect(state.code).toBeUndefined(); // nothing written
   });
 

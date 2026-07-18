@@ -249,6 +249,129 @@ export default withAuth('GET,POST,OPTIONS', async (req, res, { email, db }) => {
       return res.status(200).json({ snapshot: snap });
     }
 
+    // 📄 m0l5 "Your First Venture Report" (SPEC_VENTURE_REPORT §1/§2) — the editorial-memo
+    // reveal at the end of the free Module 0, the emotional peak before the cohort paywall.
+    // ONE Opus (MODELS.deep) pass from her real intake + quiz + onboarding report. Cached in
+    // brain_entries under lessonId 'm0l5_venture' (the snapshot owns 'm0l5'; the UNIQUE
+    // (userId,lessonId) constraint forbids sharing it). Ungated: no paid lessonId is passed,
+    // so requireEntitlement lets an unpaid M0 founder generate it. `refresh:true` regenerates.
+    if (action === 'venture-report') {
+      const VentureSchema = z.object({
+        verdict: z.object({
+          oneLiner: z.coerce.string().catch(''),
+          verdict: z.coerce.string().catch(''),
+          level: z.object({ n: z.coerce.number().int().catch(1), name: z.coerce.string().catch('') }).catch({ n: 1, name: '' }),
+        }).catch({ oneLiner: '', verdict: '', level: { n: 1, name: '' } }),
+        opportunity: z.object({
+          frame: z.coerce.string().catch('income'), // 'income' | 'valuation' (goal3y calibration)
+          numbers: z.array(z.object({
+            label: z.coerce.string().catch(''),
+            hero: z.coerce.string().catch(''),
+            support: z.coerce.string().catch(''),
+          })).catch([]),
+          whyNow: z.coerce.string().catch(''),
+        }).catch({ frame: 'income', numbers: [], whyNow: '' }),
+        whyYouCanWin: z.array(z.object({
+          point: z.coerce.string().catch(''),
+          quote: z.coerce.string().catch(''),
+        })).catch([]),
+        whatsMissing: z.array(z.object({
+          gap: z.coerce.string().catch(''),
+          solvableAs: z.coerce.string().catch(''),
+        })).catch([]),
+        risks: z.array(z.object({
+          text: z.coerce.string().catch(''),
+          whyNow: z.coerce.string().catch(''),
+        })).catch([]),
+        path: z.coerce.string().catch(''),
+      });
+      const vEntries = await db.query.brainEntries.findMany({ where: eq(brainEntries.userId, user.id) });
+      const vCached = vEntries.find((e) => e.entryType === 'venture_report');
+      if (vCached && req.body.refresh !== true) {
+        try {
+          const c = VentureSchema.parse(JSON.parse(vCached.content));
+          if (c.verdict.verdict || c.opportunity.numbers.length > 0) {
+            return res.status(200).json({ report: c, snapshotPresent: !!user.snapshot });
+          }
+        } catch { /* regen */ }
+      }
+      const vByType: Record<string, string> = {};
+      for (const e of vEntries) if (e.content) vByType[e.entryType] = e.content;
+      const vSnap = user.snapshot as { sections: { title: string; content: string }[] } | null;
+      // Her own words (m0l4 quiz) — the raw material for calibration + the "why you can win" quotes.
+      let vGoal3y = '', vGoal12w = '', vCapacity = '', vWhyMe = '', vDoneSoFar = '', vStuck = '';
+      try {
+        const intake = JSON.parse(vByType['founder_intake'] || '{}');
+        vGoal3y = intake.goal3y ?? ''; vGoal12w = intake.goal12w ?? ''; vCapacity = intake.capacity ?? '';
+        vWhyMe = intake.whyMe ?? ''; vDoneSoFar = intake.doneSoFar ?? ''; vStuck = intake.stuckPoint ?? '';
+      } catch { /* no quiz yet */ }
+      const vRep = user.onboardingReport as { score?: number; level?: { n?: number; name?: string } } | null;
+      const vArrival = vRep ? `score ${vRep.score ?? '?'}, level ${vRep.level?.name || vRep.level?.n || '?'}` : '(no first report on file)';
+      try {
+        const msg = await callClaude({
+          model: MODELS.deep, // flagship emotional moment, runs once per founder — first deep callsite
+          max_tokens: 2600,
+          system: `You are Affina, writing "Your First Venture Report" — an analyst-grade one-page memo a founder receives at the end of the free Module 0, at the emotional peak before she decides to join the founding cohort. It must feel like a REAL analysis of HER company — deeper and denser than a quiz result, the kind of brief an associate hands a partner. Tone: sharp, warm, HONEST, plain language — never a jargon lecture, never empty flattery. Everything grounded in HER real data; NEVER invent facts, numbers, market sizes, or citations. When you estimate, derive it from what she gave and give a RANGE (napkin-level). If an input is empty, skip it gracefully — never fabricate.
+
+Reuse the 1–5 readiness ladder: L1 Spark (an idea, articulated), L2 Focus (a specific customer + pain), L3 Validated (evidence from real people), L4 Built (an MVP live), L5 Selling (first paying customers). Pick her CURRENT level honestly.
+
+Produce SIX blocks:
+1. verdict: { oneLiner (her project in one plain line, HER framing), verdict (ONE strong, specific, honest sentence — the headline of where this venture stands), level: {n 1-5, name} }.
+2. opportunity: { frame ('income' or 'valuation' — SEE calibration), numbers: 2-3 napkin stats each {label (small caption), hero (ONLY the number/range, e.g. "250–500"), support (one plain human line)}, whyNow (ONE qualitative sentence naming a real trend in words — NO invented statistic) }.
+   - Number 1 = reachable audience in year one (a RANGE), anchored to her market + goal.
+   - Number 2 = revenue potential at an illustrative price (a RANGE), the price said humanly.
+   - Number 3 = CALIBRATED to her ambition (see below).
+3. whyYouCanWin: 2-3 items each {point (why SHE specifically can pull this off — founder-fit), quote (a SHORT phrase echoing HER actual words from whyMe/doneSoFar)}. Grounded, not praise.
+4. whatsMissing: 2-3 items each {gap (a concrete gap from her stuckPoint + stage-vs-ambition distance), solvableAs (frame it as a solvable PROCESS problem — "this is a process problem, not a you problem")}. Each maps to what structure fixes; do NOT name modules.
+5. risks: 2-3 items each {text, whyNow (why it matters at her stage)}. Honest — include a PACING risk if her 3-year goal outruns her stage (premature scaling), warm tone. Risks make the praise credible.
+6. path: ONE paragraph (3-4 sentences) — the 12-week arc that closes exactly these gaps, ending on momentum. Describe the work; do NOT name modules.
+
+AMBITION CALIBRATION (her 3-YEAR GOAL is the PRIMARY signal — read its number AND shape, then anchor Number 3 and the SIZE of every number to it):
+- INCOME / lifestyle (goal is a monthly/annual income figure, "a business that pays me", first customers, OR low weekly capacity) → frame "income". Number 3 = MONTHLY INCOME, label "What it means for you", hero anchored to HER stated income target. Keep ALL numbers modest and grounded. NEVER show a valuation.
+- SCALE / INVESTMENT / EXIT (goal mentions raising money, a valuation, selling for $Z, big growth; or onboarding goal = Investment) → frame "valuation". Number 3 = VALUATION, label "What it could be worth", anchored toward HER figure as an early-stage step toward it. Bigger numbers, revenue language ok.
+- UNCLEAR / not stated → frame "income" + one light line of upside. No valuation.
+Never contradict her stated 3-year number.
+
+HARD PRESENTATION RULES:
+- hero = ONLY the number/range/short phrase (the app renders it large + bold). label and support are plain.
+- BAN jargon from all visible text: "TAM", "SAM", "multiple", "ARR", "illustrative only", "benchmark", "conservative anchor". No formula/derivation lines.
+- Do NOT add "napkin"/"not a promise" caveats inside the numbers — the app appends the single honesty line itself.
+- Use her name and project name naturally throughout.
+
+Respond ONLY with valid JSON: {"verdict":{"oneLiner":"...","verdict":"...","level":{"n":1,"name":"..."}},"opportunity":{"frame":"income","numbers":[{"label":"...","hero":"...","support":"..."}],"whyNow":"..."},"whyYouCanWin":[{"point":"...","quote":"..."}],"whatsMissing":[{"gap":"...","solvableAs":"..."}],"risks":[{"text":"...","whyNow":"..."}],"path":"..."}`,
+          messages: [{ role: 'user', content: `FOUNDER: ${user.name || 'the founder'} · PROJECT: ${user.projectName || 'unnamed'} — ${user.idea || 'not set'}
+HER AMBITION → 3-YEAR GOAL (primary, calibrate everything to this): ${vGoal3y || 'not stated'} · onboarding goal: ${user.goal || 'not set'} · 12-week goal: ${vGoal12w || 'not stated'} · weekly capacity: ${vCapacity || 'not stated'}
+HER WORDS — why this matters to her: ${vWhyMe || '(not shared)'}
+HER WORDS — what she has already done: ${vDoneSoFar || '(not shared)'}
+HER WORDS — where she feels stuck: ${vStuck || '(not shared)'}
+INTAKE — target customer: ${user.customer || 'not set'} · business model: ${user.businessModel || 'not set'} · stage: ${user.stage || 'not set'}
+IMPORTED LINKS: ${vByType['imported_assets'] || '(none)'}
+WHEN SHE ARRIVED (her first report): ${vArrival} — reference this so she SEES she has moved since.
+STARTUP SNAPSHOT:\n${vSnap ? vSnap.sections.map((x) => `## ${x.title}\n${x.content}`).join('\n') : '(none)'}
+
+Write her First Venture Report — calibrate every number and the framing to her 3-year ambition, quote her real words in "why you can win" and "what's missing", and never invent a statistic.` }],
+        }, { endpoint: 'brain', mode: 'venture-report', email: user.email });
+        const raw = msg.content[0]?.type === 'text' ? msg.content[0].text : '';
+        const parsed = VentureSchema.parse(extractLlmJson(raw) ?? {});
+        if (!parsed.verdict.verdict && parsed.opportunity.numbers.length === 0) {
+          return res.status(502).json({ error: 'ai_unavailable' });
+        }
+        if (vCached) {
+          await db.update(brainEntries).set({ content: JSON.stringify(parsed), updatedAt: new Date() }).where(eq(brainEntries.id, vCached.id));
+        } else {
+          await db.insert(brainEntries).values({
+            userId: user.id, lessonId: 'm0l5_venture', lessonTitle: 'Your First Venture Report',
+            prompt: 'Verdict · Opportunity · Why you can win · Gaps · Risks · Path', content: JSON.stringify(parsed),
+            entryType: 'venture_report', processedByAi: true,
+          });
+        }
+        return res.status(200).json({ report: parsed, snapshotPresent: !!user.snapshot });
+      } catch (err) {
+        captureError(err, { endpoint: 'brain', mode: 'venture-report', email: user.email });
+        return res.status(502).json({ error: 'ai_unavailable' });
+      }
+    }
+
     // 🏛 m4l10 "The Founder's Case" (SPEC_PAYWALL §0) — pre-paywall milestone reveal.
     // Vision + Proof (real Brain data) + Potential (napkin math, optimistic, NOT a forecast).
     if (action === 'founders-case') {

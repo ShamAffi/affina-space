@@ -36,6 +36,12 @@ export type UserData = {
   verified?: boolean;    // audit F39 — real session vs just a typed email. undefined = legacy (treated as authed)
   phone?: string | null;         // SPEC_PHONE_CAPTURE — set = suppress the lead popups
   guideUrl?: string | null;      // runtime gate for the guide popup (from /api/user)
+  // Founding-cohort paywall config (SPEC_COHORT_PAYWALL) — from /api/user, env-driven.
+  calendlyUrl?: string | null;
+  cohortSeatsTotal?: number;
+  cohortSeatsLeft?: number;
+  cohortAcceptedAt?: string | null;   // §3a post-call acceptance (from /api/user)
+  seatHeldUntil?: string | null;
   onboardingReport?: OnboardingScore | null;   // funnel: persisted report (RevealTeaser / /report)
   lessonInputs: Record<string, string>;
   completedLessons: string[];

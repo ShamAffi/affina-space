@@ -69,6 +69,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       subscribed: user.subscribed ?? false,
       phone: user.phone ?? null,                       // SPEC_PHONE_CAPTURE — client gates the popups on this
       guideUrl: process.env.GUIDE_URL || null,         // runtime feature gate for the guide popup
+      // Founding-cohort config (SPEC_COHORT_PAYWALL §2/§3) — read from env per request so seat
+      // counts + Calendly change without a rebuild. Manual only; never auto-decremented.
+      calendlyUrl: process.env.CALENDLY_URL || null,
+      cohortSeatsTotal: Number(process.env.COHORT_SEATS_TOTAL) || 15,
+      cohortSeatsLeft: process.env.COHORT_SEATS_LEFT != null && process.env.COHORT_SEATS_LEFT !== ''
+        ? Number(process.env.COHORT_SEATS_LEFT) : 11,
+      // §3a post-call acceptance — drives the "claim your seat" paywall variant.
+      cohortAcceptedAt: user.cohortAcceptedAt ? new Date(user.cohortAcceptedAt).toISOString() : null,
+      seatHeldUntil: user.seatHeldUntil ? new Date(user.seatHeldUntil).toISOString() : null,
       mentorSessions: user.mentorSessions ?? null,
       // Funnel (SPEC_ONBOARDING_FUNNEL): verification state + persisted report for /report.
       verifiedAt: user.verifiedAt ? new Date(user.verifiedAt).toISOString() : null,
