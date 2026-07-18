@@ -105,12 +105,9 @@ export default function ProjectName({ idea, customer, businessModel, stage, init
           >
             Continue →
           </button>
-          <button
-            onClick={() => onNext('')}
-            className="mt-3 w-full text-sm text-ink-mute hover:text-ink-soft transition"
-          >
-            Skip for now
-          </button>
+          <p className="mt-3 text-center text-xs text-ink-mute">
+            Don't overthink it — you can change the name later in Settings.
+          </p>
         </div>
       </main>
 

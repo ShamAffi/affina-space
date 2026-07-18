@@ -27,7 +27,7 @@ export default function OnboardingName({ initialValue, onNext }: Props) {
       <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-5 py-8">
         <div className="w-full max-w-sm">
           <h1 className="text-2xl font-extrabold text-ink mb-2">First — what's your name?</h1>
-          <p className="text-sm text-ink-soft mb-6">So your mentor knows what to call you.</p>
+          <p className="text-sm text-ink-soft mb-6">So your mentor and the community can get to know the real you.</p>
           <input
             type="text"
             autoFocus

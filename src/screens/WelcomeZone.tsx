@@ -84,7 +84,7 @@ export default function WelcomeZone({ onStart }: Props) {
           {/* Badge */}
           <div className="inline-flex items-center gap-2 bg-brand-50 border border-brand-200 text-brand-700 text-sm font-semibold px-4 py-1.5 rounded-pill mb-6 animate-fade-in">
             <span className="w-2 h-2 rounded-pill bg-accent-600" />
-            You're in — welcome, founder
+            You're starting the Founding Cohort
           </div>
 
           {/* Headline */}
@@ -125,7 +125,7 @@ export default function WelcomeZone({ onStart }: Props) {
           >
             Let's get started →
           </button>
-          <p className="text-center text-xs text-ink-mute mt-3">Your first module is short — about 10 minutes to begin.</p>
+          <p className="text-center text-xs text-ink-mute mt-3">Stop putting it off — take your first real steps today.</p>
         </div>
       </main>
     </div>

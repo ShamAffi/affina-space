@@ -1851,6 +1851,7 @@ function IntakeQuizBlock({ initialJson, onComplete }: {
   const [finishing, setFinishing] = useState(false);
 
   const TOTAL = 6;
+  const MAXLEN = 1000;
   const textCls = 'w-full text-base bg-surface border-2 border-hairline rounded-card px-4 py-3.5 outline-none focus:border-brand-400 focus:ring-4 focus:ring-brand-100 placeholder-ink-mute resize-none transition';
 
   // Soft validation (§2 approved): only Q3 (chip-select) gates; all free-text
@@ -1918,6 +1919,7 @@ function IntakeQuizBlock({ initialJson, onComplete }: {
               onChange={(e) => setA((p) => ({ ...p, doneSoFar: e.target.value }))}
               rows={5}
               placeholder="e.g. Talked to 5 people about this, built a rough landing page (link below), got 3 people to say they'd try it…"
+              maxLength={MAXLEN}
               className={textCls}
             />
           </div>
@@ -1933,6 +1935,7 @@ function IntakeQuizBlock({ initialJson, onComplete }: {
               onChange={(e) => setA((p) => ({ ...p, stuckPoint: e.target.value }))}
               rows={4}
               placeholder="e.g. I don't know if people would actually pay, I can't pick between two ideas, I launched but nobody came…"
+              maxLength={MAXLEN}
               className={textCls}
             />
           </div>
@@ -1965,6 +1968,7 @@ function IntakeQuizBlock({ initialJson, onComplete }: {
               onChange={(e) => setA((p) => ({ ...p, whyMe: e.target.value }))}
               rows={4}
               placeholder="Not the elevator pitch — the real reason. What happens if you don't do this?"
+              maxLength={MAXLEN}
               className={textCls}
             />
           </div>
@@ -1980,6 +1984,7 @@ function IntakeQuizBlock({ initialJson, onComplete }: {
               onChange={(e) => setA((p) => ({ ...p, goal12w: e.target.value }))}
               rows={4}
               placeholder="e.g. I have a paying customer. I know this idea is right. I've launched, even if small."
+              maxLength={MAXLEN}
               className={textCls}
             />
           </div>
@@ -2001,11 +2006,16 @@ function IntakeQuizBlock({ initialJson, onComplete }: {
               onChange={(e) => setA((p) => ({ ...p, goal3y: e.target.value }))}
               rows={4}
               placeholder="e.g. steady $8k/month that supports my family · raise $2M and grow fast · build it to sell for $20M · not sure yet, but big"
+              maxLength={MAXLEN}
               className={textCls}
             />
           </div>
         )}
       </div>
+
+      {step !== 2 && (
+        <p className="text-right text-[11px] text-ink-mute mt-1.5">{TEXT_VALUE[step]().length} / {MAXLEN}</p>
+      )}
 
       {nudged[step] && step !== 2 && !TEXT_VALUE[step]().trim() && (
         <p className="text-xs text-amber-600 mt-2">This one really helps your mentor understand you — sure you want to skip it?</p>

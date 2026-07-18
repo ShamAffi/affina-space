@@ -129,7 +129,11 @@ Courses give you information and a certificate. We're here for something harder 
 
 **Three honest rules.**
 
-One: we will never do the parts that matter for you — talking to customers and making decisions is founder work, always. Two: you will leave this platform and speak to real humans, more than once, starting sooner than feels comfortable. Three: changing your plan when the evidence says so isn't failure here — it's the exact skill we're teaching, and you'll practice it on purpose, more than once, before this is over.
+**One — we never do the parts that matter for you.** Talking to customers and making the calls is founder work, always.
+
+**Two — you'll leave this platform and speak to real humans.** More than once, and starting sooner than feels comfortable.
+
+**Three — changing your plan when the evidence says so isn't failure here.** It's the exact skill we're teaching — and you'll practice it on purpose, more than once, before this is over.
 
 Your finish line is not "completed the program." It's your first paying customer. Every module, every exercise, every awkward conversation you're about to have — it all points at that one moment. Let's get to it.`,
       },
@@ -144,7 +148,7 @@ Your finish line is not "completed the program." It's your first paying customer
 
 Not at the start, maybe not for years. You won't have fewer bosses — you'll have more; every customer is one, and so is every investor, and so, some days, is your own bank balance. Nobody is coming to tell you what to do next. You are the engine now. If that thought excites you more than it scares you, you're exactly where you should be.
 
-Here's what's also true, and it's genuinely new: there has never been a better moment in history to be a solo founder. AI has collapsed the cost of building. A landing page in an evening instead of a month. A working prototype in days instead of a quarter. Research that used to take a paid consultant weeks — done in minutes, by you, tonight. ==One determined founder with the right AI tools can now do the work of a small team.== That's not a slogan; it's the actual, measurable shift this program is built around.
+Here's what's also true, and it's genuinely new: ==there has never been a better moment in history to be a solo founder.== AI has collapsed the cost of building. A landing page in an evening instead of a month. A working prototype in days instead of a quarter. Research that used to take a paid consultant weeks — done in minutes, by you, tonight. One determined founder with the right AI tools can now do the work of a small team. That's not a slogan; it's the actual, measurable shift this program is built around.
 
 But notice what AI did *not* make cheap. Knowing your customer well enough that she trusts you. Judgment — the ability to decide what's actually worth building, out of a hundred things you could build. That's exactly what this program trains, module by module. We'll hand the repetitive work — drafts, research, first passes — to AI at every step. The thinking, the conversations, the decisions: those stay with you, because that's precisely where the value of your company lives.
 
