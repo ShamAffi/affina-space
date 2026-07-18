@@ -325,10 +325,9 @@ function LMSRoute({ userData, update, logout, onGoToPaywall }: {
   const params = useParams();
   // Splat "/learning/*" → e.g. "launch/m1l3"; lessonId is the 2nd segment (undefined for bare /learning).
   const lessonId = (params['*'] ?? '').split('/')[1] || undefined;
-  // Re-trigger: direct entry to a gated M5+ lesson while unsubscribed reopens the paywall.
-  if (isPaidLocked(lessonId, userData.subscribed)) {
-    return <Navigate to="/unlock" replace />;
-  }
+  // Founding-cohort UX: a locked M1+ lesson is NOT force-redirected to the paywall — the LMS
+  // renders a browsable locked state (title + preview + explicit "join" CTA) so she can walk
+  // the course structure freely. The paywall opens only from an explicit CTA.
   return (
     <LMS
       userData={userData}

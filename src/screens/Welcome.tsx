@@ -36,14 +36,14 @@ export default function Welcome({ onStart, onSignIn }: Props) {
           Realize your ambition — with the right support.
         </p>
         <p className="text-sm text-ink-mute mb-10 animate-slide-up">
-          5 questions &nbsp;·&nbsp; ~2 min &nbsp;·&nbsp; free personalized roadmap
+          5 questions &nbsp;·&nbsp; 2 min &nbsp;·&nbsp; Personalized program
         </p>
 
         <button
           onClick={onStart}
           className="bg-brand hover:bg-brand-700 active:scale-95 text-white text-lg font-semibold px-10 py-4 rounded-pill transition-all duration-150 animate-slide-up"
         >
-          Let's do this →
+          Let's do this
         </button>
 
         <button

@@ -176,13 +176,10 @@ export default function LMS({ userData, onUpdateUserData, onGoToDashboard, onLog
   const activeModule = MODULES.find((m) => m.lessons.some((l) => l.id === activeLesson.id));
   const activeKind = blockKind(activeLesson);
 
-  // SPEC_PAYWALL — landing on a paid (M5+) lesson while unsubscribed (e.g. bare
-  // /learning picks the first uncompleted lesson) reopens the paywall.
+  // Founding-cohort UX: landing on a paid (M1+) lesson while unsubscribed shows a browsable
+  // LOCKED STATE inline (title + explicit "join the cohort" CTA) — it no longer auto-redirects
+  // to the paywall. She can read the structure and walk previous lessons freely.
   const activePaidLocked = !!activeModule?.paid && !userData.subscribed;
-  useEffect(() => {
-    if (activePaidLocked) onGoToPaywall?.();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activePaidLocked]);
 
   function isModuleLocked(modIdx: number): boolean {
     if (modIdx === 0) return false;
@@ -525,8 +522,9 @@ My motivation & 12-week goal: …`;
                         <button
                           key={lesson.id}
                           onClick={() => {
-                            if (paidLocked) onGoToPaywall?.();      // paid-lock → open paywall
-                            else if (!locked) openLesson(lesson.id); // completion-lock → no-op
+                            // Founding-cohort UX: a paid-locked lesson OPENS (browsable locked
+                            // state), no longer jumps to the paywall. Completion-lock = no-op.
+                            if (paidLocked || !locked) openLesson(lesson.id);
                           }}
                           disabled={locked && !paidLocked}
                           className={`w-full text-left flex items-start gap-2.5 px-3 py-2.5 rounded-control text-sm transition-all duration-150 ${
@@ -600,17 +598,34 @@ My motivation & 12-week goal: …`;
         {/* Lesson content */}
         <main ref={mainRef} className="flex-1 overflow-y-auto">
           {activePaidLocked ? (
-            // Content withheld while the paywall redirect fires (no locked-lesson flash)
-            <div className="max-w-md mx-auto px-5 py-24 text-center animate-fade-in">
-              <p className="text-3xl mb-3">🔒</p>
-              <p className="text-sm font-semibold text-ink mb-1">This module is part of the full program</p>
-              <p className="text-xs text-ink-mute mb-5">Unlock Modules 5–12 to continue.</p>
+            // Browsable locked state (founding-cohort UX): show the lesson + what the whole module
+            // covers so she can explore the structure; the paywall opens only from the CTA here.
+            <div className="max-w-2xl mx-auto px-5 sm:px-8 py-10 animate-fade-in" key={activeLessonId}>
+              <div className="flex items-center gap-2 mb-6">
+                <span className="text-xs font-semibold text-brand-600 bg-brand-50 rounded-pill px-3 py-1">{activeModule?.title}</span>
+                <span className="text-xs font-semibold bg-inset text-ink-mute rounded-pill px-3 py-1">🔒 Founding cohort</span>
+              </div>
+              <h1 className="font-display text-2xl sm:text-3xl font-medium tracking-tight text-ink mb-3">{activeLesson?.title}</h1>
+              <p className="text-sm text-ink-soft leading-relaxed mb-6">
+                This is part of the full 12-week program. Take a look at what's ahead — here's everything <span className="font-semibold text-ink">{activeModule?.title}</span> covers:
+              </p>
+              <div className="bg-surface border border-hairline rounded-card p-4 mb-6">
+                <ul className="flex flex-col gap-2.5">
+                  {activeModule?.lessons.map((l) => (
+                    <li key={l.id} className="flex items-center gap-2.5 text-sm text-ink-soft">
+                      <span className="flex-shrink-0 w-4 h-4 rounded-pill border-2 border-hairline" />
+                      {l.title}
+                    </li>
+                  ))}
+                </ul>
+              </div>
               <button
                 onClick={() => onGoToPaywall?.()}
-                className="bg-brand hover:bg-brand-700 active:scale-95 text-white text-sm font-semibold px-6 py-3 rounded-pill transition-all duration-150"
+                className="w-full bg-brand hover:bg-brand-700 active:scale-95 text-white text-base font-semibold py-4 rounded-pill transition-all duration-150"
               >
-                Unlock the full program →
+                Join the founding cohort to unlock →
               </button>
+              <p className="text-center text-xs text-ink-mute mt-3">No rush — Module 0 and your report stay open. Explore freely.</p>
             </div>
           ) : (
           <div className="max-w-2xl mx-auto px-5 sm:px-8 py-10 animate-fade-in" key={activeLessonId}>
@@ -1814,10 +1829,11 @@ type IntakeAnswers = {
 };
 
 const Q3_OPTIONS: { label: string; value: string }[] = [
-  { label: 'Under 5', value: 'under5' },
-  { label: '5–10', value: '5to10' },
+  { label: 'Under 10', value: 'under10' },
   { label: '10–20', value: '10to20' },
-  { label: '20+ (full focus)', value: '20plus' },
+  { label: '20–40', value: '20to40' },
+  { label: '40–60', value: '40to60' },
+  { label: '60+', value: '60plus' },
 ];
 
 function IntakeQuizBlock({ initialJson, onComplete }: {

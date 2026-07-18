@@ -34,6 +34,7 @@ export default function Paywall({ onDismiss, name, phone, seatsTotal = 15, seats
   const [working, setWorking] = useState(false);
   const [error, setError] = useState('');
   const [offer, setOffer] = useState<null | 'dismiss' | 'book'>(null);
+  const [cardIdx, setCardIdx] = useState(0);
 
   useEffect(() => {
     track('paywall_viewed');
@@ -203,15 +204,39 @@ export default function Paywall({ onDismiss, name, phone, seatsTotal = 15, seats
           </>
         )}
 
-        {/* 6-card slider */}
-        <div className="-mx-5 px-5 mb-8 overflow-x-auto snap-x snap-mandatory flex gap-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {CARDS.map((c) => (
-            <div key={c.title} className="snap-start shrink-0 w-[260px] bg-surface border border-hairline rounded-card p-4 shadow-sm">
-              {c.visual}
-              <p className="text-sm font-bold text-ink mt-3">{c.title}</p>
-              <p className="text-xs text-ink-soft leading-relaxed mt-1">{c.body}</p>
+        {/* Looped single-card carousel — one card centered, arrows either side, dots below */}
+        <div className="mb-8">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCardIdx((i) => (i - 1 + CARDS.length) % CARDS.length)}
+              aria-label="Previous"
+              className="shrink-0 w-9 h-9 flex items-center justify-center rounded-pill bg-surface border border-hairline text-ink-mute hover:text-ink transition shadow-sm"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6" /></svg>
+            </button>
+            <div className="flex-1 min-w-0 bg-surface border border-hairline rounded-card p-5 shadow-sm">
+              {CARDS[cardIdx].visual}
+              <p className="text-base font-bold text-ink mt-4">{CARDS[cardIdx].title}</p>
+              <p className="text-sm text-ink-soft leading-relaxed mt-1">{CARDS[cardIdx].body}</p>
             </div>
-          ))}
+            <button
+              onClick={() => setCardIdx((i) => (i + 1) % CARDS.length)}
+              aria-label="Next"
+              className="shrink-0 w-9 h-9 flex items-center justify-center rounded-pill bg-surface border border-hairline text-ink-mute hover:text-ink transition shadow-sm"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6" /></svg>
+            </button>
+          </div>
+          <div className="flex justify-center gap-1.5 mt-3">
+            {CARDS.map((c, i) => (
+              <button
+                key={c.title}
+                onClick={() => setCardIdx(i)}
+                aria-label={`Card ${i + 1}`}
+                className={`h-2 rounded-pill transition-all ${i === cardIdx ? 'w-5 bg-brand' : 'w-2 bg-inset'}`}
+              />
+            ))}
+          </div>
         </div>
 
         {/* Price block */}
@@ -228,7 +253,7 @@ export default function Paywall({ onDismiss, name, phone, seatsTotal = 15, seats
             <p className="inline-block text-sm font-bold text-accent-700 bg-accent-50 border border-accent-100 rounded-pill px-3 py-1">{seatsLeft} of {seatsTotal} seats left</p>
           )}
           <p className="text-[11px] text-ink-mute leading-relaxed mt-3">3-month subscription · all updates · live mentor sessions · community</p>
-          <p className="text-[11px] text-ink-mute mt-1">€600 after the founding cohort.</p>
+          <p className="text-[11px] text-ink-mute mt-1">€600 regular price after the founding cohort.</p>
         </div>
 
         {/* CTA block */}

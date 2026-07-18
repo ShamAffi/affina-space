@@ -178,7 +178,7 @@ Sara Blakely started Spanx with $5,000 and zero industry contacts. Nobody gave e
         id: 'm0l5',
         type: 'text',
         kind: 'system',
-        title: 'Generate your Startup Snapshot v1',
+        title: 'Your First Venture Report',
         body: `This is where the program turns your intake into a living document: the Startup Snapshot — your whole startup on one page, curated by AI. It will update itself after every module checkpoint and weekly check-in. Snapshot generation activates here in the next release step; your intake is already saved to the Brain.`,
       },
     ],

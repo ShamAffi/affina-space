@@ -20,12 +20,6 @@ const DIMENSION_LABELS: Record<string, string> = {
 
 const LADDER = ['Spark', 'Focus', 'Validated', 'Built', 'Selling'];
 
-const HORIZON_LABELS: Record<string, string> = {
-  w1_2: 'Weeks 1–2',
-  w3_6: 'Weeks 3–6',
-  w7_12: 'Weeks 7–12',
-};
-
 function ScoreRing({ score }: { score: number }) {
   const [current, setCurrent] = useState(0);
 
@@ -121,7 +115,7 @@ function DimensionBars({ dimensions }: { dimensions: NonNullable<OnboardingScore
   );
 }
 
-export default function RevealTeaser({ projectName, goal, result, onRegister, ctaLabel = 'Start Your AI Incubation Program for FREE' }: Props) {
+export default function RevealTeaser({ projectName, result, onRegister, ctaLabel = 'Start Your AI Incubation Program for FREE' }: Props) {
   const [visible, setVisible] = useState(false);
   const topPercent = 100 - result.percentileAheadOf;
 
@@ -130,14 +124,11 @@ export default function RevealTeaser({ projectName, goal, result, onRegister, ct
   const isV2 = !!result.level && Array.isArray(result.dimensions) && result.dimensions.length > 0;
   const strengths = result.strengths ?? [];
   const risks = result.risks ?? [];
-  const roadmap = result.roadmap ?? [];
 
   useEffect(() => {
     const t = setTimeout(() => setVisible(true), 50);
     return () => clearTimeout(t);
   }, []);
-
-  const goalLine = goal ? `Your goal: ${goal}` : 'Your personalized plan starts today';
 
   return (
     <div className="min-h-screen bg-canvas flex flex-col">
@@ -207,38 +198,22 @@ export default function RevealTeaser({ projectName, goal, result, onRegister, ct
               </div>
             )}
 
-            {/* Risks — each with why-now */}
+            {/* Threats — strategic (SWOT "T"): future external obstacles. Yellow "!" markers
+                mirror the strengths' green ✓ (amber-600 is darker than the amber-50 card). */}
             {risks.length > 0 && (
               <div className="w-full bg-amber-50 border border-amber-200 rounded-card p-4 mb-6">
                 <div className="flex items-center gap-1.5 mb-2.5">
                   <span className="text-amber-600 text-xs">⚠</span>
-                  <p className="text-xs text-amber-700 font-bold uppercase tracking-wider">Watch-outs at your stage</p>
+                  <p className="text-xs text-amber-700 font-bold uppercase tracking-wider">Threats</p>
                 </div>
-                <ul className="flex flex-col gap-3">
+                <ul className="flex flex-col gap-2.5">
                   {risks.map((r, i) => (
-                    <li key={i} className="text-sm text-ink leading-relaxed">
-                      {r.text}
-                      {r.whyNow && <span className="block text-xs text-amber-700 mt-1"><span className="font-semibold">Why now:</span> {r.whyNow}</span>}
+                    <li key={i} className="flex gap-2 text-sm text-ink leading-relaxed">
+                      <span className="text-amber-600 font-bold flex-shrink-0" aria-hidden>!</span>
+                      <span>{r.text}</span>
                     </li>
                   ))}
                 </ul>
-              </div>
-            )}
-
-            {/* 90-day roadmap — 3 paragraphs */}
-            {roadmap.length > 0 && (
-              <div className="w-full mb-6">
-                <p className="text-xs text-ink-mute font-semibold uppercase tracking-wider mb-3">Your next 90 days</p>
-                <div className="flex flex-col gap-3">
-                  {roadmap.map((r, i) => (
-                    <div key={i} className="bg-surface border border-hairline rounded-card p-4">
-                      <p className="text-[11px] font-bold text-brand-700 uppercase tracking-wider mb-1.5">
-                        {HORIZON_LABELS[r.horizon] ?? `Phase ${i + 1}`}{r.title ? ` · ${r.title}` : ''}
-                      </p>
-                      <p className="text-sm text-ink-soft leading-relaxed">{r.body}</p>
-                    </div>
-                  ))}
-                </div>
               </div>
             )}
 
@@ -285,12 +260,6 @@ export default function RevealTeaser({ projectName, goal, result, onRegister, ct
             )}
           </div>
         )}
-
-        {/* Goal echo */}
-        <div className="flex items-center gap-2 text-sm text-ink-soft mb-6">
-          <span className="text-brand-600">◈</span>
-          <span>{goalLine}</span>
-        </div>
 
         {/* Top {n}% highlight — gray card + violet border/number (not a solid-violet block that reads as a button) */}
         <div className="w-full bg-inset border-2 border-brand rounded-card p-4 mb-6 text-center">

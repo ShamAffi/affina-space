@@ -324,7 +324,7 @@ Produce SIX blocks:
 3. whyYouCanWin: 2-3 items each {point (why SHE specifically can pull this off — founder-fit), quote (a SHORT phrase echoing HER actual words from whyMe/doneSoFar)}. Grounded, not praise.
 4. whatsMissing: 2-3 items each {gap (a concrete gap from her stuckPoint + stage-vs-ambition distance), solvableAs (frame it as a solvable PROCESS problem — "this is a process problem, not a you problem")}. Each maps to what structure fixes; do NOT name modules.
 5. risks: 2-3 items each {text, whyNow (why it matters at her stage)}. Honest — include a PACING risk if her 3-year goal outruns her stage (premature scaling), warm tone. Risks make the praise credible.
-6. path: ONE paragraph (3-4 sentences) — the 12-week arc that closes exactly these gaps, ending on momentum. Describe the work; do NOT name modules.
+6. path: 2-3 SHORT paragraphs (SEPARATE each with a blank line, i.e. \\n\\n) — the 12-week arc that closes exactly these gaps, ending on momentum. Describe the work; do NOT name modules.
 
 AMBITION CALIBRATION (her 3-YEAR GOAL is the PRIMARY signal — read its number AND shape, then anchor Number 3 and the SIZE of every number to it):
 - INCOME / lifestyle (goal is a monthly/annual income figure, "a business that pays me", first customers, OR low weekly capacity) → frame "income". Number 3 = MONTHLY INCOME, label "What it means for you", hero anchored to HER stated income target. Keep ALL numbers modest and grounded. NEVER show a valuation.

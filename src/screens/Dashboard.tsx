@@ -105,7 +105,12 @@ export default function Dashboard({ userData, onUpdateUserData, onGoToLMS, onGoT
 
   // One card = the current lesson of each active course. Today there's a single course → 1 card.
   // When parallel courses ship, show one card per course capped at 4 (more behind "View all lessons").
-  const nextLessons = allLessons.filter((l) => !userData.completedLessons.includes(l.id)).slice(0, 1);
+  // Founding-cohort UX: an unpaid founder whose only remaining lesson is paid (M1+) resumes on her
+  // m0l5 Venture Report — the natural home to revisit + explore the course from — not a locked wall.
+  const rawNext = allLessons.filter((l) => !userData.completedLessons.includes(l.id)).slice(0, 1);
+  const nextIsPaid = !!rawNext[0] && /^m[1-9]\d*l/.test(rawNext[0].id);
+  const reportLesson = allLessons.find((l) => l.id === 'm0l5');
+  const nextLessons = (!userData.subscribed && nextIsPaid && reportLesson) ? [reportLesson] : rawNext;
 
   const completedCount = userData.completedLessons.length;
   const exercisesCount = brainEntries.filter((e) => e.aiScore !== null).length;
@@ -253,14 +258,14 @@ export default function Dashboard({ userData, onUpdateUserData, onGoToLMS, onGoT
                     !MODULES[modIdx - 1].lessons.every((l) =>
                       userData.completedLessons.includes(l.id),
                     );
-                  // SPEC_PAYWALL — a paid (M5+) next lesson while unsubscribed opens the paywall.
+                  // Founding-cohort UX: a paid (M1+) next lesson opens the browsable locked view in
+                  // the LMS (not the paywall) — she can read the structure; the paywall is a CTA there.
                   const paidLocked = !!mod.paid && !userData.subscribed;
                   return (
                     <button
                       key={lesson.id}
                       onClick={() => {
-                        if (paidLocked) onGoToPaywall();
-                        else if (!isLocked) onGoToLMS(lesson.id);
+                        if (paidLocked || !isLocked) onGoToLMS(lesson.id);
                       }}
                       disabled={isLocked && !paidLocked}
                       className={`w-full text-left bg-inset border border-hairline rounded-control p-4 transition-all duration-150 group ${
@@ -279,7 +284,7 @@ export default function Dashboard({ userData, onUpdateUserData, onGoToLMS, onGoT
                       </p>
                       <p className="text-xs text-ink-mute mt-1">
                         {paidLocked
-                          ? `Module ${mod.order} · 🔒 unlock the full program`
+                          ? `Module ${mod.order} · 🔒 take a look inside`
                           : isLocked
                             ? `Module ${mod.order} · locked`
                             : `Module ${mod.order} · ${lesson.type !== 'text' ? 'exercise' : 'lesson'}`}

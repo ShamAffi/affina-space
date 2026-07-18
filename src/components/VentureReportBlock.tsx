@@ -105,7 +105,7 @@ export default function VentureReportBlock({ projectName, name, onReportReady, o
           <p className="font-display text-xl sm:text-2xl text-ink leading-snug">{report.verdict.oneLiner}</p>
         )}
         {report.verdict.verdict && (
-          <p className="text-base text-ink-soft leading-relaxed mt-3">{report.verdict.verdict}</p>
+          <p className="text-[15px] text-ink leading-relaxed mt-3">{report.verdict.verdict}</p>
         )}
         {lvl?.name && (
           <div className="inline-flex items-center gap-2 mt-4 text-xs font-semibold text-brand-700 bg-brand-50 border border-brand-100 rounded-pill px-3 py-1.5">
@@ -118,17 +118,19 @@ export default function VentureReportBlock({ projectName, name, onReportReady, o
       <SectionRule label="The Opportunity" n="01" />
       <section className="mb-10">
         {report.opportunity.numbers.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 my-2">
+          <div className="flex flex-col divide-y divide-hairline border-y border-hairline my-2">
             {report.opportunity.numbers.map((num, i) => (
-              <div key={i}>
-                <p className="text-[11px] uppercase tracking-wider text-ink-mute font-semibold mb-1.5">{num.label}</p>
-                <p className="font-display text-3xl sm:text-[2.5rem] text-brand-700 font-medium leading-none tracking-tight">{num.hero}</p>
-                <p className="text-xs text-ink-soft leading-relaxed mt-2">{num.support}</p>
+              <div key={i} className="flex items-baseline gap-4 py-3.5">
+                <p className="font-display text-2xl sm:text-3xl text-brand-700 font-medium leading-none tracking-tight shrink-0 w-32">{num.hero}</p>
+                <div className="min-w-0">
+                  <p className="text-[11px] uppercase tracking-wider text-ink-mute font-semibold">{num.label}</p>
+                  {num.support && <p className="text-sm text-ink-soft leading-relaxed mt-0.5">{num.support}</p>}
+                </div>
               </div>
             ))}
           </div>
         )}
-        {report.opportunity.whyNow && <p className="text-sm text-ink-soft leading-relaxed mt-5">{report.opportunity.whyNow}</p>}
+        {report.opportunity.whyNow && <p className="text-[15px] text-ink leading-relaxed mt-5">{report.opportunity.whyNow}</p>}
         <p className="text-[11px] text-ink-mute mt-4 leading-relaxed">These are napkin numbers — the optimistic case if you hit it, not a promise.</p>
       </section>
 
@@ -139,7 +141,7 @@ export default function VentureReportBlock({ projectName, name, onReportReady, o
           <section className="mb-10 flex flex-col gap-5">
             {report.whyYouCanWin.map((w, i) => (
               <div key={i}>
-                <p className="text-base text-ink leading-relaxed">{w.point}</p>
+                <p className="text-[15px] text-ink leading-relaxed">{w.point}</p>
                 {w.quote && <p className="border-l-2 border-brand-300 pl-3 mt-2 text-sm italic text-ink-soft">“{w.quote}”</p>}
               </div>
             ))}
@@ -154,7 +156,7 @@ export default function VentureReportBlock({ projectName, name, onReportReady, o
           <section className="mb-10 flex flex-col gap-4">
             {report.whatsMissing.map((g, i) => (
               <div key={i}>
-                <p className="text-base font-semibold text-ink">{g.gap}</p>
+                <p className="text-[15px] text-ink leading-relaxed">{g.gap}</p>
                 {g.solvableAs && <p className="text-sm text-ink-soft leading-relaxed mt-1">{g.solvableAs}</p>}
               </div>
             ))}
@@ -169,8 +171,8 @@ export default function VentureReportBlock({ projectName, name, onReportReady, o
           <section className="mb-10 flex flex-col gap-4">
             {report.risks.map((r, i) => (
               <div key={i}>
-                <p className="text-base text-ink leading-relaxed">{r.text}</p>
-                {r.whyNow && <p className="text-xs text-ink-mute mt-1">Why it matters now: {r.whyNow}</p>}
+                <p className="text-[15px] text-ink leading-relaxed">{r.text}</p>
+                {r.whyNow && <p className="text-sm text-ink-soft leading-relaxed mt-1"><span className="font-medium">Why it matters:</span> {r.whyNow}</p>}
               </div>
             ))}
           </section>
@@ -181,8 +183,10 @@ export default function VentureReportBlock({ projectName, name, onReportReady, o
       {report.path && (
         <>
           <SectionRule label="The Path" n="05" />
-          <section className="mb-8">
-            <p className="text-base text-ink leading-relaxed">{report.path}</p>
+          <section className="mb-8 flex flex-col gap-3">
+            {report.path.split(/\n{2,}/).map((para, i) => para.trim() && (
+              <p key={i} className="text-[15px] text-ink leading-relaxed">{para.trim()}</p>
+            ))}
           </section>
         </>
       )}
@@ -191,7 +195,7 @@ export default function VentureReportBlock({ projectName, name, onReportReady, o
         onClick={onJoinCohort}
         className="w-full bg-brand hover:bg-brand-700 active:scale-[0.98] text-white text-base font-semibold py-4 rounded-pill transition-all duration-150"
       >
-        Join the founding cohort →
+        Turn this into a real business →
       </button>
       <p className="text-center text-xs text-ink-mute mt-3">15 seats · founding price · your report is saved to your account</p>
     </div>

@@ -64,9 +64,12 @@ function safeReturnPath(p: string | undefined): string | undefined {
 
 // POST /api/stripe?action=checkout[&next=/path] — Checkout Session (subscription, quarterly first term).
 async function handleCheckout(email: string, res: VercelResponse, next?: string) {
-  // Founding-cohort funnel (SPEC_COHORT_PAYWALL §0): checkout now charges the €300/3mo founding
-  // price. Until STRIPE_PRICE_FOUNDING is set in Vercel, this 503s (acceptable per spec).
-  if (!process.env.STRIPE_SECRET_KEY || !priceFounding()) {
+  // Founding-cohort funnel (SPEC_COHORT_PAYWALL §0): checkout charges the €300/3mo founding price
+  // when STRIPE_PRICE_FOUNDING is set, else falls back to the existing (working) quarterly test
+  // price so checkout keeps working until Shamil creates the founding price. The webhook's
+  // annual-phase bypass is gated on the founding price id, so the fallback keeps legacy behavior.
+  const checkoutPrice = priceFounding() || priceQuarterly();
+  if (!process.env.STRIPE_SECRET_KEY || !checkoutPrice) {
     return res.status(503).json({ error: 'stripe_not_configured' });
   }
   const db = getDb();
@@ -79,7 +82,7 @@ async function handleCheckout(email: string, res: VercelResponse, next?: string)
   try {
     const session = await stripe().checkout.sessions.create({
       mode: 'subscription',
-      line_items: [{ price: priceFounding(), quantity: 1 }],
+      line_items: [{ price: checkoutPrice, quantity: 1 }],
       // Map the payment → user for the webhook. Reuse the customer if we have one.
       client_reference_id: String(user.id),
       ...(user.stripeCustomerId ? { customer: user.stripeCustomerId } : { customer_email: email }),
