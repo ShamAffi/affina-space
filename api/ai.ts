@@ -468,7 +468,7 @@ Draft her For (confirms) and Against (contradicts/surprised) from this.` }],
         max_tokens: 600,
         system: `A founder has weighed what her interviews CONFIRM vs CONTRADICT about her idea. From the two blocks she gives you — and ONLY those — draft a starting CONCLUSION in her first person: what she should keep, what to change, and why, grounded strictly in the For/Against provided. This is a draft for her to edit and make her own — keep it honest and specific to her evidence, not generic startup advice. Do not invent evidence beyond the two blocks. Respond ONLY with valid JSON: {"conclusion":"..."}`,
         messages: [{ role: 'user', content: `FOR (confirms):\n${forText || '(empty)'}\n\nAGAINST (contradicts/surprised):\n${againstText || '(empty)'}\n\nDraft her conclusion.` }],
-      }, { endpoint: 'ai', mode: 'psc-conclusion' });
+      }, { endpoint: 'ai', mode: 'psc-conclusion', email });
       const raw = msg.content[0].type === 'text' ? msg.content[0].text : '';
       const match = raw.match(/\{[\s\S]*\}/);
       if (!match) throw new Error('no JSON');

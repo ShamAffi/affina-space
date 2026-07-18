@@ -69,7 +69,9 @@ async function getStats(sql: Sql) {
     FROM users WHERE created_at > now()-interval '14 days' GROUP BY 1 ORDER BY 1`;
   const utm = await sql`SELECT source, campaign, captures::int, verified::int, paid::int, revenue_cents::bigint
     FROM v_utm_performance LIMIT 8`;
-  return { tiles: tiles[0], funnel: funnel[0], signups, utm };
+  const usage = await sql`SELECT count(*)::int AS calls, coalesce(sum(input_tokens),0)::bigint AS input,
+    coalesce(sum(output_tokens),0)::bigint AS output FROM llm_usage`;
+  return { tiles: tiles[0], funnel: funnel[0], signups, utm, usage: usage[0] };
 }
 
 // ─── §3 Users: list (search + pagination) ──────────────────────────────────────
@@ -104,7 +106,8 @@ async function getUser(sql: Sql, id: number) {
     FROM users WHERE id = ${id}`;
   if (!urow[0]) return null;
 
-  const [events, emails, mentorReqs, brain, taskAgg, checkinsRow, achievements, payments, completedRow] = await Promise.all([
+  const uemail = urow[0].email as string;
+  const [events, emails, mentorReqs, brain, taskAgg, checkinsRow, achievements, payments, completedRow, usageTotal, usageByMode] = await Promise.all([
     sql`SELECT created_at, name, path, props FROM events WHERE user_id = ${id} ORDER BY created_at DESC LIMIT 100`,
     sql`SELECT type, sent_at FROM email_log WHERE user_id = ${id} ORDER BY sent_at DESC LIMIT 100`,
     sql`SELECT id, session, topic, status, created_at FROM mentor_requests WHERE user_id = ${id} ORDER BY created_at DESC`,
@@ -116,6 +119,11 @@ async function getUser(sql: Sql, id: number) {
     sql`SELECT created_at, (props->>'amountCents')::bigint AS amount_cents FROM events
         WHERE user_id = ${id} AND name='payment_succeeded' ORDER BY created_at DESC`,
     sql`SELECT count(*)::int AS n FROM completed_lessons WHERE user_id = ${id}`,
+    // Token usage (migration 0008) — total + per-feature breakdown, keyed by email.
+    sql`SELECT count(*)::int AS calls, coalesce(sum(input_tokens),0)::bigint AS input, coalesce(sum(output_tokens),0)::bigint AS output
+        FROM llm_usage WHERE email = ${uemail}`,
+    sql`SELECT mode, count(*)::int AS calls, coalesce(sum(input_tokens+output_tokens),0)::bigint AS tokens
+        FROM llm_usage WHERE email = ${uemail} GROUP BY mode ORDER BY tokens DESC`,
   ]);
 
   return {
@@ -126,6 +134,8 @@ async function getUser(sql: Sql, id: number) {
     brain, achievements, payments, emails,
     mentorRequests: mentorReqs,
     timeline: events,
+    usage: usageTotal[0],
+    usageByMode,
   };
 }
 

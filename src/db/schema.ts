@@ -213,3 +213,19 @@ export const emailLog = pgTable('email_log', {
   weekOf: text('week_of').notNull().default('once'),
   sentAt: timestamp('sent_at').defaultNow(),
 });
+
+// Claude token usage per call (migration 0008) — recorded by callClaude (src/server/anthropic.ts)
+// so the admin panel totals tokens per founder. email is nullable (pre-auth onboarding calls have
+// no user); attribution joins on users.email. Raw SQL owns writes/reads; defined here to document.
+export const llmUsage = pgTable('llm_usage', {
+  id: bigserial('id', { mode: 'number' }).primaryKey(),
+  email: text('email'),
+  endpoint: text('endpoint'),
+  mode: text('mode'),
+  model: text('model'),
+  inputTokens: integer('input_tokens').notNull().default(0),
+  outputTokens: integer('output_tokens').notNull().default(0),
+  cacheReadTokens: integer('cache_read_tokens').notNull().default(0),
+  cacheCreationTokens: integer('cache_creation_tokens').notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+});

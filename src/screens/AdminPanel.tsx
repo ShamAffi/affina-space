@@ -6,6 +6,10 @@ import { useEffect, useState, useCallback, type ReactNode } from 'react';
 
 type Tab = 'overview' | 'users' | 'requests';
 const money = (cents: number | string | null) => `€${Math.round(Number(cents ?? 0) / 100).toLocaleString()}`;
+const tokens = (n: number | string | null) => Number(n ?? 0).toLocaleString();
+// Rough cost — Anthropic bills in USD; Sonnet 5 ≈ $3/M input, $15/M output. Edit if pricing shifts.
+const cost = (input: number | string | null, output: number | string | null) =>
+  `≈ $${(Number(input ?? 0) * 3e-6 + Number(output ?? 0) * 15e-6).toFixed(2)}`;
 const day = (s: string | null) => (s ? new Date(s).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '—');
 const dayTime = (s: string | null) => (s ? new Date(s).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—');
 
@@ -124,6 +128,17 @@ function Overview() {
             {d.utm.length === 0 && <tr><td colSpan={5} className="py-3 text-ink-mute">No attribution data yet.</td></tr>}
           </tbody>
         </table>
+      </div>
+
+      <div className="bg-surface border border-hairline rounded-card p-5">
+        <p className="text-[11px] font-bold text-ink-mute uppercase tracking-wider mb-3">AI usage — all users</p>
+        <div className="flex flex-wrap gap-x-8 gap-y-2 text-sm">
+          <span className="text-ink-mute">Calls <span className="font-semibold text-ink tabular-nums">{d.usage.calls}</span></span>
+          <span className="text-ink-mute">Input <span className="font-semibold text-ink tabular-nums">{tokens(d.usage.input)}</span></span>
+          <span className="text-ink-mute">Output <span className="font-semibold text-ink tabular-nums">{tokens(d.usage.output)}</span></span>
+          <span className="text-ink-mute">Total <span className="font-semibold text-ink tabular-nums">{tokens(Number(d.usage.input) + Number(d.usage.output))}</span></span>
+          <span className="text-ink-mute">Est. cost <span className="font-semibold text-brand-700">{cost(d.usage.input, d.usage.output)}</span></span>
+        </div>
       </div>
     </div>
   );
@@ -253,6 +268,25 @@ function UserDetail({ id, onBack }: { id: number; onBack: () => void }) {
           ))}
         </Card>
       )}
+
+      <div className="mt-4">
+        <Card title="AI token usage — this founder's program">
+          <div className="flex flex-wrap gap-x-6 gap-y-1.5 text-sm mb-2">
+            <span className="text-ink-mute">Calls <span className="font-semibold text-ink tabular-nums">{d.usage.calls}</span></span>
+            <span className="text-ink-mute">Input <span className="font-semibold text-ink tabular-nums">{tokens(d.usage.input)}</span></span>
+            <span className="text-ink-mute">Output <span className="font-semibold text-ink tabular-nums">{tokens(d.usage.output)}</span></span>
+            <span className="text-ink-mute">Total <span className="font-semibold text-ink tabular-nums">{tokens(Number(d.usage.input) + Number(d.usage.output))}</span></span>
+            <span className="text-ink-mute">Est. cost <span className="font-semibold text-brand-700">{cost(d.usage.input, d.usage.output)}</span></span>
+          </div>
+          {d.usage.calls === 0 ? <p className="text-xs text-ink-mute">No AI calls recorded yet.</p> : (
+            <div className="pt-2 border-t border-hairline">
+              {d.usageByMode.map((m: any) => (
+                <Row key={m.mode} k={m.mode} v={<span className="tabular-nums text-xs">{tokens(m.tokens)} tok · {m.calls} calls</span>} />
+              ))}
+            </div>
+          )}
+        </Card>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
         <Card title={`Activity timeline (${d.timeline.length})`}>

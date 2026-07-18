@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { neon } from '@neondatabase/serverless';
 
 // Shared Anthropic client + call wrapper (SPEC_MODEL_STRATEGY §5). Replaces the
 // `new Anthropic({...})` that used to live in all 8 endpoints. Lives in src/ (not
@@ -71,6 +72,16 @@ export async function callClaude(
         ...(attempt > 1 ? { retries: attempt - 1 } : {}),
         ...(meta.email ? { email: meta.email } : {}),
       }));
+
+      // Persist token usage (migration 0008) so the admin panel totals tokens per founder.
+      // Best-effort + awaited (serverless may freeze after the response) — a DB hiccup here must
+      // NEVER fail the AI response, so it's fully swallowed.
+      try {
+        const db = neon(process.env.DATABASE_URL!);
+        await db`INSERT INTO llm_usage (email, endpoint, mode, model, input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens)
+          VALUES (${meta.email ?? null}, ${meta.endpoint}, ${meta.mode}, ${finalParams.model},
+                  ${u.input_tokens ?? 0}, ${u.output_tokens ?? 0}, ${u.cache_read_input_tokens ?? 0}, ${u.cache_creation_input_tokens ?? 0})`;
+      } catch { /* usage persistence is best-effort */ }
 
       return res;
     } catch (err) {
