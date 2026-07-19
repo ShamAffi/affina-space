@@ -66,15 +66,11 @@
   @media (max-width: 640px) { .h1-hero { line-height: 1; } }
 }
 
-/* Buttons — condensed Archivo across onboarding + platform (new spec, not uppercase).
-   Global so every <button> label picks it up; icon-only buttons are unaffected (no text).
-   Primary fill stays brand + white (chosen); radius/fill per-element via Tailwind. */
-button {
-  font-stretch: 66%;
-}
+/* Buttons use normal-width Archivo (their Tailwind weights). The condensed 66% treatment is
+   reserved for tags/eyebrows via .type-tag — on sentence-case buttons it reads cramped. */
 
 /* Logo — strict brand rules: always "Affina Space" (Title Case, one space), Archivo 900,
-   NORMAL width (never condensed — beats the button rule above), -0.045em. Two-tone by bg:
+   NORMAL width (never condensed), -0.045em. Two-tone by bg:
    light → Affina #0B0A08 / Space #6D28D9 ; dark → Affina #fff / Space #CBA9EF (.logo-dark).
    No gradient/shadow/outline; never recolour "Affina" purple; no slash/dot/emoji. */
 .logo {
