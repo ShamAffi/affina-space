@@ -27,9 +27,8 @@ export default function Welcome({ onStart, onSignIn }: Props) {
           The First AI Native Incubator<br />for Female Founders
         </div>
 
-        <h1 className="font-display text-4xl sm:text-5xl md:text-6xl font-medium tracking-tight text-ink leading-tight max-w-3xl mb-5 animate-slide-up">
-          Your business growth<br />
-          <span className="text-brand">starts here</span>
+        <h1 className="h1-hero mb-5 animate-slide-up">
+          Your business growth <span className="accent">starts here</span>
         </h1>
 
         <p className="text-lg sm:text-2xl text-ink-soft leading-snug max-w-2xl mb-10 animate-slide-up">

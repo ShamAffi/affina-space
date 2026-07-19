@@ -46,6 +46,24 @@
     text-transform: uppercase;
     letter-spacing: 0.02em;
   }
+
+  /* Hero headline — the big centered display h1 (new spec). Applied via class so it doesn't
+     centre/clamp every small screen-title <h1>. Accent word → brand. */
+  .h1-hero {
+    font-family: 'Archivo', system-ui, sans-serif;
+    font-weight: 900;
+    font-size: clamp(3rem, 8vw, 5.4rem);
+    line-height: 0.97;
+    letter-spacing: -0.045em;
+    color: var(--ink);
+    text-align: center;
+    max-width: 15ch;
+    margin-left: auto;
+    margin-right: auto;
+    text-wrap: balance;
+  }
+  .h1-hero .accent { color: var(--brand); }
+  @media (max-width: 640px) { .h1-hero { line-height: 1; } }
 }
 
 /* Warm brand focus ring (keyboard only). */
