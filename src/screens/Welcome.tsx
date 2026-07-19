@@ -23,7 +23,7 @@ export default function Welcome({ onStart, onSignIn }: Props) {
       {/* Hero */}
       <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 py-16 text-center">
         {/* Badge — two lines, no dot (founding-cohort positioning) */}
-        <div className="inline-block text-center bg-brand-50 border border-brand-200 text-brand-700 text-sm font-semibold px-5 py-2 rounded-2xl mb-8 animate-fade-in leading-snug">
+        <div className="inline-block text-center bg-brand text-white text-sm font-semibold px-5 py-2 rounded-2xl mb-8 animate-fade-in leading-snug">
           The First AI Native Incubator<br />for Female Founders
         </div>
 
@@ -32,7 +32,7 @@ export default function Welcome({ onStart, onSignIn }: Props) {
         </h1>
 
         <p className="text-lg sm:text-2xl text-ink-soft leading-snug max-w-2xl mb-10 animate-slide-up">
-          Take a short quiz and get an expert-level report on your project — with clear recommendations.
+          Take a short quiz and get an expert-level report on your project — with clear recommendations and incubation program plan
         </p>
 
         <button

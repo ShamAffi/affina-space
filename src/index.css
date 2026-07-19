@@ -66,6 +66,13 @@
   @media (max-width: 640px) { .h1-hero { line-height: 1; } }
 }
 
+/* Buttons — condensed Archivo across onboarding + platform (new spec, not uppercase).
+   Global so every <button> label picks it up; icon-only buttons are unaffected (no text).
+   Primary fill stays brand + white (chosen); radius/fill per-element via Tailwind. */
+button {
+  font-stretch: 66%;
+}
+
 /* Warm brand focus ring (keyboard only). */
 *:focus-visible {
   outline: 2px solid var(--brand);

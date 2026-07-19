@@ -82,14 +82,14 @@ export default function WelcomeZone({ onStart }: Props) {
       <main className="relative z-10 flex-1 flex flex-col items-center px-5 py-6 sm:py-10 w-full">
         <div className="w-full max-w-xl">
           {/* Badge */}
-          <div className="inline-flex items-center gap-2 bg-brand-50 border border-brand-200 text-brand-700 text-sm font-semibold px-4 py-1.5 rounded-pill mb-6 animate-fade-in">
-            <span className="w-2 h-2 rounded-pill bg-accent-600" />
+          <div className="inline-flex items-center gap-2 bg-brand text-white text-sm font-semibold px-4 py-1.5 rounded-pill mb-6 animate-fade-in">
+            <span className="w-2 h-2 rounded-pill bg-white/70" />
             You're starting the Founding Cohort
           </div>
 
-          {/* Headline */}
-          <h1 className="font-display text-4xl sm:text-5xl font-medium tracking-tight text-ink leading-[1.05] mb-4 animate-slide-up">
-            Welcome to <span className="text-brand">Affina Space</span>.
+          {/* Headline — main-page hero type (Archivo 900, -0.045em) at this screen's size */}
+          <h1 className="font-display font-black text-4xl sm:text-5xl text-ink leading-[1.05] mb-4 animate-slide-up">
+            Welcome to <span className="text-brand">Affina Space</span>
           </h1>
           <p className="text-lg sm:text-xl text-ink-soft leading-snug mb-2 animate-slide-up">
             The AI-native incubator for women turning ideas into real companies.
