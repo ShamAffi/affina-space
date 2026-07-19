@@ -58,7 +58,7 @@ export default function AccountPanel({ userData, onClose, onSave }: Props) {
           {/* Avatar placeholder */}
           <div className="flex flex-col items-center gap-3 pb-4 border-b border-hairline">
             <div className="w-16 h-16 rounded-pill bg-brand-100 flex items-center justify-center">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#7150EA" strokeWidth="1.5" strokeLinecap="round">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#6D28D9" strokeWidth="1.5" strokeLinecap="round">
                 <circle cx="12" cy="7.5" r="3.5" />
                 <path d="M5 21c0-3.87 3.13-7 7-7s7 3.13 7 7" />
               </svg>

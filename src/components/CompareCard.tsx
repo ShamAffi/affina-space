@@ -103,7 +103,7 @@ export default function CompareCard({ lessonTitle, prompt, answer, result, onRef
               >
                 <div className="flex items-center gap-1.5 min-w-0">
                   {isWinner && (
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="#7150EA" stroke="none" className="flex-shrink-0">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="#6D28D9" stroke="none" className="flex-shrink-0">
                       <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z" />
                     </svg>
                   )}

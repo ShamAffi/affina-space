@@ -5,9 +5,9 @@ Virtual incubator for early-stage female founders. React + Vite + TS + Tailwind 
 ## Design — read this before any UI work
 The visual design system is defined in **[DESIGN.md](./DESIGN.md)**. Tokens are wired into `tailwind.config.js` and `src/index.css`.
 
-Use the Tailwind classes (`bg-brand`, `text-ink`, `bg-canvas`, `rounded-pill`, `rounded-card`, `font-display`, `font-sans`, `bg-brand-50`, etc.). **Never** reintroduce Inter, pure-white (`#fff`) page backgrounds, pure-black (`#000`) text, purple gradients, or the old `#9333EA` purple.
+Use the Tailwind classes (`bg-brand`, `text-ink`, `bg-canvas`, `rounded-card`, `rounded-control`, `rounded-pill`, `font-display`, `font-sans`, `bg-brand-50`, `.type-tag`, etc.). **Never** reintroduce Inter or Fraunces, pure-white (`#fff`) page backgrounds, pure-black (`#000`) text (use `ink` `#0B0A08`), or the old violet (`#7150EA` / `#9333EA`).
 
-Brand in one line: **editorial, confident, minimal — royal-violet primary (`#7150EA`) + emerald accent (`#119C74`) on a soft light-gray canvas (`#F4F4F5`), big typography, ultra-rounded pills, flat surfaces.**
+Brand in one line (design-system v2, 2026-07): **confident, editorial, tactile — one font Archivo (heavy display 900 / condensed-uppercase tags), royal-purple primary (`#6D28D9`) + emerald accent (`#0F9D74`) on a warm bone canvas (`#ECE9E2`), near-black ink (`#0B0A08`), 16px cards / 8px controls, soft warm shadows + faint grain.**
 
 ## Product spec — source of truth
 - **SPEC_PROGRAM_V2.md** — the program (13 modules M0–M12, block kinds, Snapshot, Delegate, Briefing/Debrief, Launch Readiness §7, mentor sessions). Implemented in full (Phases 1–3 + audit P1–P5).

@@ -73,7 +73,7 @@ export default function Analyzing({ userData, onDone }: Props) {
     <div className="min-h-screen bg-canvas flex flex-col items-center justify-center">
       <div
         className="w-28 h-28 rounded-pill animate-orb-pulse"
-        style={{ background: 'radial-gradient(circle at 35% 35%, #9070EE, #7150EA 60%, #422A92)' }}
+        style={{ background: 'radial-gradient(circle at 35% 35%, #9A5CE6, #6D28D9 60%, #4C1D95)' }}
       />
       <p
         className="mt-10 text-ink-soft text-lg font-medium transition-opacity duration-200"

@@ -32,11 +32,8 @@ export default function Welcome({ onStart, onSignIn }: Props) {
           <span className="text-brand">starts here</span>
         </h1>
 
-        <p className="text-base sm:text-lg text-ink-soft mb-3 animate-slide-up">
-          Realize your ambition — with the right support.
-        </p>
-        <p className="text-sm text-ink-mute mb-10 animate-slide-up">
-          5 questions &nbsp;·&nbsp; 2 min &nbsp;·&nbsp; Personalized program
+        <p className="text-lg sm:text-2xl text-ink-soft leading-snug max-w-2xl mb-10 animate-slide-up">
+          Take a short quiz and get an expert-level report on your project — with clear recommendations.
         </p>
 
         <button

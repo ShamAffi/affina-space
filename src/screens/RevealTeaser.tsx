@@ -41,10 +41,10 @@ function ScoreRing({ score }: { score: number }) {
   return (
     <div className="relative w-36 h-36 mx-auto">
       <svg className="w-36 h-36 -rotate-90" viewBox="0 0 140 140">
-        <circle cx="70" cy="70" r="54" fill="none" stroke="#EFEBFD" strokeWidth="12" />
+        <circle cx="70" cy="70" r="54" fill="none" stroke="#F3EBFB" strokeWidth="12" />
         <circle
           cx="70" cy="70" r="54" fill="none"
-          stroke="#7150EA"
+          stroke="#6D28D9"
           strokeWidth="12"
           strokeLinecap="round"
           strokeDasharray={CIRCUMFERENCE}

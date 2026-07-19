@@ -46,10 +46,10 @@ function ScoreMeter({ target }: { target: number }) {
     <div className="flex flex-col items-center gap-0.5">
       <div className="relative w-14 h-14">
         <svg className="w-14 h-14 -rotate-90" viewBox="0 0 100 100">
-          <circle cx="50" cy="50" r="38" fill="none" stroke="#EFEBFD" strokeWidth="13" />
+          <circle cx="50" cy="50" r="38" fill="none" stroke="#F3EBFB" strokeWidth="13" />
           <circle
             cx="50" cy="50" r="38" fill="none"
-            stroke="#7150EA"
+            stroke="#6D28D9"
             strokeWidth="13"
             strokeLinecap="round"
             strokeDasharray={CIRCUMFERENCE}

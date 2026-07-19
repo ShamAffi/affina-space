@@ -135,7 +135,7 @@ export default function MentorSessionModal({ session, email, completed, booked, 
         <div className="px-6 pb-6 pt-4 border-t border-hairline flex flex-col gap-3">
           <MentorRequestForm session={session} alreadyBooked={booked} onPaywall={onPaywall} initialPhone={phone} />
           <label className="flex items-center gap-2 justify-center text-xs text-ink-soft cursor-pointer select-none">
-            <input type="checkbox" checked={completed} disabled={saving} onChange={toggleCompleted} className="accent-[#7150EA]" />
+            <input type="checkbox" checked={completed} disabled={saving} onChange={toggleCompleted} className="accent-[#6D28D9]" />
             Session completed <span className="text-ink-mute">(set manually in v2)</span>
           </label>
         </div>

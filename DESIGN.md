@@ -1,77 +1,63 @@
-# Affina Space — Design System
+# Affina Space — Design System (v2, 2026-07)
 
-Inspiration: **Female Invest** — editorial, minimal-but-stylish. Deliberately **NOT** the default "AI" look: no Inter, no pure-white, no purple gradients, no heavy shadows.
+Confident, editorial, tactile. Warm bone canvas (not white), near-black ink, a single royal-purple brand + emerald accent, one variable font (Archivo) doing everything from heavy display to condensed uppercase tags, on flat surfaces with soft warm shadows and a faint grain over the whole thing.
 
-## Brand in one line
-Editorial, confident, minimal. Big readable typography, generous whitespace, ultra-rounded pills, flat surfaces — one **royal-violet primary** + one **emerald accent** on a **soft light-gray canvas**.
+Tokens are wired into **`tailwind.config.js`** + **`src/index.css`** — build with the Tailwind classes (`bg-brand`, `text-ink`, `bg-canvas`, `rounded-card`, `rounded-control`, `rounded-pill`, `font-display`, `font-sans`, `bg-brand-50`, …), never raw hex.
 
 ---
 
-## Tokens (already wired into `tailwind.config.js` + `src/index.css`)
+## Fonts — one family: Archivo (variable, width + weight axes)
+Loaded in `index.html`: `Archivo:ital,wdth,wght@…,62..125,400..900`.
 
-**Colors** (Tailwind class → hex):
+| Role | Treatment |
+|---|---|
+| **Display / headings** | Archivo **900**, letter-spacing **−0.045em** (`font-display` sets the tracking; add `font-black`) |
+| **Body** | Archivo **500**, letter-spacing **−0.01em** (the global default on `body`) |
+| **Buttons / eyebrows / tags** | Archivo **700**, `font-stretch: 66%` (condensed), **UPPERCASE**, letter-spacing **+0.02em** → helper class **`.type-tag`** |
+| **Logo** | `affina/space` lowercase 900 — the slash is `text-brand`, `space` is *italic* |
 
-| Purpose | Tailwind | Hex |
+---
+
+## Colors
+
+**Neutrals** (warm):
+| Token | Hex | Use |
 |---|---|---|
-| Primary — royal violet | `bg-brand` / `text-brand` | `#7150EA` (scale `brand-50…800`) |
-| Secondary — emerald | `bg-accent` / `text-accent` | `#119C74` (scale `accent-50…800`) |
-| Page background (NOT white) | `bg-canvas` | `#F4F4F5` |
-| Card surface | `bg-surface` | `#FFFFFF` |
-| Inset (tracks, empty states) | `bg-inset` | `#E9E9EC` |
-| Hairline border | `border-hairline` | `#E0E0E4` |
-| Text primary (soft, never `#000`) | `text-ink` | `#1F1F23` |
-| Text secondary | `text-ink-soft` | `#6C6C74` |
-| Text muted | `text-ink-mute` | `#9D9DA6` |
+| `canvas` | `#ECE9E2` | page background — warm bone, never white |
+| `surface` | `#FFFFFF` | cards |
+| `inset` | `#E2DED4` | tracks, insets, empty states |
+| `hairline` | `#D9D4C7` | 1px borders |
+| `ink` | `#0B0A08` | primary text (near-black), also black buttons |
+| `ink-soft` | `#55524B` | secondary text |
+| `ink-mute` | `#98948A` | captions / labels |
 
-Tint chips: `brand-50` bg + `brand-800` text, or `accent-50` bg + `accent-800` text.
+**Brand — royal purple** (`brand-600` = `#6D28D9` primary):
+`50 #F3EBFB · 100 #E7D6F7 · 200 #CBA9EF · 300 #B27EEB · 400 #9A5CE6 · 500 #843BE0 · 600 #6D28D9 · 700 #5B21B6 · 800 #4C1D95 · 900 #2E1065`
 
-**Fonts:**
-- `font-sans` = **Hanken Grotesk** → all UI, body, functional headings.
-- `font-display` = **Fraunces** (serif) → brand / emotional moments only (dashboard greeting, onboarding reveal, hero). **No italic for now.**
-- Weights: 400 regular, 500 medium, 600 semibold, 700 heavy headlines.
+**Accent — emerald** (point use only): `50 #E4F5EE · 100 #BEE9D8 · 600 #0F9D74 · 800 #0A5E47`
 
-**Radius:**
-- `rounded-pill` (999px) → buttons, chips.
-- `rounded-card` (20px) → cards.
-- `rounded-control` (12px) → inputs, small controls.
+**Dark panels** (gradient): `linear-gradient(155deg, #3B1580, #2E1065 55%, #160A33)` + a soft white radial highlight top.
 
 ---
 
-## Typography rules
-- **Hero / brand headline:** `font-display`, large, weight 500, `tracking-tight`. Use **sparingly** — one per screen.
-- **Functional headline:** `font-sans`, weight 600–700.
-- **Body:** `font-sans`, weight 400, `leading-relaxed` (~1.6).
-- **Eyebrow/label:** `font-sans` 600, uppercase, `tracking-wide`, `text-ink-mute`, 11–12px.
-- Sentence case everywhere. No italic until later.
-
----
-
-## Components (build with these)
-- **Primary button:** `bg-brand text-white rounded-pill px-5 py-3 font-semibold` (hover → `brand-700`).
-- **Secondary button:** `bg-transparent text-brand border-[1.5px] border-brand rounded-pill px-5 py-3 font-semibold`.
-- **Card:** `bg-surface border border-hairline rounded-card p-5` (flat — no shadow, or very soft).
-- **Chip / tag:** `rounded-pill bg-brand-50 text-brand-800 text-xs font-medium px-3 py-1` (or `accent-50/accent-800`).
-- **Progress bar:** track `bg-inset rounded-pill`, fill `bg-brand`.
-- **Input:** `bg-surface border border-hairline rounded-control`, focus ring `brand`.
-- **Accent badge:** circle, `bg-accent-100` + `text-accent-800` icon (Female-Invest-style accent circle).
+## Patterns
+- **Radii:** cards `rounded-card` 16px · controls/buttons `rounded-control` 8px · pills `rounded-pill` 999px.
+- **Buttons:** primary = halo-gradient fill + **black condensed uppercase** label (`.type-tag`); secondary = 2px black (`ink`) outline. Radius `rounded-control` (8px).
+- **Shadows** (soft, warm): `0 1px 2px rgba(11,10,8,.05), 0 18px 40px -28px rgba(11,10,8,.25)`; hover-lift `-4px`.
+- **Number chips:** black square, 8px radius, white **900** digit.
+- **Tint cards:** `bg-brand-50` + `text-brand-800` (or `accent-50` / `accent-800`).
+- **Grain:** a fixed `feTurbulence` texture over everything at `opacity .05` (wired in `index.css` `body::after`).
+- **Focus ring:** `#6D28D9`, 2px, offset 2px (wired globally on `:focus-visible`).
 
 ---
 
 ## Do / Don't
-**DO:** soft light-gray canvas; white cards on top; one big serif brand moment per screen; lots of whitespace; pill buttons; flat surfaces.
-**DON'T:** Inter / system default look; pure `#fff` page bg; pure `#000` text; purple gradients; drop shadows everywhere; italic (for now); more than 2 brand colors per screen.
+**DO:** warm bone canvas; white cards; one heavy Archivo display moment per screen; condensed-uppercase for buttons/eyebrows/tags; flat surfaces + soft warm shadows; grain over all.
+**DON'T:** Inter / system default; pure `#fff` page bg; pure `#000` (use `ink #0B0A08`); the old violet `#7150EA` / `#9333EA`; serif display (retired Fraunces); more than 2 brand colors per screen.
 
 ---
 
-## Handoff task (for the implementing agent)
-Apply this system across the app — replace the old Inter / white / generic styling. **Visual only — do not touch logic, data, or API behavior.**
-
-1. Confirm fonts load (`index.html` links Fraunces + Hanken Grotesk) and Tailwind tokens resolve (`bg-brand`, `text-ink`, `rounded-pill`, `font-display`).
-2. Page backgrounds → `bg-canvas`; cards → `bg-surface border border-hairline rounded-card`.
-3. All buttons → pill primary/secondary styles above.
-4. Text colors → `text-ink` / `text-ink-soft` / `text-ink-mute` (never `#000`).
-5. One brand headline per screen in `font-display` (dashboard greeting, onboarding reveal); everything else `font-sans`.
-6. Tags/chips → pill with `brand-50` / `accent-50` tints.
-7. Replace any hardcoded old purple (`#9333EA`, `rgba(147,51,234,…)`) with `brand` (`#7150EA`).
-
-**Screens / components to restyle:** `src/screens/` (Welcome, Question, EmailCapture, Analyzing, Score, LMS, Dashboard, ProgramIntro) and `src/components/` (AccountPanel, CompareCard, DocumentsPanel, FeedbackCard, ProfileButton).
+## Implementation status (2026-07-19)
+- ✅ **Wired globally (cascades):** Archivo font (`index.html` + config), full new palette (config + `index.css` vars + component SVG hex), radii (16/8/999), grain overlay, `:focus-visible` ring, body weight/tracking, `.font-display` tracking, `.type-tag` helper.
+- 🔜 **Per-component pass (in progress):** converting inline buttons/eyebrows/tags to the black **condensed-uppercase** treatment (`.type-tag`), number chips, and dark-gradient panels — done screen-by-screen so nothing regresses (UI is eyeballed, no preview in CI).
+- **Emails** (`src/server/email.ts`) keep their own inline-hex brand for now — update separately if the app/email brand must match exactly.

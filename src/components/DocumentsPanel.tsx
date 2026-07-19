@@ -132,7 +132,7 @@ export default function DocumentsPanel({ email, onClose, onLessonInputSaved, con
             {!loading && entries.length === 0 && !snapshot && (
               <div className="flex-1 flex flex-col items-center justify-center text-center gap-3 py-16">
                 <div className="w-12 h-12 rounded-pill bg-brand-50 flex items-center justify-center">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7150EA" strokeWidth="1.5">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6D28D9" strokeWidth="1.5">
                     <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
                     <polyline points="14 2 14 8 20 8" />
                   </svg>

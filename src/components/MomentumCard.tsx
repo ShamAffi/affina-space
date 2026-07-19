@@ -301,7 +301,7 @@ function Sparkline({ values }: { values: number[] }) {
   });
   return (
     <svg viewBox={`0 0 ${w} ${h}`} className="w-full" style={{ height: h }}>
-      <polyline points={pts.join(' ')} fill="none" stroke="#7150EA" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+      <polyline points={pts.join(' ')} fill="none" stroke="#6D28D9" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
     </svg>
   );
 }

@@ -337,7 +337,7 @@ export default function MetricPulse({ email, projectName, onBack }: Props) {
               <div className="space-y-4 text-center">
                 <div className="bg-surface border border-hairline rounded-card p-8 shadow-sm">
                   <div className="w-12 h-12 rounded-pill bg-accent-100 flex items-center justify-center mx-auto mb-4">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#119C74" strokeWidth="2.5">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0F9D74" strokeWidth="2.5">
                       <polyline points="20 6 9 17 4 12" />
                     </svg>
                   </div>
@@ -434,10 +434,10 @@ function Sparkline({ values }: { values: number[] }) {
   });
   return (
     <svg viewBox={`0 0 ${w} ${h}`} className="w-full" style={{ height: h }}>
-      <polyline points={pts.join(' ')} fill="none" stroke="#7150EA" strokeWidth="2" strokeLinejoin="round" />
+      <polyline points={pts.join(' ')} fill="none" stroke="#6D28D9" strokeWidth="2" strokeLinejoin="round" />
       {pts.map((pt, i) => {
         const [x, y] = pt.split(',').map(Number);
-        return <circle key={i} cx={x} cy={y} r="3" fill="#7150EA" />;
+        return <circle key={i} cx={x} cy={y} r="3" fill="#6D28D9" />;
       })}
     </svg>
   );

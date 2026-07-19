@@ -4,39 +4,44 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Hanken Grotesk', 'system-ui', 'sans-serif'],
-        display: ['Fraunces', 'Georgia', 'serif'],
+        // One family — Archivo variable (width + weight axes). display = heavy/tight, sans = body.
+        sans: ['Archivo', 'system-ui', 'sans-serif'],
+        display: ['Archivo', 'system-ui', 'sans-serif'],
       },
       colors: {
+        // Royal-purple brand (new spec) — 600 is the primary.
         brand: {
-          50: '#EFEBFD',
-          100: '#DDD3FB',
-          200: '#C0AEF6',
-          400: '#9070EE',
-          600: '#7150EA',
-          700: '#5636C0',
-          800: '#422A92',
-          DEFAULT: '#7150EA',
+          50: '#F3EBFB',
+          100: '#E7D6F7',
+          200: '#CBA9EF',
+          300: '#B27EEB',
+          400: '#9A5CE6',
+          500: '#843BE0',
+          600: '#6D28D9',
+          700: '#5B21B6',
+          800: '#4C1D95',
+          900: '#2E1065',
+          DEFAULT: '#6D28D9',
         },
         accent: {
-          50: '#E0F4ED',
-          100: '#B6E6D5',
-          400: '#2DBE92',
-          600: '#119C74',
+          50: '#E4F5EE',
+          100: '#BEE9D8',
+          400: '#34C48F',
+          600: '#0F9D74',
           800: '#0A5E47',
-          DEFAULT: '#119C74',
+          DEFAULT: '#0F9D74',
         },
-        canvas: '#F4F4F5',
+        canvas: '#ECE9E2',      // warm bone, not white
         surface: '#FFFFFF',
-        inset: '#E9E9EC',
-        hairline: '#E0E0E4',
-        ink: '#1F1F23',
-        'ink-soft': '#6C6C74',
-        'ink-mute': '#9D9DA6',
+        inset: '#E2DED4',
+        hairline: '#D9D4C7',
+        ink: '#0B0A08',         // near-black
+        'ink-soft': '#55524B',
+        'ink-mute': '#98948A',
       },
       borderRadius: {
-        card: '20px',
-        control: '12px',
+        card: '16px',
+        control: '8px',
         pill: '999px',
       },
       animation: {
@@ -51,11 +56,11 @@ export default {
         'orb-pulse': {
           '0%, 100%': {
             transform: 'scale(1)',
-            boxShadow: '0 0 0 0 rgba(113,80,234,0.45), 0 0 40px 8px rgba(113,80,234,0.18)',
+            boxShadow: '0 0 0 0 rgba(109,40,217,0.45), 0 0 40px 8px rgba(109,40,217,0.18)',
           },
           '50%': {
             transform: 'scale(1.22)',
-            boxShadow: '0 0 0 24px rgba(113,80,234,0), 0 0 90px 28px rgba(113,80,234,0.36)',
+            boxShadow: '0 0 0 24px rgba(109,40,217,0), 0 0 90px 28px rgba(109,40,217,0.36)',
           },
         },
         'fade-in': {
@@ -72,9 +77,9 @@ export default {
           '100%': { opacity: '0', transform: 'translate(120px, -200px) scale(0.2)' },
         },
         'avatar-ping': {
-          '0%':   { boxShadow: '0 0 0 0 rgba(113,80,234,0.6)' },
-          '60%':  { boxShadow: '0 0 0 8px rgba(113,80,234,0.15)' },
-          '100%': { boxShadow: '0 0 0 12px rgba(113,80,234,0)' },
+          '0%':   { boxShadow: '0 0 0 0 rgba(109,40,217,0.6)' },
+          '60%':  { boxShadow: '0 0 0 8px rgba(109,40,217,0.15)' },
+          '100%': { boxShadow: '0 0 0 12px rgba(109,40,217,0)' },
         },
         'panel-in': {
           '0%':   { opacity: '0', transform: 'translateX(24px)' },
