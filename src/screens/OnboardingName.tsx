@@ -19,8 +19,8 @@ export default function OnboardingName({ initialValue, onNext }: Props) {
       </div>
 
       <header className="relative z-10 flex items-center px-5 py-4">
-        <span className="text-brand-700 font-bold text-lg tracking-tight">
-          Affina<span className="text-ink">Space</span>
+        <span className="logo">
+          Affina <span className="space">Space</span>
         </span>
       </header>
 

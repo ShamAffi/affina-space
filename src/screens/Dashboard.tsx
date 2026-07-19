@@ -142,8 +142,8 @@ export default function Dashboard({ userData, onUpdateUserData, onGoToLMS, onGoT
     <div className="min-h-screen bg-canvas">
       {/* Header */}
       <header className="bg-surface border-b border-hairline flex items-center gap-3 px-4 sm:px-6 py-4 sticky top-0 z-30">
-        <span className="text-brand-700 font-bold text-lg tracking-tight select-none">
-          Affina<span className="text-ink">Space</span>
+        <span className="logo select-none">
+          Affina <span className="space">Space</span>
         </span>
         <div className="ml-auto flex items-center gap-3">
           <ProfileButton

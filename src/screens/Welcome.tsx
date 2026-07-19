@@ -15,8 +15,8 @@ export default function Welcome({ onStart, onSignIn }: Props) {
 
       {/* Header */}
       <header className="relative z-10 flex items-center px-6 py-5">
-        <span className="text-brand-700 font-bold text-xl tracking-tight">
-          Affina<span className="text-ink">Space</span>
+        <span className="logo">
+          Affina <span className="space">Space</span>
         </span>
       </header>
 

@@ -31,7 +31,7 @@ export default class ErrorBoundary extends Component<Props, State> {
     return (
       <div className="min-h-screen bg-canvas flex flex-col items-center justify-center px-5 text-center">
         <div className="w-full max-w-sm">
-          <span className="text-brand-700 font-bold text-xl tracking-tight">Affina<span className="text-ink">Space</span></span>
+          <span className="logo">Affina <span className="space">Space</span></span>
           <div className="mt-8 text-4xl">🌀</div>
           <h1 className="mt-4 text-2xl font-extrabold text-ink mb-2">Something glitched</h1>
           <p className="text-sm text-ink-soft mb-6">A part of the app hit an unexpected error — your work is safe. Reload to pick up where you left off.</p>

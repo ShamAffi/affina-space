@@ -124,8 +124,8 @@ export default function OnboardingQuestion({
 
       {/* Header */}
       <header className="relative z-10 flex items-center justify-between px-5 py-4">
-        <span className="text-brand-700 font-bold text-lg tracking-tight">
-          Affina<span className="text-ink">Space</span>
+        <span className="logo">
+          Affina <span className="space">Space</span>
         </span>
         <div className="flex items-center gap-3">
           <span className="text-sm text-ink-mute">

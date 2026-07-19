@@ -32,7 +32,7 @@ export default function ReportPage({ userData, onContinue }: Props) {
   if (loading) {
     return (
       <div className="min-h-screen bg-canvas flex flex-col items-center justify-center px-5 text-center">
-        <span className="text-brand-700 font-bold text-xl tracking-tight">Affina<span className="text-ink">Space</span></span>
+        <span className="logo">Affina <span className="space">Space</span></span>
         <div className="mt-8 w-10 h-10 rounded-pill bg-brand animate-orb-pulse" />
         <p className="mt-4 text-ink-soft text-sm">Loading your report…</p>
       </div>

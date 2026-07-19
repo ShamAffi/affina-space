@@ -388,7 +388,7 @@ function Login() {
     return (
       <div className="min-h-screen bg-canvas flex flex-col items-center justify-center px-5 text-center">
         <div className="w-full max-w-sm">
-          <span className="text-brand-700 font-bold text-xl tracking-tight">Affina<span className="text-ink">Space</span></span>
+          <span className="logo">Affina <span className="space">Space</span></span>
           <div className="mt-8 text-4xl">📬</div>
           <h1 className="mt-4 text-2xl font-extrabold text-ink mb-2">Check your inbox</h1>
           <p className="text-sm text-ink-soft">We sent a magic link to <span className="font-semibold text-ink">{email.trim()}</span>. Click it to sign in — it expires in 15 minutes.</p>
@@ -401,7 +401,7 @@ function Login() {
   return (
     <div className="min-h-screen bg-canvas flex flex-col items-center justify-center px-5">
       <div className="w-full max-w-sm text-center">
-        <span className="text-brand-700 font-bold text-xl tracking-tight">Affina<span className="text-ink">Space</span></span>
+        <span className="logo">Affina <span className="space">Space</span></span>
         <h1 className="mt-6 text-2xl font-extrabold text-ink mb-2">Sign in</h1>
         <p className="text-sm text-ink-soft mb-6">Enter your email — we'll send you a magic link. No password.</p>
         <input
@@ -458,7 +458,7 @@ function Verify({ onVerified }: { onVerified: (email: string, isNew: boolean, ne
     return (
       <div className="min-h-screen bg-canvas flex flex-col items-center justify-center px-5 text-center">
         <div className="w-full max-w-sm">
-          <span className="text-brand-700 font-bold text-xl tracking-tight">Affina<span className="text-ink">Space</span></span>
+          <span className="logo">Affina <span className="space">Space</span></span>
           <h1 className="mt-8 text-2xl font-extrabold text-ink mb-2">This link didn't work</h1>
           <p className="text-sm text-ink-soft mb-6">It may have expired or already been used. Request a fresh one — it only takes a moment.</p>
           <button onClick={() => navigate('/login')} className="bg-brand hover:bg-brand-700 active:scale-95 text-white text-sm font-semibold px-8 py-3 rounded-pill transition">
@@ -471,7 +471,7 @@ function Verify({ onVerified }: { onVerified: (email: string, isNew: boolean, ne
 
   return (
     <div className="min-h-screen bg-canvas flex flex-col items-center justify-center px-5 text-center">
-      <span className="text-brand-700 font-bold text-xl tracking-tight">Affina<span className="text-ink">Space</span></span>
+      <span className="logo">Affina <span className="space">Space</span></span>
       <div className="mt-8 w-10 h-10 rounded-pill bg-brand animate-orb-pulse" />
       <p className="mt-4 text-ink-soft text-sm">Signing you in…</p>
     </div>
@@ -512,7 +512,7 @@ function PaymentSuccess({ onConfirmed, onDefer }: { onConfirmed: (next?: string)
 
   return (
     <div className="min-h-screen bg-canvas flex flex-col items-center justify-center px-5 text-center">
-      <span className="text-brand-700 font-bold text-xl tracking-tight">Affina<span className="text-ink">Space</span></span>
+      <span className="logo">Affina <span className="space">Space</span></span>
       <div className="mt-8 text-4xl">🎉</div>
       <h1 className="mt-4 text-2xl font-extrabold text-ink mb-2">Payment received</h1>
       {slow ? (

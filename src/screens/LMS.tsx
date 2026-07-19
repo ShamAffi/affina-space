@@ -435,9 +435,9 @@ My motivation & 12-week goal: …`;
 
         <button
           onClick={onGoToDashboard}
-          className="text-brand-700 font-bold text-lg tracking-tight hover:opacity-70 transition-opacity"
+          className="logo hover:opacity-70 transition-opacity"
         >
-          Affina<span className="text-ink">Space</span>
+          Affina <span className="space">Space</span>
         </button>
 
         <div className="hidden sm:flex items-center gap-1.5 ml-2 text-sm text-ink-mute">

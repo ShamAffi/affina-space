@@ -42,7 +42,7 @@ function wrap(bodyHtml: string, lifecycleNote?: string): string {
     <tr><td align="center">
       <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;background:#ffffff;border-radius:16px;">
         <tr><td style="padding:28px 32px 6px 32px;">
-          <span style="font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:700;color:#7150EA;letter-spacing:-0.5px;">Affina<span style="color:#1F1F23;">Space</span></span>
+          <span style="font-family:'Archivo',system-ui,-apple-system,'Segoe UI',sans-serif;font-size:22px;font-weight:900;color:#0B0A08;letter-spacing:-0.045em;">Affina <span style="color:#6D28D9;">Space</span></span>
         </td></tr>
         <tr><td style="padding:6px 32px 30px 32px;font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;color:#1F1F23;">
           ${bodyHtml}

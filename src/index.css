@@ -73,6 +73,27 @@ button {
   font-stretch: 66%;
 }
 
+/* Logo — strict brand rules: always "Affina Space" (Title Case, one space), Archivo 900,
+   NORMAL width (never condensed — beats the button rule above), -0.045em. Two-tone by bg:
+   light → Affina #0B0A08 / Space #6D28D9 ; dark → Affina #fff / Space #CBA9EF (.logo-dark).
+   No gradient/shadow/outline; never recolour "Affina" purple; no slash/dot/emoji. */
+.logo {
+  font-family: 'Archivo', system-ui, sans-serif;
+  font-weight: 900;
+  font-stretch: normal;
+  font-style: normal;
+  font-size: 21px;            /* nav; use .logo-sm 18px for footer/compact */
+  letter-spacing: -0.045em;
+  line-height: 1;
+  color: #0B0A08;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.logo .space { color: #6D28D9; }
+.logo-sm { font-size: 18px; }
+.logo-dark { color: #FFFFFF; }
+.logo-dark .space { color: #CBA9EF; }
+
 /* Warm brand focus ring (keyboard only). */
 *:focus-visible {
   outline: 2px solid var(--brand);

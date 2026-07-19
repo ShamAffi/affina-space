@@ -57,8 +57,8 @@ export default function ProjectName({ idea, customer, businessModel, stage, init
       </div>
 
       <header className="relative z-10 flex items-center px-5 py-4">
-        <span className="text-brand-700 font-bold text-lg tracking-tight">
-          Affina<span className="text-ink">Space</span>
+        <span className="logo">
+          Affina <span className="space">Space</span>
         </span>
         <span className="ml-auto text-xs text-ink-mute font-medium">Last step</span>
       </header>
