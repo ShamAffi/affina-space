@@ -305,8 +305,10 @@ export default function Paywall({ onDismiss, name, phone, seatsTotal = 15, seats
         <div className="bg-inset border border-hairline rounded-card p-5 mt-8">
           <p className="text-sm font-bold text-ink mb-2">The Founding Cohort Guarantee</p>
           <p className="text-sm text-ink-soft leading-relaxed">
-            Finish the program without your first customers — and we refund everything. Or, if you'd rather, we keep
-            working with you personally until you get there. We're here for business results, not subscriptions.
+            Finish the program without your first customers — and we refund everything. We're here for business results, not subscriptions.
+          </p>
+          <p className="text-xs text-ink-mute mt-2">
+            <a href="https://affina.space/terms" target="_blank" rel="noopener noreferrer" className="underline hover:text-ink-soft transition">Full conditions in our Terms (§9).</a>
           </p>
         </div>
       </div>

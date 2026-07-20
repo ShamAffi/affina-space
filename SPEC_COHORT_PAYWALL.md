@@ -73,8 +73,11 @@
 ### 5. Guarantee (bottom, framed card — visible, not shouty)
 - **The Founding Cohort Guarantee**
 - *"Finish the program without your first customers — and we refund
-  everything. Or, if you'd rather, we keep working with you personally until
-  you get there. We're here for business results, not subscriptions."*
+  everything. We're here for business results, not subscriptions."*
+- ⚠️ AMENDED 2026-07-20: the "or we keep working with you personally" option
+  is REMOVED — the lawyer-final Terms §9 guarantee is refund-only, and
+  marketing must not promise more than the contract. Optionally add a small
+  legal-anchor line under it: *"Full conditions in our Terms (§9)."*
 - (Ops: refunds are manual via the Stripe dashboard; no code.)
 
 ## §2 — Seat counter (honest scarcity only)
