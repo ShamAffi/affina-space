@@ -67,6 +67,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       email: user.email,
       score: user.score ?? 0,
       subscribed: user.subscribed ?? false,
+      // Subscription self-management (account panel): status + paid-through date + renewal flag.
+      subscriptionStatus: user.subscriptionStatus ?? null,
+      currentPeriodEnd: user.currentPeriodEnd ? new Date(user.currentPeriodEnd).toISOString() : null,
+      cancelAtPeriodEnd: user.cancelAtPeriodEnd ?? false,
       phone: user.phone ?? null,                       // SPEC_PHONE_CAPTURE — client gates the popups on this
       guideUrl: process.env.GUIDE_URL || null,         // runtime feature gate for the guide popup
       // Founding-cohort config (SPEC_COHORT_PAYWALL §2/§3) — read from env per request so seat

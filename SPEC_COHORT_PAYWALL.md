@@ -10,14 +10,19 @@
 ## §0 — PRICING CHANGE (⚠️ Stripe work + one decision)
 - New founding price: **€300 for 3 months** (was €360). Anchor: full price
   **€600**.
-- **Renewal scheme — DEFAULT (build this): (а) single recurring €300 / 3
-  months** — no annual phase for founding members, cancel anytime; the
-  schedule-to-annual webhook logic is BYPASSED for this price (keep the code,
-  gate by price id). Revisit pricing post-cohort. (If Shamil later picks the
-  2-phase variant, it's a Stripe-price + schedule-numbers change only.)
-- ONE new Stripe price needed (Shamil, sandbox, like before): recurring
-  **€300 every 3 months** on the same product → env `STRIPE_PRICE_FOUNDING`;
-  checkout switches to it.
+- **Renewal scheme — CONFIRMED (2026-07-18): two-phase.** Founding term
+  **€300 for the first 3 months** → then the subscription transitions to the
+  **annual plan €1,200/year** (existing `STRIPE_PRICE_ANNUAL`), yearly until
+  cancelled. This REUSES the already-built Subscription Schedule machinery
+  (originally €360→€1,200) with the founding price as phase 1:
+  `STRIPE_PRICE_FOUNDING` ×1 cycle → `STRIPE_PRICE_ANNUAL` ongoing. Verify the
+  phase transition with a Stripe Test Clock (as before).
+- **Mandatory renewal disclosure** (EU consumer law — auto-renewal at a
+  HIGHER price must be clear pre-purchase): the price block carries the line
+  *"Renews at €1,200/year after your founding term — cancel anytime."* and
+  the same is visible in the Stripe checkout description.
+- Stripe env: `STRIPE_PRICE_FOUNDING` (€300 / every 3 months — created) +
+  existing `STRIPE_PRICE_ANNUAL` (€1,200/yr).
 - **Stripe (test mode, Shamil creates like last time):** one new recurring
   price on the product — €300 every 3 months → new `STRIPE_PRICE_FOUNDING` env;
   checkout switches to it; the schedule-to-annual webhook logic is bypassed for
@@ -50,9 +55,11 @@
 ### 3. Price block
 - ~~€600~~ → **€300 founding price** — *"one-time price offer"*
 - Seat counter: **"11 of 15 seats left"** (see §2)
-- One quiet line: *"3-month subscription · all updates · live mentor sessions ·
-  community"*
-- Micro-line under (legal-safe anchor): *"€600 after the founding cohort."*
+- One quiet line: *"3-month founding term · all updates · live mentor
+  sessions · community"*
+- Micro-lines under (legal-safe anchor + MANDATORY renewal disclosure):
+  *"€600 after the founding cohort."* ·
+  *"Renews at €1,200/year after your founding term — cancel anytime."*
 
 ### 4. CTA block (mutual-selection frame)
 - **Primary:** `Book my seat — 20 minutes with a founder` → Calendly (§3)
@@ -147,9 +154,11 @@ auto seat counting from Stripe.
       locked forever · 11/15 · quiet inclusions line · "€600 after the
       founding cohort") → dual CTA with mutual-selection caption → guarantee.
 - [ ] Primary CTA: opens `CALENDLY_URL` when set; founder-call modal when not.
-- [ ] Secondary CTA → Stripe checkout charges **€300/3mo** on the new founding
-      price; webhook flips `subscribed`; renewal behavior matches whichever §0
-      option Shamil confirmed.
+- [ ] Secondary CTA → Stripe checkout charges **€300** (founding price);
+      webhook flips `subscribed` AND sets up the schedule → **transitions to
+      €1,200/yr annual after the first 3-month cycle** (verify with a Test
+      Clock); the renewal disclosure line is visible on the paywall and in
+      checkout.
 - [ ] Seat counter reads from env; 0 → waitlist state.
 - [ ] Dismiss → dashboard; M1+ clicks re-open it (gating per
       SPEC_VENTURE_REPORT §4).

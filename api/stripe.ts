@@ -52,7 +52,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const action = req.query.action;
   if (action === 'checkout') return handleCheckout(email, res, typeof req.query.next === 'string' ? req.query.next : undefined);
   if (action === 'portal') return handlePortal(email, res);
-  return res.status(400).json({ error: 'unknown action (expected checkout|portal)' });
+  if (action === 'cancel-renewal') return handleCancelRenewal(email, res, true);
+  if (action === 'resume-renewal') return handleCancelRenewal(email, res, false);
+  return res.status(400).json({ error: 'unknown action (expected checkout|portal|cancel-renewal|resume-renewal)' });
 }
 
 // Restrict `next` to a safe in-app path (single leading slash, no scheme/host/query) so the
@@ -112,6 +114,38 @@ async function handlePortal(email: string, res: VercelResponse) {
   } catch (err) {
     captureError(err, { endpoint: 'stripe', mode: 'portal' });
     return res.status(502).json({ error: 'portal_failed' });
+  }
+}
+
+// POST /api/stripe?action=cancel-renewal | resume-renewal — turn auto-renewal off/on.
+// Cancelling renewal does NOT refund or cut access: the period is paid in advance, so access
+// runs to `current_period_end`, then the subscription just doesn't renew. A schedule-managed sub
+// (quarterly→annual) can't take `cancel_at_period_end` directly, so we RELEASE the schedule first
+// (the sub stays on its current phase — no annual transition), then set the flag.
+async function handleCancelRenewal(email: string, res: VercelResponse, cancel: boolean) {
+  const db = getDb();
+  const user = await db.query.users.findFirst({ where: eq(users.email, email) });
+  if (!user?.stripeSubscriptionId) return res.status(400).json({ error: 'no_subscription' });
+  try {
+    if (cancel) {
+      const sub = await stripe().subscriptions.retrieve(user.stripeSubscriptionId, { expand: ['schedule'] });
+      const schedId = idOf(sub.schedule as string | { id: string } | null | undefined);
+      if (schedId) {
+        try { await stripe().subscriptionSchedules.release(schedId); }
+        catch (e) { captureError(e, { endpoint: 'stripe', mode: 'schedule-release', note: 'cancel-renewal' }); }
+      }
+    }
+    const updated = await stripe().subscriptions.update(user.stripeSubscriptionId, { cancel_at_period_end: cancel });
+    await db.update(users).set({
+      cancelAtPeriodEnd: cancel,
+      subscriptionStatus: updated.status,
+      currentPeriodEnd: periodEndDate(updated),
+      updatedAt: new Date(),
+    }).where(eq(users.id, user.id));
+    return res.status(200).json({ ok: true, cancelAtPeriodEnd: cancel, currentPeriodEnd: periodEndDate(updated) });
+  } catch (err) {
+    captureError(err, { endpoint: 'stripe', mode: cancel ? 'cancel-renewal' : 'resume-renewal' });
+    return res.status(502).json({ error: 'update_failed' });
   }
 }
 
@@ -214,6 +248,25 @@ async function handleWebhook(raw: Buffer, sig: string, res: VercelResponse) {
         if (!customerId) break;
         const u = await db.query.users.findFirst({ where: eq(users.stripeCustomerId, customerId) });
         if (u) await db.update(users).set({ subscriptionStatus: 'past_due', updatedAt: new Date() }).where(eq(users.id, u.id));
+        break;
+      }
+
+      // Sub changed (renewal toggled, plan change, schedule release) — mirror the state so the
+      // account panel shows the truth even when changed via the hosted portal. Requires the
+      // `customer.subscription.updated` event to be enabled on the Stripe webhook (manual, §ops).
+      case 'customer.subscription.updated': {
+        const sub = event.data.object as Stripe.Subscription;
+        const customerId = idOf(sub.customer);
+        if (!customerId) break;
+        const u = await db.query.users.findFirst({ where: eq(users.stripeCustomerId, customerId) });
+        if (u) {
+          await db.update(users).set({
+            cancelAtPeriodEnd: !!sub.cancel_at_period_end,
+            subscriptionStatus: sub.status,
+            currentPeriodEnd: periodEndDate(sub),
+            updatedAt: new Date(),
+          }).where(eq(users.id, u.id));
+        }
         break;
       }
 

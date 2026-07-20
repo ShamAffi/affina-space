@@ -329,6 +329,22 @@ export function seatHoldReminderEmail(to: string, link: string, name?: string | 
   };
 }
 
+// ── 15. Subscription renewal reminder — cron, once, ~7 days before the paid period ends, for a
+// subscriber who WILL renew. Covers the quarterly→annual transition + recurring renewals. ──
+export function renewalReminderEmail(to: string, dateStr: string, name?: string | null): Mail {
+  return {
+    to,
+    subject: subj(name, 'your Affina subscription renews soon'),
+    html: wrap(`
+      ${heyLine(name)}
+      <p style="${P}">Quick heads-up — your Affina subscription renews on <strong>${escapeHtml(dateStr)}</strong>, and the next period is charged automatically.</p>
+      <p style="${P}">Staying? Nothing to do — you keep everything. Prefer not to renew? You can turn renewal off anytime in your account settings — you still keep full access through ${escapeHtml(dateStr)} (no refund needed, it just won't renew).</p>
+      <p style="margin:0;">${button(appUrl() + '/dashboard', 'Open my account')}</p>
+      ${sign}
+    `, LIFECYCLE_NOTE),
+  };
+}
+
 // ── Ops alerts → ADMIN_EMAIL (internal; not user-facing) ──────────────────────────
 
 // Mentor request (SPEC_MENTOR_REQUEST §4). Her topic verbatim so Shamil can prep.

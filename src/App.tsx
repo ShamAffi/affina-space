@@ -87,6 +87,9 @@ function AppRoutes() {
         completedLessons: Array.isArray(db.completedLessons) ? db.completedLessons : [],
         lessonInputs: db.lessonInputs ?? {},
         subscribed: db.subscribed ?? false,
+        subscriptionStatus: db.subscriptionStatus ?? null,
+        currentPeriodEnd: db.currentPeriodEnd ?? null,
+        cancelAtPeriodEnd: db.cancelAtPeriodEnd ?? false,
       });
     }).catch(() => { /* offline → keep the cache */ });
     return () => { alive = false; };
@@ -167,6 +170,9 @@ function AppRoutes() {
           timezone: db.timezone || withEmail.timezone,
           score: db.score || withEmail.score,
           subscribed: db.subscribed ?? false,
+          subscriptionStatus: db.subscriptionStatus ?? null,
+          currentPeriodEnd: db.currentPeriodEnd ?? null,
+          cancelAtPeriodEnd: db.cancelAtPeriodEnd ?? false,
           phone: db.phone ?? null,
           guideUrl: db.guideUrl ?? null,
           calendlyUrl: db.calendlyUrl ?? null,

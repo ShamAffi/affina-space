@@ -8,7 +8,8 @@ import { MODULES } from '../src/data.js';
 import { sendOnce, alreadyLogged, logEmail } from '../src/server/emailLog.js';
 import {
   weeklyTasksEmail, reflectionEmail, bookMentorEmail, reengagementEmail,
-  finish1Email, finish2Email, finish3Email, reportReadyEmail, seatHoldReminderEmail, sendEmail,
+  finish1Email, finish2Email, finish3Email, reportReadyEmail, seatHoldReminderEmail,
+  renewalReminderEmail, sendEmail,
 } from '../src/server/email.js';
 import { createMagicLink } from '../src/server/magicLink.js';
 
@@ -148,6 +149,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           await logEmail(u.id, 'cohort_hold_reminder', 'once');
           mark('cohort_hold_reminder', true);
         }
+      }
+    }
+
+    // Renewal reminder: once, ~7 days before the paid period ends, for a subscriber who WILL
+    // renew (not cancel_at_period_end). Covers the quarterly→annual transition + recurring
+    // renewals. Any hour (elapsed trigger); dedup per period-end date so it re-fires each cycle.
+    if (u.subscribed && !u.cancelAtPeriodEnd && u.currentPeriodEnd) {
+      const msLeft = new Date(u.currentPeriodEnd).getTime() - now.getTime();
+      if (msLeft > 0 && msLeft <= 7 * DAY_MS) {
+        const periodKey = new Date(u.currentPeriodEnd).toISOString().slice(0, 10);
+        const dateStr = new Date(u.currentPeriodEnd).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+        mark('renewal_reminder', dry ? true : await sendOnce(u.id, 'renewal_reminder', periodKey, renewalReminderEmail(u.email, dateStr, u.name)));
       }
     }
 

@@ -33,6 +33,9 @@ export type UserData = {
   email: string;
   score: number;
   subscribed: boolean;   // paywall entitlement (SPEC_PAYWALL) — M5–M12 gated on this
+  subscriptionStatus?: string | null;   // active | past_due | canceled | … (from /api/user)
+  currentPeriodEnd?: string | null;      // ISO — "paid through / renews on" date
+  cancelAtPeriodEnd?: boolean;           // renewal off; access runs to currentPeriodEnd
   verified?: boolean;    // audit F39 — real session vs just a typed email. undefined = legacy (treated as authed)
   phone?: string | null;         // SPEC_PHONE_CAPTURE — set = suppress the lead popups
   guideUrl?: string | null;      // runtime gate for the guide popup (from /api/user)

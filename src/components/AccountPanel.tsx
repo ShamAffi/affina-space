@@ -12,8 +12,10 @@ export default function AccountPanel({ userData, onClose, onSave }: Props) {
   const [projectName, setProjectName] = useState(userData.projectName || '');
   const [saved, setSaved] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [renewLoading, setRenewLoading] = useState(false);
+  const [renewalOff, setRenewalOff] = useState(!!userData.cancelAtPeriodEnd);
 
-  // SPEC_STRIPE §7 — hosted Customer Portal (cancel / card / invoices).
+  // SPEC_STRIPE §7 — hosted Customer Portal (invoices / card).
   async function openPortal() {
     setPortalLoading(true);
     try {
@@ -23,6 +25,24 @@ export default function AccountPanel({ userData, onClose, onSave }: Props) {
     } catch { /* fall through */ }
     setPortalLoading(false);
   }
+
+  // Turn auto-renewal off/on in-app. Cancelling keeps access to the paid-through date (no refund).
+  async function toggleRenewal(cancel: boolean) {
+    setRenewLoading(true);
+    try {
+      const r = await fetch(`/api/stripe?action=${cancel ? 'cancel-renewal' : 'resume-renewal'}`, { method: 'POST' });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok && d.ok) {
+        setRenewalOff(cancel);
+        onSave({ cancelAtPeriodEnd: cancel, ...(d.currentPeriodEnd ? { currentPeriodEnd: d.currentPeriodEnd } : {}) });
+      }
+    } catch { /* ignore */ }
+    setRenewLoading(false);
+  }
+
+  const periodEnd = userData.currentPeriodEnd
+    ? new Date(userData.currentPeriodEnd).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+    : null;
 
   function handleSave() {
     onSave({ name, projectName });
@@ -102,18 +122,50 @@ export default function AccountPanel({ userData, onClose, onSave }: Props) {
             />
           </div>
 
-          {/* Subscription (SPEC_STRIPE §7) — only for subscribers */}
+          {/* Subscription — status + paid-through date + in-app renewal toggle */}
           {userData.subscribed && (
-            <div className="flex flex-col gap-1.5 pt-4 border-t border-hairline">
+            <div className="flex flex-col gap-2 pt-4 border-t border-hairline">
               <label className="text-sm font-semibold text-ink-soft">Subscription</label>
+              <div className="bg-inset border border-hairline rounded-control px-4 py-3">
+                <p className="text-sm font-semibold text-ink">
+                  {userData.subscriptionStatus === 'past_due' ? 'Payment past due' : renewalOff ? 'Active — cancels at period end' : 'Active'}
+                </p>
+                {periodEnd && (
+                  <p className="text-xs text-ink-soft mt-0.5">
+                    {renewalOff
+                      ? <>Access until <span className="font-semibold text-ink">{periodEnd}</span> — won't renew</>
+                      : <>Renews on <span className="font-semibold text-ink">{periodEnd}</span></>}
+                  </p>
+                )}
+              </div>
+
+              {renewalOff ? (
+                <button
+                  onClick={() => toggleRenewal(false)}
+                  disabled={renewLoading}
+                  className="w-full py-2.5 rounded-control text-sm font-semibold bg-brand hover:bg-brand-700 text-white disabled:opacity-50 transition active:scale-95"
+                >
+                  {renewLoading ? 'Working…' : 'Resume renewal'}
+                </button>
+              ) : (
+                <button
+                  onClick={() => toggleRenewal(true)}
+                  disabled={renewLoading}
+                  className="w-full py-2.5 rounded-control text-sm font-semibold border border-hairline text-ink-soft hover:bg-inset disabled:opacity-50 transition"
+                >
+                  {renewLoading ? 'Working…' : 'Cancel renewal'}
+                </button>
+              )}
+              <p className="text-xs text-ink-mute leading-relaxed">
+                Cancelling renewal keeps your access until the paid period ends — no refund needed, it simply won't renew after that.
+              </p>
               <button
                 onClick={openPortal}
                 disabled={portalLoading}
-                className="text-left text-sm font-semibold text-brand hover:text-brand-700 disabled:opacity-50 transition"
+                className="text-left text-xs font-semibold text-brand hover:text-brand-700 disabled:opacity-50 transition mt-1"
               >
-                {portalLoading ? 'Opening…' : 'Manage subscription →'}
+                {portalLoading ? 'Opening…' : 'Invoices & payment method →'}
               </button>
-              <p className="text-xs text-ink-mute">Cancel, update your card, or view invoices.</p>
             </div>
           )}
         </div>
